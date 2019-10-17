@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<div>
+    A Jenkins plugin to publish jobs to external servers.
+</div>
