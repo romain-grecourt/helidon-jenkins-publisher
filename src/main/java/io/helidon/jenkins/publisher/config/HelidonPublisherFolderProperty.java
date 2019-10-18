@@ -1,13 +1,12 @@
 package io.helidon.jenkins.publisher.config;
 
+import javax.annotation.Nonnull;
+
 import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderProperty;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderPropertyDescriptor;
 import hudson.Extension;
-import hudson.Util;
 import hudson.util.ListBoxModel;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -15,16 +14,15 @@ import org.kohsuke.stapler.StaplerRequest;
 
 public class HelidonPublisherFolderProperty extends AbstractFolderProperty<AbstractFolder<?>> {
 
-    public final String serverName;
+    private final String serverUrl;
 
     @DataBoundConstructor
-    public HelidonPublisherFolderProperty(String serverName) {
-        this.serverName = Util.fixEmptyAndTrim(serverName);
+    public HelidonPublisherFolderProperty(String serverUrl) {
+        this.serverUrl = HelidonPublisherServer.check(serverUrl);
     }
 
-    @Nullable
-    public HelidonPublisherServer getServer() {
-        return HelidonPublisherProjectProperty.getServer(serverName, owner);
+    public String getServerUrl() {
+        return serverUrl;
     }
 
     @Extension
@@ -33,10 +31,10 @@ public class HelidonPublisherFolderProperty extends AbstractFolderProperty<Abstr
         public static final String FOLDER_BLOCK_NAME = "helidonFolderPublisher";
 
         @SuppressWarnings("unused") // used by stapler
-        public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
+        public ListBoxModel doFillServerUrlItems(@AncestorInPath AbstractFolder<?> folder) {
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
-                items.add(server.getName());
+                items.add(server.getServerUrl());
             }
             return items;
         }
@@ -51,7 +49,7 @@ public class HelidonPublisherFolderProperty extends AbstractFolderProperty<Abstr
             HelidonPublisherFolderProperty tpp = req.bindJSON(
                 HelidonPublisherFolderProperty.class,
                 formData.getJSONObject(FOLDER_BLOCK_NAME));
-            if (tpp == null || tpp.serverName == null) {
+            if (tpp == null || tpp.serverUrl == null) {
                 return null;
             }
             return tpp;

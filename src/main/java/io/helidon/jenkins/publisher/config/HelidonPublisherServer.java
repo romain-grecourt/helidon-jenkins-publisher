@@ -1,5 +1,12 @@
 package io.helidon.jenkins.publisher.config;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.List;
+import javax.annotation.CheckForNull;
+import javax.servlet.ServletException;
+
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
@@ -11,40 +18,30 @@ import hudson.Util;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
 import hudson.model.ItemGroup;
-import hudson.model.Job;
 import hudson.model.Queue;
 import hudson.security.ACL;
 import hudson.security.AccessControlled;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
-import javax.servlet.ServletException;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.AncestorInPath;
-import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.interceptor.RequirePOST;
-
-import javax.annotation.Nullable;
-import javax.annotation.PreDestroy;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import javax.annotation.CheckForNull;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPublisherServer> {
 
-    private final URL apiUrl;
+    private final String serverUrl;
     private final String credentialsId;
 
     @DataBoundConstructor
-    public HelidonPublisherServer(String apiUrl, String credentialsId) {
-        URL url = toURL(apiUrl);
-        if (url == null) {
+    public HelidonPublisherServer(String serverUrl, String credentialsId) {
+        this.credentialsId = credentialsId;
+        serverUrl =  Util.fixEmptyAndTrim(serverUrl);
+        if (serverUrl == null) {
             throw new AssertionError("URL cannot be empty");
         }
-        this.apiUrl = url;
-        this.credentialsId = credentialsId;
+        this.serverUrl = serverUrl;
     }
 
     static URL toURL(String url) {
@@ -66,17 +63,8 @@ public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPubli
         return credentialsId;
     }
 
-    public String getName() {
-        return apiUrl.toExternalForm();
-    }
-
-    @PreDestroy
-    public void destroy() {
-    }
-
-    @Nullable
-    public URL getUrl() {
-        return this.apiUrl;
+    public String getServerUrl() {
+        return this.serverUrl;
     }
 
     @CheckForNull
@@ -97,15 +85,22 @@ public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPubli
         );
     }
 
-    public static HelidonPublisherServer get(Job<?, ?> p) {
-        HelidonPublisherProjectProperty ppp = p.getProperty(HelidonPublisherProjectProperty.class);
-        if (ppp != null) {
-            HelidonPublisherServer server = ppp.getServer();
-            if (server != null) {
+    public static String check(String serverUrl) {
+        serverUrl = Util.fixEmptyAndTrim(serverUrl);
+        if (get(serverUrl) != null) {
+            return serverUrl;
+        }
+        return null;
+    }
+
+    public static HelidonPublisherServer get(String serverUrl) {
+        List<HelidonPublisherServer> servers = HelidonPublisherGlobalConfiguration.get().getServers();
+        for(HelidonPublisherServer server : servers) {
+            if (server.getServerUrl().equals(serverUrl)) {
                 return server;
             }
         }
-        return HelidonPublisherProjectProperty.getServer(null, p);
+        return null;
     }
 
     @Extension
@@ -127,19 +122,19 @@ public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPubli
 
         @SuppressWarnings("unused") // used by stapler
         @RequirePOST
-        public FormValidation doVerifyCredentials(@QueryParameter String apiUrl, @QueryParameter String credentialsId) {
+        public FormValidation doVerifyCredentials(@QueryParameter String serverUrl, @QueryParameter String credentialsId) {
             Jenkins.get().checkPermission(Jenkins.ADMINISTER);
             try {
-                apiUrl = Util.fixEmpty(apiUrl);
-                if (apiUrl == null) {
+                serverUrl = Util.fixEmpty(serverUrl);
+                if (serverUrl == null) {
                     return FormValidation.error("No URL given");
                 }
-                URL url = new URL(apiUrl);
+                URL url = new URL(serverUrl);
                 if (lookupSystemCredentials(Util.fixEmpty(credentialsId), url) == null) {
                     FormValidation.error("Credentials not found");
                 }
             } catch (MalformedURLException e) {
-                return FormValidation.error(String.format("Malformed URL (%s)", apiUrl), e);
+                return FormValidation.error(String.format("Malformed URL (%s)", serverUrl), e);
             }
             return FormValidation.ok("Success");
         }

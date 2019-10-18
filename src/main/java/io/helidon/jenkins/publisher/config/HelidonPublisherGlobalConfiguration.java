@@ -1,12 +1,15 @@
 package io.helidon.jenkins.publisher.config;
 
-import hudson.Extension;
-import hudson.util.PersistedList;
 import java.util.List;
 import javax.annotation.Nonnull;
+
+import hudson.Extension;
+import hudson.util.PersistedList;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.StaplerRequest;
 
 @Extension
 public class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
@@ -22,6 +25,11 @@ public class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
         load();
     }
 
+    @Override
+    public String getId() {
+        return "HelidonPublisher";
+    }
+
     public List<HelidonPublisherServer> getServers() {
         return servers;
     }
@@ -29,6 +37,13 @@ public class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
     @DataBoundSetter
     public void setServers(List<HelidonPublisherServer> servers) {
         this.servers = servers;
+    }
+
+    @Override
+    public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
+        super.configure(req, json);
+        save();
+        return true;
     }
 
     @Override

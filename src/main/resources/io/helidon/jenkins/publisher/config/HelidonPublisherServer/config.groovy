@@ -3,7 +3,7 @@ package io.helidon.jenkins.publisher.config.HelidonPublisherServer
 def f = namespace(lib.FormTagLib);
 def c = namespace(lib.CredentialsTagLib)
 
-f.entry(title: _("API URL"), field: "apiUrl") {
+f.entry(title: _("Server URL"), field: "serverUrl") {
     f.textbox()
 }
 
@@ -16,6 +16,6 @@ f.block() {
             title: _("Test connection"),
             progress: _("Testing..."),
             method: "verifyCredentials",
-            with: "apiUrl,credentialsId"
+            with: "serverUrl,credentialsId"
     )
 }
