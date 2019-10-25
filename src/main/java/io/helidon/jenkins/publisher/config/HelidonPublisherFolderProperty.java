@@ -7,20 +7,29 @@ import com.cloudbees.hudson.plugins.folder.AbstractFolderProperty;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderPropertyDescriptor;
 import hudson.Extension;
 import hudson.util.ListBoxModel;
+import javax.annotation.Nullable;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
-public class HelidonPublisherFolderProperty extends AbstractFolderProperty<AbstractFolder<?>> {
+/**
+ * Helidon Publisher folder property that enables publishing a folder.
+ */
+public final class HelidonPublisherFolderProperty extends AbstractFolderProperty<AbstractFolder<?>> {
 
     private final String serverUrl;
 
     @DataBoundConstructor
     public HelidonPublisherFolderProperty(String serverUrl) {
-        this.serverUrl = HelidonPublisherServer.check(serverUrl);
+        this.serverUrl = HelidonPublisherServer.validate(serverUrl);
     }
 
+    /**
+     * Get the server URL for this folder.
+     * @return String
+     */
+    @Nullable
     public String getServerUrl() {
         return serverUrl;
     }

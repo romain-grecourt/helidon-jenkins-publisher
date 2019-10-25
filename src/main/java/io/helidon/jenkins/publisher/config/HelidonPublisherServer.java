@@ -1,5 +1,6 @@
 package io.helidon.jenkins.publisher.config;
 
+import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -19,17 +20,22 @@ import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
 import hudson.model.ItemGroup;
 import hudson.model.Queue;
+import hudson.model.Run;
 import hudson.security.ACL;
 import hudson.security.AccessControlled;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.interceptor.RequirePOST;
 import org.kohsuke.stapler.DataBoundConstructor;
 
-public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPublisherServer> {
+/**
+ * Helidon Publisher server configuration.
+ */
+public final class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPublisherServer> {
 
     private final String serverUrl;
     private final String credentialsId;
@@ -44,25 +50,18 @@ public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPubli
         this.serverUrl = serverUrl;
     }
 
-    static URL toURL(String url) {
-        url = Util.fixEmptyAndTrim(url);
-        if (url == null) {
-            return null;
-        }
-        if (!url.endsWith("/")) {
-            url = url + "/";
-        }
-        try {
-            return new URL(url);
-        } catch (MalformedURLException e) {
-            throw new AssertionError(e);
-        }
-    }
-
+    /**
+     * Get the credentials ID for this server.
+     * @return String
+     */
     public String getCredentialsId() {
         return credentialsId;
     }
 
+    /**
+     * Get the URL for this server.
+     * @return String
+     */
     public String getServerUrl() {
         return this.serverUrl;
     }
@@ -85,15 +84,59 @@ public class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPubli
         );
     }
 
-    public static String check(String serverUrl) {
+    /**
+     * Trims and matches the given input URL.
+     *
+     * @param serverUrl input
+     * @return valid URL or {@code null} if the input is empty or the URL doesn't match a server in the global configuration
+     */
+    static String validate(String serverUrl) {
         serverUrl = Util.fixEmptyAndTrim(serverUrl);
-        if (get(serverUrl) != null) {
+        if (HelidonPublisherServer.get(serverUrl) != null) {
             return serverUrl;
         }
         return null;
     }
 
-    public static HelidonPublisherServer get(String serverUrl) {
+    /**
+     * Get the configured URL for a given run.
+     * @param run the run to introspect
+     * @return valid server URL or {@code null} if the project / folder does not a have the property enabled.
+     */
+    public static HelidonPublisherServer get(Run<?, ?> run) {
+        if (run != null) {
+            if (run instanceof WorkflowRun) {
+                ItemGroup itemGroup = ((WorkflowRun) run).getParent().getParent();
+                if (itemGroup instanceof AbstractFolder<?>) {
+                    AbstractFolder<?> folder = (AbstractFolder<?>) itemGroup;
+                    HelidonPublisherFolderProperty prop = folder.getProperties().get(HelidonPublisherFolderProperty.class);
+                    if (prop != null) {
+                        String serverUrl = prop.getServerUrl();
+                        if (serverUrl != null) {
+                            return HelidonPublisherServer.get(serverUrl);
+                        }
+                    }
+                }
+            } else {
+                HelidonPublisherProjectProperty prop = run.getParent().getProperty(HelidonPublisherProjectProperty.class);
+                if (prop != null) {
+                    String serverUrl = prop.getServerUrl();
+                    if (serverUrl != null) {
+                        return HelidonPublisherServer.get(serverUrl);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get an instance of {@link HelidonPublisherServer} that matches the given input URL.
+     * @param serverUrl input
+     * @return HelidonPublisherServer or {@code null} if the URL doesn't match a server in the global configuration
+     */
+    static HelidonPublisherServer get(String serverUrl) {
+        serverUrl = Util.fixEmptyAndTrim(serverUrl);
         List<HelidonPublisherServer> servers = HelidonPublisherGlobalConfiguration.get().getServers();
         for(HelidonPublisherServer server : servers) {
             if (server.getServerUrl().equals(serverUrl)) {

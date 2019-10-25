@@ -14,15 +14,23 @@ import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
-public class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>> {
+/**
+ * Helidon Publisher project property that enables publishing a project.
+ */
+public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>> {
 
     private final String serverUrl;
 
     @DataBoundConstructor
     public HelidonPublisherProjectProperty(String serverUrl) {
-        this.serverUrl = HelidonPublisherServer.check(serverUrl);
+        this.serverUrl = HelidonPublisherServer.validate(serverUrl);
     }
 
+    /**
+     * Get the server URL for this project.
+     *
+     * @return String
+     */
     @Nullable
     public String getServerUrl() {
         return serverUrl;
@@ -34,7 +42,7 @@ public class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>> {
         public static final String PROJECT_BLOCK_NAME = "helidonProjectPublisher";
 
         @SuppressWarnings("unused") // used by stapler
-        public ListBoxModel doFillServeUrlItems(@AncestorInPath AbstractFolder<?> folder) {
+        public ListBoxModel doFillServerUrlItems(@AncestorInPath AbstractFolder<?> folder) {
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
                 items.add(server.getServerUrl());

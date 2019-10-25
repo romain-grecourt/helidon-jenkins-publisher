@@ -11,8 +11,11 @@ import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.StaplerRequest;
 
+/**
+ * Helidon Publisher global configuration that configures a list publisher server usable for folders and projects.
+ */
 @Extension
-public class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
+public final class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
 
     @Nonnull
     public static HelidonPublisherGlobalConfiguration get() {
@@ -30,6 +33,10 @@ public class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
         return "HelidonPublisher";
     }
 
+    /**
+     * Get the configured servers.
+     * @return list of {@link HelidonPublisherServer}.
+     */
     public List<HelidonPublisherServer> getServers() {
         return servers;
     }

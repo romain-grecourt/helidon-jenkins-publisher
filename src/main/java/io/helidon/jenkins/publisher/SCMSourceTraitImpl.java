@@ -1,6 +1,7 @@
 package io.helidon.jenkins.publisher;
 
 import hudson.Extension;
+import io.helidon.jenkins.publisher.config.Messages;
 import java.util.Collections;
 import jenkins.scm.api.SCMSource;
 import jenkins.scm.api.trait.SCMSourceContext;
@@ -11,7 +12,10 @@ import org.jenkinsci.plugins.github_branch_source.GitHubSCMSource;
 import org.jenkinsci.plugins.github_branch_source.GitHubSCMSourceContext;
 import org.kohsuke.stapler.DataBoundConstructor;
 
-public class SCMSourceTraitImpl extends SCMSourceTrait {
+/**
+ * An SCM behavior that replaces the notification strategies with {@link GitHubNotificationStrategyImpl}.
+ */
+public final class SCMSourceTraitImpl extends SCMSourceTrait {
 
     @DataBoundConstructor
     public SCMSourceTraitImpl() {
@@ -29,7 +33,7 @@ public class SCMSourceTraitImpl extends SCMSourceTrait {
 
         @Override
         public String getDisplayName() {
-            return "Helidon Jenkins Publisher";
+            return Messages.DisplayName();
         }
 
         @Override
