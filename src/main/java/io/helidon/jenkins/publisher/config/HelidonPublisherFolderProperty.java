@@ -19,10 +19,12 @@ import org.kohsuke.stapler.StaplerRequest;
 public final class HelidonPublisherFolderProperty extends AbstractFolderProperty<AbstractFolder<?>> {
 
     private final String serverUrl;
+    private final String branchExcludes;
 
     @DataBoundConstructor
-    public HelidonPublisherFolderProperty(String serverUrl) {
+    public HelidonPublisherFolderProperty(String serverUrl, String branchExcludes) {
         this.serverUrl = HelidonPublisherServer.validate(serverUrl);
+        this.branchExcludes = branchExcludes;
     }
 
     /**
@@ -32,6 +34,14 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
     @Nullable
     public String getServerUrl() {
         return serverUrl;
+    }
+
+    /**
+     * Get the excluded branch names.
+     * @return String
+     */
+    public String getBranchExcludes() {
+        return branchExcludes;
     }
 
     @Extension

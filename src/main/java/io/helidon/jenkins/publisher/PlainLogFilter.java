@@ -17,12 +17,24 @@ import java.io.Serializable;
 @Extension
 public class PlainLogFilter extends ConsoleLogFilter implements Serializable {
 
+    private final boolean enabled;
+    private final String serverUrl;
+
     public PlainLogFilter() {
         super();
+        enabled = false;
+        serverUrl = null;
     }
 
-    public PlainLogFilter(Run build) {
-        this();
+    public PlainLogFilter(Run run) {
+        HelidonPublisherServer publisherServer = HelidonPublisherServer.get(run);
+        if (publisherServer != null) {
+            serverUrl = publisherServer.getServerUrl();
+            enabled = true;
+        } else {
+            enabled = false;
+            serverUrl = null;
+        }
     }
 
     @Override

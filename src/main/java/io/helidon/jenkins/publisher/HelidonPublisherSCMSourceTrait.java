@@ -13,18 +13,18 @@ import org.jenkinsci.plugins.github_branch_source.GitHubSCMSourceContext;
 import org.kohsuke.stapler.DataBoundConstructor;
 
 /**
- * An SCM behavior that replaces the notification strategies with {@link GitHubNotificationStrategyImpl}.
+ * An SCM behavior that replaces the notification strategies with {@link HelidonPublisherGitHubNotificationStrategy}.
  */
-public final class SCMSourceTraitImpl extends SCMSourceTrait {
+public final class HelidonPublisherSCMSourceTrait extends SCMSourceTrait {
 
     @DataBoundConstructor
-    public SCMSourceTraitImpl() {
+    public HelidonPublisherSCMSourceTrait() {
     }
 
     @Override
     protected void decorateContext(SCMSourceContext<?, ?> context) {
         GitHubSCMSourceContext ctx = (GitHubSCMSourceContext) context;
-        ctx.withNotificationStrategies(Collections.singletonList(new GitHubNotificationStrategyImpl()));
+        ctx.withNotificationStrategies(Collections.singletonList(new HelidonPublisherGitHubNotificationStrategy()));
     }
 
     @Extension

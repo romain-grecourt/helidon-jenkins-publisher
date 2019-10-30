@@ -28,11 +28,14 @@ import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTBranch;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTStage;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTStages;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTStep;
+import org.jenkinsci.plugins.workflow.actions.LabelAction;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowExecution;
 import org.jenkinsci.plugins.workflow.cps.Safepoint;
-import org.jenkinsci.plugins.workflow.cps.nodes.StepAtomNode;
+import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
+import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
+import org.jenkinsci.plugins.workflow.graph.FlowStartNode;
 import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 
 /**
@@ -47,9 +50,6 @@ final class FlowStepSignatures {
 
     private FlowStepSignatures(List<String> signatures) {
         this.signatures = Collections.unmodifiableList(signatures);
-        for (String sig : signatures) {
-            System.out.println("SIG: " + sig);
-        }
     }
 
     /**
@@ -83,11 +83,11 @@ final class FlowStepSignatures {
 
     /**
      * Test if this instance contains a signature matching the given step.
-     * @param step step node to match the signature of
+     * @param signature signature to test
      * @return {@code true} if there is a step matching, {@code false} otherwise
      */
-    boolean contains(StepAtomNode step) {
-        return signatures.contains(createSignature(step));
+    boolean contains(String signature) {
+        return signatures.contains(signature);
     }
 
     /**
@@ -112,82 +112,105 @@ final class FlowStepSignatures {
 
     /**
      * Create the signature for a given step node to match with the registered signatures.
-     * @param step
+     * @param name step name
+     * @param args step arguments
+     * @param parents step parents
      * @return the created signature
      */
-    private static String createSignature(StepAtomNode step) {
-        return "TODO";
+    static String createSignature(String name, String args, List<? extends BlockStartNode> parents) {
+        String sig;
+        sig = "/step(" + name + ")";
+        if (args != null && !args.isEmpty()) {
+            sig += "=" + new String(Base64.getEncoder().encode(args.getBytes()));
+        }
+        for (BlockStartNode node : parents) {
+            if (node instanceof StepStartNode) {
+                if (((StepStartNode) node).isBody()) {
+                    String stepName = ((StepStartNode) node).getDescriptor().getFunctionName();
+                    LabelAction label = node.getAction(LabelAction.class);
+                    if (label != null) {
+                        sig = "/" + stepName + "[" + label.getDisplayName() + "]" + sig;
+                    }
+                }
+            } else if (node instanceof FlowStartNode) {
+                sig = "/stages" + sig;
+            }
+        }
+        return sig;
     }
 
     /**
      * Create the signature for a leaf scripted step.
      * @param step the step
-     * @param sigPrefix the signature prefix
+     * @param sig the signature prefix
      * @return the created signature
      */
-    private static String createSignature(ScriptedStep step, String sigPrefix) {
-        String stepSig = sigPrefix + "step(" + step.getMethod() + ")[";
-        Object stepArgs = step.getArgs();
-        if (stepArgs instanceof Map) {
-            for (Object stepArg : ((Map) stepArgs).values()) {
-                stepSig += Base64.getEncoder().encode(stepArg.toString().getBytes());
+    private static String createSignature(ScriptedStep step, String sig) {
+        String ssig = sig + "/step(" + step.method + ")";
+        if (step.args instanceof Map) {
+            for (Object stepArg : ((Map) step.args).values()) {
+                ssig += "=" + new String(Base64.getEncoder().encode(stepArg.toString().getBytes()));
             }
-        } else if (stepArgs instanceof List) {
-            for (Object stepArg : ((List) stepArgs)) {
-                stepSig += Base64.getEncoder().encode(stepArg.toString().getBytes());
+        } else if (step.args instanceof List) {
+            for (Object stepArg : ((List) step.args)) {
+                ssig += "=" + new String(Base64.getEncoder().encode(stepArg.toString().getBytes()));
             }
-        } else if (stepArgs != null) {
-            stepSig += Base64.getEncoder().encode(stepArgs.toString().getBytes());
+        } else if (step.args != null) {
+            ssig += "=" +  new String(Base64.getEncoder().encode(step.args.toString().getBytes()));
         }
-        return stepSig += "]";
+        return ssig;
     }
 
     /**
      * Create the signature for the given scripted steps.
      * @param steps the steps to create the signatures of
-     * @param sigPrefix the signature prefix
+     * @param sig the signature prefix
      * @return the created signatures
      */
-    private static List<String> createSignatures(List<ScriptedStep> steps, String sigPrefix) {
+    private static List<String> createSignatures(List<ScriptedStep> steps, String sig) {
         List<String> sigs = new LinkedList<>();
         for(ScriptedStep step : steps) {
-            if (step.isMeta()) {
+            if (step.isMeta) {
                 continue;
             }
-            if ("parallel".equals(step.getMethod())) {
+            if ("parallel".equals(step.method)) {
                 // special case for parallel since it's a leaf
                 // but it creates nested steps
-                if (step.getArgs() instanceof Map) {
-                    for (Object stepArg : ((Map)step.getArgs()).values()) {
-                        if (stepArg instanceof ScriptedStepsSequence) {
-                            sigs.addAll(createSignatures(((ScriptedStepsSequence)stepArg).getSteps(), sigPrefix + "/parallel"));
+                if (step.args instanceof Map) {
+                    for (Entry<Object, Object> entry : ((Map<Object, Object>) step.args).entrySet()) {
+                        Object arg = entry.getValue();
+                        String branchName = entry.getKey().toString();
+                        if (arg instanceof ScriptedStepsSequence) {
+                            sigs.addAll(createSignatures(((ScriptedStepsSequence) arg).steps,
+                                    sig + "/parallel[Branch: " + branchName + "]"));
                         }
                     }
                 }
-            } else if (step.getNested().isEmpty()) {
+            } else if (step.nested.isEmpty()) {
                 // leaf
-                sigs.add(createSignature(step, sigPrefix));
+                sigs.add(createSignature(step, sig));
             } else {
-                String stepSigPrefix = sigPrefix + "/" + step.getMethod() + "[" + step.getArgs() + "]";
-                List<Entry<String, ScriptedStep>> nestedSteps = new LinkedList<>();
-                for(ScriptedStep nestedStep : step.getNested()) {
-                    nestedSteps.add(new AbstractMap.SimpleEntry<>(stepSigPrefix, nestedStep));
+                String ssig = sig + "/" + step.method + "[" + step.args + "]";
+                List<Entry<String, ScriptedStep>> nsteps = new LinkedList<>();
+                for(ScriptedStep nstep : step.nested) {
+                    nsteps.add(new AbstractMap.SimpleEntry<>(ssig, nstep));
                 }
-                while(!nestedSteps.isEmpty()) {
-                    nestedSteps = new LinkedList<>();
-                    for(Entry<String, ScriptedStep> entry : nestedSteps) {
-                        ScriptedStep nestedStep = entry.getValue();
-                        String nestedStepSigPrefix = entry.getKey();
-                        if (nestedStep.getNested().isEmpty()) {
+                while(!nsteps.isEmpty()) {
+                    List<Entry<String, ScriptedStep>> next = new LinkedList<>();
+                    for(Entry<String, ScriptedStep> entry : nsteps) {
+                        ScriptedStep nstep = entry.getValue();
+                        String nsig = entry.getKey();
+                        if (nstep.nested.isEmpty()) {
                             // leaf
-                            sigs.add(createSignature(nestedStep, nestedStepSigPrefix));
+                            sigs.add(createSignature(nstep, nsig));
                         } else {
-                            String nextSigPrefix = nestedStepSigPrefix + "/" + nestedStep.getMethod() + "[" + nestedStep.getArgs() + "]";
-                            for(ScriptedStep stepGrandChild : nestedStep.getNested()) {
-                                nestedSteps.add(new AbstractMap.SimpleEntry<>(nextSigPrefix, stepGrandChild));
+                            String nextSig = nsig + "/" + nstep.method + "[" + nstep.args + "]";
+                            for(ScriptedStep s : nstep.nested) {
+                                next.add(new AbstractMap.SimpleEntry<>(nextSig, s));
                             }
                         }
                     }
+                    nsteps = next;
                 }
             }
         }
@@ -196,31 +219,26 @@ final class FlowStepSignatures {
 
     /**
      * Create the signatures for the given AST steps.
-     * @param steps the steps to create the signatures of
-     * @param sigPrefix the signature prefix
+     * @param msteps the model steps to create the signatures of
+     * @param sig the signature prefix
      * @param shell the groovy shell to evaluate scripted steps
      * @return the created signatures
      */
-    private static List<String> createSignatures(List<ModelASTStep> steps, String sigPrefix, GroovyShell shell) {
+    private static List<String> createSignatures(List<ModelASTStep> msteps, String sig, GroovyShell shell) {
         List<String> sigs = new LinkedList<>();
-        for (ModelASTStep step : steps) {
-            String stepName = step.getName();
-            // skip meta step
-            if (!StepDescriptor.metaStepsOf(stepName).isEmpty()) {
-                continue;
-            }
-            Map<String, ?> stepArgs = step.getArgs().argListToMap();
-            if ("script".equals(stepName)) {
-                String scriptText = (String) stepArgs.get("scriptBlock");
-                List<ScriptedStep> scriptSteps = ScriptedStep.eval(shell, scriptText);
-                sigs.addAll(createSignatures(scriptSteps, sigPrefix));
+        for (ModelASTStep mstep : msteps) {
+            String sid = mstep.getName();
+            Map<String, ?> args = mstep.getArgs().argListToMap();
+            if ("script".equals(sid)) {
+                String script = (String) args.get("scriptBlock");
+                List<ScriptedStep> ssteps = eval(shell, script);
+                sigs.addAll(createSignatures(ssteps, sig));
             } else {
-                String stepSig = sigPrefix + "/step(" + stepName + ")[";
-                for (Object stepArg : stepArgs.values()) {
-                    stepSig += Base64.getEncoder().encode(stepArg.toString().getBytes());
+                String ssig = sig + "/step(" + sid + ")=";
+                for (Object arg : args.values()) {
+                    ssig += new String(Base64.getEncoder().encode(arg.toString().getBytes()));
                 }
-                stepSig += "]";
-                sigs.add(stepSig);
+                sigs.add(ssig);
             }
         }
         return sigs;
@@ -228,30 +246,38 @@ final class FlowStepSignatures {
 
     /**
      * Create the signatures for the given AST stages.
-     * @param stages the stages to create the signature for
+     * @param mstages the stages to create the signature for
      * @param shell the groovy shell to evaluate scripted steps
      * @return the created signatures
      */
-    private static List<String> createSignatures(List<ModelASTStage> stages, GroovyShell shell) {
+    private static List<String> createSignatures(List<ModelASTStage> mstages, GroovyShell shell) {
         List<String> sigs = new LinkedList<>();
-        List<Entry<String, ModelASTStage>> nestedStages = new LinkedList<>();
-        for(ModelASTStage stage : stages) {
-            nestedStages.add(new AbstractMap.SimpleEntry<>("", stage));
+        List<Entry<String, ModelASTStage>> sstages = new LinkedList<>();
+        String sig = "/stages";
+        for(ModelASTStage mstage : mstages) {
+            sstages.add(new AbstractMap.SimpleEntry<>(sig + "/stage[" + mstage.getName() + "]", mstage));
         }
-        while(!nestedStages.isEmpty()) {
-            for (Entry<String, ModelASTStage> entry : nestedStages) {
-                nestedStages = new LinkedList<>();
-                ModelASTStage stage = entry.getValue();
-                String stageSigPrefix = entry.getKey();
-                for (ModelASTBranch stageBranch : stage.getBranches()) {
-                    String branchName = stageBranch.getName();
-                    createSignatures(stageBranch.getSteps(), stageSigPrefix + "/" + branchName != null ? branchName : "", shell);
+        while(!sstages.isEmpty()) {
+            List<Entry<String, ModelASTStage>> next = new LinkedList<>();
+            for (Entry<String, ModelASTStage> entry : sstages) {
+                ModelASTStage sstage = entry.getValue();
+                String ssig = entry.getKey();
+                for (ModelASTBranch b : sstage.getBranches()) {
+                    String bpid = b.getName();
+                    String bsig = ssig;
+                    if (!"default".equals(bpid) && bpid != null) {
+                        bsig += "/" + bpid;
+                    }
+                    sigs.addAll(createSignatures(b.getSteps(), bsig, shell));
                 }
-                String nextSigPrefix = stageSigPrefix + "/stage[" + stage.getName();
-                for(ModelASTStage nestedStage : stage.getStages().getStages()) {
-                    nestedStages.add(new AbstractMap.SimpleEntry<>(nextSigPrefix, nestedStage));
+                if (sstage.getStages() != null) {
+                    for(ModelASTStage nsstage : sstage.getStages().getStages()) {
+                        String nssig = ssig + "/stages/stage[" + nsstage.getName();
+                        next.add(new AbstractMap.SimpleEntry<>(nssig, nsstage));
+                    }
                 }
             }
+            sstages = next;
         }
         return sigs;
     }
@@ -264,62 +290,29 @@ final class FlowStepSignatures {
         private final String method;
         private final Object args;
         private final List<ScriptedStep> nested;
-        private final boolean meta;
+        private final boolean isMeta;
 
         ScriptedStep(String method, Object args, List<ScriptedStep> nested, boolean meta) {
             this.method = method;
             this.args = args;
             this.nested = nested;
-            this.meta = meta;
-        }
-
-        String getMethod() {
-            return method;
-        }
-
-        Object getArgs() {
-            return args;
-        }
-
-        boolean isMeta() {
-            return meta;
-        }
-
-        List<ScriptedStep> getNested() {
-            return nested;
+            this.isMeta = meta;
         }
 
         @Override
         public String toString() {
             return ScriptedStep.class.getSimpleName() + "{"
                     + "method=" + method
-                    + ", meta=" + meta
+                    + ", meta=" + isMeta
                     + ", args=" + args
                     + ", nested=" + nested
                     + "}";
         }
-
-        /**
-         * Evaluate the steps from the given script text.
-         * @param shell groovy shell
-         * @param scriptText raw script text
-         * @return list of top level steps
-         */
-        static List<ScriptedStep> eval(GroovyShell shell, String scriptText) {
-            Script script = shell.parse(scriptText);
-            try {
-                script.run();
-            } catch (CpsCallableInvocation e) {
-                ScriptedStepInvoker invoker = new ScriptedStepInvoker();
-                e.invoke(Envs.empty(invoker), SourceLocation.UNKNOWN, Continuation.HALT).run();
-                return invoker.getSteps();
-            }
-            return Collections.emptyList();
-        }
     }
 
     /**
-     * Sequence of steps.
+     * Sequence of scripted steps.
+     * I.e steps resolved as part of the same closure call
      */
     private static final class ScriptedStepsSequence {
 
@@ -333,16 +326,30 @@ final class FlowStepSignatures {
             this.steps = steps != null ? steps : Collections.emptyList();
         }
 
-        List<ScriptedStep> getSteps() {
-            return steps;
-        }
-
         @Override
         public String toString() {
             return ScriptedStepsSequence.class.getSimpleName() + "{"
                     + steps.toString()
                     + "}";
         }
+    }
+
+    /**
+     * Evaluate the steps from the given script text.
+     * @param shell groovy shell
+     * @param scriptText raw script text
+     * @return list of top level steps
+     */
+    static List<ScriptedStep> eval(GroovyShell shell, String scriptText) {
+        Script script = shell.parse(scriptText);
+        try {
+            script.run();
+        } catch (CpsCallableInvocation e) {
+            ScriptedStepInvoker invoker = new ScriptedStepInvoker();
+            e.invoke(Envs.empty(invoker), SourceLocation.UNKNOWN, Continuation.HALT).run();
+            return invoker.steps;
+        }
+        return Collections.emptyList();
     }
 
     /**
@@ -354,14 +361,6 @@ final class FlowStepSignatures {
         private final transient List<ScriptedStep> steps = new LinkedList<>();
         private final transient Map<Object, List<ScriptedStep>> sequences = new HashMap<>();
         private volatile boolean resolving;
-
-        /**
-         * Get the top-level steps.
-         * @return list of scripted steps
-         */
-        List<ScriptedStep> getSteps() {
-            return steps;
-        }
 
         @Override
         public Object methodCall(Object receiver, String method, Object[] args) throws Throwable {
@@ -452,7 +451,7 @@ final class FlowStepSignatures {
         private ScriptedStep resolveStep(String method, boolean isMetaStep, Object... args) {
             Object resolveArgs = args.length > 0 ? resolve(args[0]) : null;
             List<ScriptedStep> nested = args.length > 1 && (args[1] instanceof CpsClosure)
-                    ? call((CpsClosure) args[1]).getSteps()
+                    ? call((CpsClosure) args[1]).steps
                     : Collections.emptyList();
             return new ScriptedStep(method, resolveArgs, nested, isMetaStep);
         }

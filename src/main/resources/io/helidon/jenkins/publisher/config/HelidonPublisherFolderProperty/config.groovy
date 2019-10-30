@@ -8,4 +8,7 @@ f.optionalBlock(name: FOLDER_BLOCK_NAME, title: _("Publish job externally"), che
     f.entry(title: _("Publisher Server"), field: "serverUrl") {
         f.select()
     }
+    f.entry(title: _("Excluded branches"), field: "branchExcludes") {
+        f.select()
+    }
 }

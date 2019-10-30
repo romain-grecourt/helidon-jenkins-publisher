@@ -15,7 +15,7 @@ import org.jenkinsci.plugins.github_branch_source.GitHubNotificationRequest;
  * A GitHub notification strategy that customizes the commit status URL to point at the (external) publisher server.
  */
 @Extension
-public class GitHubNotificationStrategyImpl extends AbstractGitHubNotificationStrategy{
+public class HelidonPublisherGitHubNotificationStrategy extends AbstractGitHubNotificationStrategy {
 
     @Override
     public List<GitHubNotificationRequest> notifications(GitHubNotificationContext notificationContext, TaskListener listener) {
