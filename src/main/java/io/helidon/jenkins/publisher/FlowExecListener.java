@@ -19,7 +19,7 @@ public final class FlowExecListener extends FlowExecutionListener {
         System.out.println("Flow run completed: " + run.getFullDisplayName() + ", status: " + result);
         FlowDecorator decorator = FlowDecoratorFactory.clear(execution);
         if (decorator != null && decorator.isEnabled()) {
-            System.out.println(decorator.graph().root().prettyPrint("  ", true, true));
+            System.out.println(decorator.graph().root().prettyPrint("", true, true));
         }
     }
 

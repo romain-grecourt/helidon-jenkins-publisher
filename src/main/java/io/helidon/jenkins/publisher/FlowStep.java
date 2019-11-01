@@ -1,6 +1,7 @@
 package io.helidon.jenkins.publisher;
 
 import java.util.Base64;
+import java.util.List;
 import java.util.Objects;
 import org.jenkinsci.plugins.workflow.actions.ArgumentsAction;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepAtomNode;
@@ -113,6 +114,27 @@ final class FlowStep {
      */
     String path() {
         return path;
+    }
+
+    /**
+     * Get the previous step in the parent stage.
+     *
+     * @return FlowStep or {@code null} if there is no previous step.
+     */
+    FlowStep previous() {
+        List<FlowStep> sequence = stage.steps();
+        if (parentIndex > 0 && sequence.size() > parentIndex + 1) {
+            return sequence.get(parentIndex - 1);
+        }
+        return null;
+    }
+
+    /**
+     * Create a status for this step.
+     * @return FlowStatus
+     */
+    FlowStatus createStatus() {
+        return new FlowStatus(node);
     }
 
     @Override

@@ -3,7 +3,9 @@ package io.helidon.jenkins.publisher;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import org.jenkinsci.plugins.workflow.actions.LabelAction;
+import org.jenkinsci.plugins.workflow.actions.ThreadNameAction;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
 
 /**
@@ -11,12 +13,12 @@ import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
  */
 abstract class FlowStage {
 
-    private final StepStartNode node;
-    private final FlowStage parent;
-    private final String id;
-    private final String name;
-    private final int parentIndex;
-    private final String path;
+    protected final StepStartNode node;
+    protected final FlowStage parent;
+    protected final String id;
+    protected final String name;
+    protected final int parentIndex;
+    protected final String path;
     protected int index = 0;
 
     /**
@@ -37,13 +39,25 @@ abstract class FlowStage {
             this.node = node;
             this.parent = parent;
             LabelAction action = node.getAction(LabelAction.class);
-            this.name = action != null ? action.getDisplayName() : null;
+            if (action != null) {
+                if (action instanceof ThreadNameAction) {
+                    this.name = ((ThreadNameAction)action).getThreadName();
+                } else {
+                    this.name = action.getDisplayName();
+                }
+            } else {
+                this.name = null;
+            }
             this.parentIndex = parent.index + 1;
             p = parent.path;
             if (!synthetic) {
                 p += node.getDescriptor().getFunctionName();
                 if (node.isBody() && this.name != null && !this.name.isEmpty()) {
-                    p += "[" + name + "]";
+                    p += "[";
+                    if (parent instanceof Parallel) {
+                        p += "Branch: ";
+                    }
+                    p += name + "]";
                 }
                 p += "/";
             }
@@ -64,8 +78,8 @@ abstract class FlowStage {
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      */
-    protected FlowStage(String id, StepStartNode node, FlowStage parent) {
-        this(node != null ? node.getId() : "0", node, parent, /* meta */ false);
+    protected FlowStage(StepStartNode node, FlowStage parent, boolean synthetic) {
+        this(node != null ? node.getId() : "0", node, parent, synthetic);
     }
 
     /**
@@ -75,7 +89,86 @@ abstract class FlowStage {
      * @param parent parent stage, may be {@code null}
      */
     protected FlowStage(StepStartNode node, FlowStage parent) {
-        this(node != null ? node.getId() : "0", node, parent);
+        this(node, parent, /* synthetic */ false);
+    }
+
+    /**
+     * If the parent stage is a {@link Sequence}, return the previous stage in the parent sequence.
+     *
+     * @return FlowStage or {@code null} if the parent is not a {@link Sequence} or there is no previous stage in the sequence
+     */
+    FlowStage previous() {
+        if (parent instanceof FlowStage.Sequence && parentIndex > 0) {
+            List<FlowStage> sequence = ((FlowStage.Sequence) parent).stages;
+            if (parentIndex > 0 && sequence.size() > parentIndex + 1) {
+                return sequence.get(parentIndex - 1);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Indicate that this stage is the head of the parent sequence. 
+     * @return {@code true} if this stage is the current head of the parent sequence
+     */
+    boolean head() {
+        return parentIndex == parent.index;
+    }
+
+    /**
+     * Get this stage as a {@link Steps}.
+     * @return Steps
+     * @throws IllegalStateException if this instance is not a steps stage
+     */
+    Steps asSteps() {
+        if (this instanceof Steps) {
+            return (Steps) this;
+        }
+        throw new IllegalStateException("Not a steps stage");
+    }
+
+    /**
+     * Get this stage as a {@link Stages}.
+     * @return Stages
+     * @throws IllegalStateException if this instance is not a multi stage
+     */
+    Stages asStages() {
+        if (this instanceof Stages) {
+            return (Stages) this;
+        }
+        throw new IllegalStateException("Not a multi stage");
+    }
+
+    /**
+     * Get this stage as a {@link Parallel}.
+     * @return Parallel
+     * @throws IllegalStateException if this instance is not a parallel stage
+     */
+    Parallel asParallel() {
+        if (this instanceof Parallel) {
+            return (Parallel) this;
+        }
+        throw new IllegalStateException("Not a parallel stage");
+    }
+
+    /**
+     * Get this stage as a {@link Sequence}.
+     * @return Sequence
+     * @throws IllegalStateException if this instance is not a sequence
+     */
+    Sequence asSequence() {
+        if (this instanceof Sequence) {
+            return (Sequence) this;
+        }
+        throw new IllegalStateException("Not a stage sequence");
+    }
+
+    /**
+     * Create a new flow status for this stage.
+     * @return FlowStatus
+     */
+    FlowStatus createStatus() {
+        return new FlowStatus(node);
     }
 
     /**
@@ -193,10 +286,11 @@ abstract class FlowStage {
             sb.append(indent).append("steps {\n");
             indent += "  ";
             for (FlowStep step : steps) {
-                if ((declaredOnly && !step.declared()) || step.meta() && skipMeta) {
-                    continue;
-                }
                 sb.append(step.prettyPrint(indent));
+                if ((declaredOnly && !step.declared()) || step.meta() && skipMeta) {
+                    sb.append(" // filtered");
+                }
+                sb.append("\n");
             }
             indent = indent.substring(2);
             sb.append(indent).append("}\n");
@@ -207,23 +301,29 @@ abstract class FlowStage {
     /**
      * A parallel stage or a stage sequence.
      */
-    static abstract class Virtual extends FlowStage {
+    static abstract class Stages extends FlowStage {
 
-        private final List<FlowStage> stages = new LinkedList<>();
+        protected final List<FlowStage> stages = new LinkedList<>();
 
         /**
-         * Create a new virtual stage.
+         * Create a new multi stage.
          *
-         * @param stages the nested stages
          * @param node original graph node
          * @param parent parent stage
-         * @param id unique node id
-         * @param name stage name, may be {@code null}
-         * @param stages nested stages
-         * @param index index in the parent sequence
          */
-        protected Virtual(StepStartNode node, Virtual parent) {
+        protected Stages(StepStartNode node, Stages parent) {
             super(node, parent);
+        }
+
+        /**
+         * Create a new multi stage.
+         *
+         * @param node the original graph nodes
+         * @param parent parent stage
+         * @param synthetic if {@code true}, this stage path is equal to the parent path
+         */
+        protected Stages(StepStartNode node, Stages parent, boolean synthetic) {
+            super(node, parent, synthetic);
         }
 
         /**
@@ -247,11 +347,14 @@ abstract class FlowStage {
 
         /**
          * Get a pretty print-able description of the graph.
-         *
+         * @param indent indentation, must not be {@code null}
+         * @param declaredOnly include the declared steps only
+         * @param skipMeta skip the meta steps
          * @return String
          */
         String prettyPrint(String indent, boolean declaredOnly, boolean skipMeta) {
-            StringBuilder sb = new StringBuilder();
+            Objects.requireNonNull(indent, "indent is null");
+            StringBuilder sb = new StringBuilder(indent);
             if (parent() != null) {
                 sb.append("stage ");
             }
@@ -266,7 +369,7 @@ abstract class FlowStage {
                     sb.append(((FlowStage.Steps) stage).prettyPrint(indent, declaredOnly, skipMeta));
                     parentId = stage.parent().id();
                     stack.pop();
-                } else if (stage instanceof FlowStage.Virtual) {
+                } else if (stage instanceof FlowStage.Stages) {
                     // node
                     if (parentId.equals(stage.id())) {
                         // leaving (2nd pass)
@@ -281,18 +384,18 @@ abstract class FlowStage {
                             sb.append("parallel {");
                         } else {
                             sb.append("stage");
-                            String name = stage.getName();
-                            if (name != null && !name.isEmpty()) {
-                                sb.append("('").append(name).append("')");
+                            String stageName = stage.getName();
+                            if (stageName != null && !stageName.isEmpty()) {
+                                sb.append("('").append(stageName).append("')");
                             }
                             sb.append(" {");
                         }
-                        List<FlowStage> children = ((FlowStage.Virtual) stage).stages();
+                        List<FlowStage> children = ((FlowStage.Stages) stage).stages();
                         if (!children.isEmpty()) {
                             sb.append("\n");
                             // process children
                             indent += "  ";
-                            for (int i = 0; i < children.size(); i++) {
+                            for (int i = children.size() - 1; i >= 0; i--) {
                                 stack.push(children.get(i));
                             }
                         } else {
@@ -312,26 +415,23 @@ abstract class FlowStage {
     /**
      * A set of stages running in parallel.
      */
-    static final class Parallel extends Virtual {
+    static final class Parallel extends Stages {
 
         /**
          * Create a new parallel stages.
          *
          * @param node original graph node
          * @param parent parent stage
-         * @param id unique node id
-         * @param name stage name, may be {@code null}
-         * @param index index in the parent sequence
          */
-        Parallel(StepStartNode node, Virtual parent) {
-            super(node, parent);
+        Parallel(StepStartNode node, Stages parent) {
+            super(node, parent, /* synthetic */ true);
         }
     }
 
     /**
      * An ordered sequence of stages.
      */
-    static final class Sequence extends Virtual {
+    static final class Sequence extends Stages {
 
         /**
          * Create a new top level sequence.
@@ -343,9 +443,10 @@ abstract class FlowStage {
         /**
          * Create a new stage sequence
          *
-         * @param stages nested stages in order
+         * @param node original graph node
+         * @param parent parent stage
          */
-        Sequence(StepStartNode node, Virtual parent) {
+        Sequence(StepStartNode node, Stages parent) {
             super(node, parent);
         }
     }

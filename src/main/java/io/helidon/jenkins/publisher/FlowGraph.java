@@ -14,7 +14,7 @@ import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 
 /**
- * Representation of a flow graph.
+ * Wrapper model for the flow graph.
  */
 final class FlowGraph {
 
@@ -100,85 +100,104 @@ final class FlowGraph {
         Objects.requireNonNull(listener, "listener is null");
         if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);
-            FlowStage.Sequence parent = findSequenceStage((StepAtomNode) node);
-            String stepsStageId = parent.id() + "-steps";
-            FlowStage s = stages.get(stepsStageId);
-            FlowStage.Steps stepsStage;
-            if (s != null){
-                if(!(s instanceof FlowStage.Steps)) {
-                    throw new IllegalStateException("invalid steps stage");
-                }
-                stepsStage = (FlowStage.Steps) s;
-            } else {
-                stepsStage = new FlowStage.Steps(stepsStageId, parent.node(), parent);
-                parent.addStage(stepsStage);
-                stages.put(stepsStageId, stepsStage);
-            }
-            FlowStep step = new FlowStep((StepAtomNode)node, stepsStage, signatures);
-            stepsStage.addStep(step);
-            steps.put(step.id(), step);
-            listener.onStepStatus(step, new FlowStatus(step.node()));
-            int index = step.parentIndex();
-            List<FlowStep> sequence = step.stage().steps();
-            if (index > 0 && sequence.size() > index + 1) {
-                FlowStep previous = sequence.get(index - 1);
-                listener.onStepStatus(previous, new FlowStatus(previous.node()));
+            FlowStep step = createFlowStep((StepAtomNode)node);
+            listener.onStepStatus(step, step.createStatus());
+            FlowStep previous = step.previous();
+            if (previous != null) {
+                listener.onStepStatus(previous, previous.createStatus());
             }
         } else if (node instanceof StepStartNode) {
-            StepStartNode stepStartNode = (StepStartNode) node;
-            if (node.getAction(LabelAction.class) != null) {
-                FlowStage.Virtual stage = null;
-                FlowStage.Virtual parent = findVirtualStage(stepStartNode);
-                String descId = stepStartNode.getDescriptor().getId();
-                if (STAGE_DESC_ID.equals(descId)) {
-                    stage = new FlowStage.Sequence(stepStartNode, parent);
-                } else if (PARALLEL_DESC_ID.equals(descId)) {
-                    // TODO wrap against the parent node of this step so that the parallel branches
-                    // are grouped in the same stage
-                    // TODO check order of parallel steps to avoid mismatch
-                    stage = new FlowStage.Parallel(stepStartNode, parent);
-                }
-                if (stage != null) {
-                    parent.addStage(stage);
-                    stages.put(stage.id(), stage);
-                    listener.onStageStatus(stage, new FlowStatus(stage.node()));
-                    int index = stage.parentIndex();
-                    if (parent instanceof FlowStage.Sequence && index > 0) {
-                        List<FlowStage> sequence = ((FlowStage.Sequence) parent).stages();
-                        if (index > 0 && sequence.size() > index + 1) {
-                            FlowStage previous = sequence.get(index - 1);
-                            listener.onStageStatus(previous, new FlowStatus(previous.node()));
-                        }
-                    }
+            FlowStage.Stages stage = createFlowStages((StepStartNode) node);
+            if (stage != null) {
+                listener.onStageStatus(stage, stage.createStatus());
+                FlowStage previous = stage.previous();
+                if (previous != null) {
+                    listener.onStageStatus(previous, previous.createStatus());
                 }
             }
         }
     }
 
     /**
-     * Find the first sequence stage in the enclosing blocks of the given node.
-     * @param node the node to visit
-     * @return FlowStage.Sequence, never {@code null}
+     * Create a new flow step.
+     * @param node the original graph node
+     * @return FlowStep, never {@code null}
      */
-    private FlowStage.Sequence findSequenceStage(StepAtomNode node) {
-        FlowStage parent = findParent(node);
-        if (!(parent instanceof FlowStage.Sequence)) {
-            throw new IllegalStateException("steps parent stage is not a sequence");
+    private FlowStep createFlowStep(StepAtomNode node) {
+        FlowStage.Sequence parentStage = findParentStage(node).asSequence();
+        FlowStage.Steps stepsStage = null;
+        String parentId = parentStage.id() + "__steps-wrapper__";
+        for (int i = 1 ; stepsStage == null ; i++) {
+            String stepsStageId = parentId + "#" +i;
+            if (stages.containsKey(stepsStageId)) {
+                stepsStage = stages.get(stepsStageId).asSteps();
+                if (!stepsStage.head()) {
+                    stepsStage = null;
+                }
+            } else {
+                stepsStage = new FlowStage.Steps(stepsStageId, parentStage.node(), parentStage);
+                parentStage.addStage(stepsStage);
+                stages.put(stepsStageId, stepsStage);
+            }
         }
-        return (FlowStage.Sequence) parent;
+        FlowStep step = new FlowStep((StepAtomNode)node, stepsStage, signatures);
+        stepsStage.addStep(step);
+        steps.put(step.id(), step);
+        return step;
     }
 
     /**
-     * Find the first virtual stage in the enclosing blocks of the given node.
-     * @param node the node to visit
-     * @return FlowStage.Virtual, never {@code null}
+     * Create a new flow multi stage.
+     * @param node the original graph node
+     * @return FlowStage.Stages or null if this node doesn't map to a stage
      */
-    private FlowStage.Virtual findVirtualStage(StepStartNode node) {
-        FlowStage parent = findParent(node);
-        if (!(parent instanceof FlowStage.Virtual)) {
-            throw new IllegalStateException("parent stage is not a virtual stage");
+    private FlowStage.Stages createFlowStages(StepStartNode node) {
+        if (node.getAction(LabelAction.class) != null) {
+            FlowStage.Stages parentStage = findParentStage(node).asStages();
+            String descId = node.getDescriptor().getId();
+            if (STAGE_DESC_ID.equals(descId)) {
+                FlowStage.Stages stage = new FlowStage.Sequence(node, parentStage);
+                parentStage.addStage(stage);
+                stages.put(stage.id(), stage);
+                return stage;
+            } else if (PARALLEL_DESC_ID.equals(descId) && node.isBody()) {
+                StepStartNode nodeParent = getParentStepStartNode(node);
+                if (PARALLEL_DESC_ID.equals(nodeParent.getDescriptor().getId()) && !nodeParent.isBody()) {
+                    FlowStage.Parallel parallelStage;
+                    String parentId = nodeParent.getId();
+                    if (stages.containsKey(parentId)) {
+                        parallelStage = stages.get(parentId).asParallel();
+                    } else {
+                        parallelStage = new FlowStage.Parallel(nodeParent, parentStage);
+                        parentStage.addStage(parallelStage);
+                        stages.put(parentId, parallelStage);
+                    }
+                    FlowStage.Stages stage = new FlowStage.Sequence(node, parallelStage);
+                    parallelStage.addStage(stage);
+                    stages.put(stage.id(), stage);
+                    return stage;
+                }
+            }
         }
-        return (FlowStage.Virtual) parent;
+        return null;
+    }
+
+    /**
+     * Get the given node parent as a {@link StepStartNode}.
+     * @param node the node to process
+     * @return StepStartNode
+     * @throws IllegalStateException if the node is not a {@link StepStartNode} or has no parent
+     */
+    private StepStartNode getParentStepStartNode(FlowNode node) {
+        List<FlowNode> parents = node.getParents();
+        if (!parents.isEmpty()) {
+            FlowNode parent = parents.get(0);
+            if (parent instanceof StepStartNode) {
+                return (StepStartNode) parent;
+            }
+            throw new IllegalStateException("not a step start node");
+        }
+        throw new IllegalStateException("node has no parents");
     }
 
     /**
@@ -186,7 +205,7 @@ final class FlowGraph {
      * @param node the node to visit
      * @return FlowStage, never {@code null}
      */
-    private FlowStage findParent(FlowNode node) {
+    private FlowStage findParentStage(FlowNode node) {
         for (BlockStartNode parent : node.getEnclosingBlocks()) {
             FlowStage stage = stages.get(parent.getId());
             if (stage != null) {
