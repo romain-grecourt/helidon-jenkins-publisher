@@ -1,8 +1,9 @@
 package io.helidon.jenkins.publisher;
 
+import java.util.Base64;
+import java.util.Objects;
 import org.jenkinsci.plugins.workflow.actions.ArgumentsAction;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepAtomNode;
-import org.jenkinsci.plugins.workflow.graph.FlowNode;
 
 /**
  * Flow step.
@@ -12,40 +13,73 @@ final class FlowStep {
     private final String id;
     private final String name;
     private final String args;
-    private final boolean declared;
-    private final String signature;
+    private final String path;
     private final boolean meta;
+    private final int parentIndex;
+    private final FlowStage.Steps stage;
     private final StepAtomNode node;
+    private final boolean declared;
 
     /**
      * Create a new flow step instance.
      * @param node step node
      * @param signatures declared step signatures
      */
-    FlowStep(StepAtomNode node, FlowStepSignatures signatures) {
+    FlowStep(StepAtomNode node, FlowStage.Steps stage, FlowStepSignatures signatures) {
+        Objects.requireNonNull(stage, "stage is null");
         this.node = node;
+        this.stage = stage;
         this.id = node.getId();
         this.name = node.getDisplayFunctionName();
-        this.args = ArgumentsAction.getStepArgumentsAsString(node);
-        this.signature = FlowStepSignatures.createSignature(name, args, node.getEnclosingBlocks());
-        this.declared = signatures.contains(signature);
+        String stepArgs = ArgumentsAction.getStepArgumentsAsString(node);
+        this.args = stepArgs != null ? stepArgs : "";
         this.meta = node.getDescriptor().isMetaStep();
+        String p = stage.path() + "step(" + name + ")";
+        if (!args.isEmpty()) {
+            p += "=" + new String(Base64.getEncoder().encode(args.getBytes()));
+        }
+        this.path = p;
+        this.parentIndex = stage.index();
+        this.declared = signatures.contains(this.path);
     }
 
     /**
-     * Get the underlying node.
-     *
+     * Indicate if this step is explicitly declared.
+     * @return {@code true} if declared, {@code false} otherwise
+     */
+    boolean declared() {
+        return declared;
+    }
+
+    /**
+     * Get the corresponding node.
      * @return StepAtomNode
      */
-    StepAtomNode getNode() {
+    StepAtomNode node() {
         return node;
+    }
+
+    /**
+     * Get the index in the stage sequence.
+     * @return int
+     */
+    int parentIndex() {
+        return parentIndex;
+    }
+
+    /**
+     * Get the parent stage.
+     * @return FlowStage.StepsSequence
+     */
+    FlowStage.Steps stage() {
+        return stage;
     }
 
     /**
      * Get the step unique id.
      * @return String
      */
-    String getId() {
+    String id() {
         return id;
     }
 
@@ -53,7 +87,7 @@ final class FlowStep {
      * Get the step name.
      * @return String
      */
-    String getName() {
+    String name() {
         return name;
     }
 
@@ -61,24 +95,24 @@ final class FlowStep {
      * Get the step arguments.
      * @return String
      */
-    String getArgs() {
+    String args() {
         return args;
-    }
-
-    /**
-     * Indicate if this step is declared.
-     * @return {@code true} if declared, {@code false} otherwise
-     */
-    boolean isDeclared() {
-        return declared;
     }
 
     /**
      * Indicate if this step is a meta step.
      * @return {@code true} if meta, {@code false} otherwise
      */
-    boolean isMeta() {
+    boolean meta() {
         return meta;
+    }
+
+    /**
+     * Get the step path.
+     * @return String
+     */
+    String path() {
+        return path;
     }
 
     @Override
@@ -87,9 +121,33 @@ final class FlowStep {
                 + "id=" + id
                 + ", stepName=" + name
                 + ", args=" + args
-                + ", declared=" + declared
                 + ", meta=" + meta
-                + ", signature=" + signature
+                + ", path=" + path
                 + "}";
+    }
+
+    /**
+     * Pretty print this step.
+     * @param indent indentation
+     * @return String
+     */
+    String prettyPrint(String indent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(indent).append(name);
+        if (!args.isEmpty()) {
+            String[] argsLines = args.split("\\r?\\n");
+            sb.append(" ");
+            for (String line : argsLines) {
+                String argPreview = line.trim();
+                if (!argPreview.isEmpty()) {
+                    sb.append(argPreview);
+                    break;
+                }
+            }
+            if (argsLines.length > 1) {
+                sb.append(" [...]");
+            }
+        }
+        return sb.toString();
     }
 }

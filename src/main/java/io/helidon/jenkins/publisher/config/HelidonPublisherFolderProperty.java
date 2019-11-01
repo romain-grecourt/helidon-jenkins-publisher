@@ -58,6 +58,11 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
             return items;
         }
 
+        @SuppressWarnings("unused") // used by stapler
+        public ListBoxModel doFillBranchExcludesItems(@AncestorInPath AbstractFolder<?> folder) {
+            return new ListBoxModel();
+        }
+
         @Override
         public String getDisplayName() {
             return Messages.DisplayName();

@@ -57,38 +57,43 @@ final class FlowStatus {
     final FlowResult result;
     final FlowState state;
 
-     public FlowStatus(FlowNode endNode) {
-        Result res = null;
-        ErrorAction errorAction = endNode.getError();
-        WarningAction warningAction = endNode.getPersistentAction(WarningAction.class);
-        if (errorAction != null) {
-            if(errorAction.getError() instanceof FlowInterruptedException) {
-                res = ((FlowInterruptedException) errorAction.getError()).getResult();
-            }
-            if(res == null || res != Result.ABORTED) {
-                this.result = FlowResult.FAILURE;
-            } else {
-                this.result = FlowResult.ABORTED;
-            }
-            this.state = endNode.isActive() ? FlowState.RUNNING : FlowState.FINISHED;
-        } else if (warningAction != null) {
-            this.result = FlowResult.fromResult(warningAction.getResult());
-            this.state = endNode.isActive() ? FlowState.RUNNING : FlowState.FINISHED;
-        } else if (QueueItemAction.getNodeState(endNode) == QueueItemAction.QueueState.QUEUED) {
+    FlowStatus(FlowNode node) {
+        if (node == null) {
             this.result = FlowResult.UNKNOWN;
             this.state = FlowState.QUEUED;
-        } else if (QueueItemAction.getNodeState(endNode) == QueueItemAction.QueueState.CANCELLED) {
-            this.result = FlowResult.ABORTED;
-            this.state = FlowState.FINISHED;
-        } else if (endNode.isActive()) {
-            this.result = FlowResult.UNKNOWN;
-            this.state = FlowState.RUNNING;
-        } else if (NotExecutedNodeAction.isExecuted(endNode)) {
-            this.result = FlowResult.SUCCESS;
-            this.state = FlowState.FINISHED;
         } else {
-            this.result = FlowResult.NOT_BUILT;
-            this.state = FlowState.QUEUED;
+            Result res = null;
+            ErrorAction errorAction = node.getError();
+            WarningAction warningAction = node.getPersistentAction(WarningAction.class);
+            if (errorAction != null) {
+                if (errorAction.getError() instanceof FlowInterruptedException) {
+                    res = ((FlowInterruptedException) errorAction.getError()).getResult();
+                }
+                if (res == null || res != Result.ABORTED) {
+                    this.result = FlowResult.FAILURE;
+                } else {
+                    this.result = FlowResult.ABORTED;
+                }
+                this.state = node.isActive() ? FlowState.RUNNING : FlowState.FINISHED;
+            } else if (warningAction != null) {
+                this.result = FlowResult.fromResult(warningAction.getResult());
+                this.state = node.isActive() ? FlowState.RUNNING : FlowState.FINISHED;
+            } else if (QueueItemAction.getNodeState(node) == QueueItemAction.QueueState.QUEUED) {
+                this.result = FlowResult.UNKNOWN;
+                this.state = FlowState.QUEUED;
+            } else if (QueueItemAction.getNodeState(node) == QueueItemAction.QueueState.CANCELLED) {
+                this.result = FlowResult.ABORTED;
+                this.state = FlowState.FINISHED;
+            } else if (node.isActive()) {
+                this.result = FlowResult.UNKNOWN;
+                this.state = FlowState.RUNNING;
+            } else if (NotExecutedNodeAction.isExecuted(node)) {
+                this.result = FlowResult.SUCCESS;
+                this.state = FlowState.FINISHED;
+            } else {
+                this.result = FlowResult.NOT_BUILT;
+                this.state = FlowState.QUEUED;
+            }
         }
     }
 }

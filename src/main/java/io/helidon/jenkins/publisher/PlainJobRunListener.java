@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 
 @Extension
-public final class PlainRunListener extends RunListener<Run<?,?>> {
+public final class PlainJobRunListener extends RunListener<Run<?,?>> {
 
     @Override
     public void onStarted(Run run, TaskListener listener) {
@@ -33,7 +33,7 @@ public final class PlainRunListener extends RunListener<Run<?,?>> {
      * @param run
      * @return {@code true} if enabled for the given {@link run}, {@code false} otherwise
      */
-    static boolean isEnabled(Run run) {
+    private static boolean isEnabled(Run run) {
         if (run instanceof WorkflowRun || run == null) {
             return false;
         }

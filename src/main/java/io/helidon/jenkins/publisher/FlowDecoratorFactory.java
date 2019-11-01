@@ -19,16 +19,24 @@ import org.kohsuke.accmod.restrictions.suppressions.SuppressRestrictedWarnings;
 public class FlowDecoratorFactory implements TaskListenerDecorator.Factory {
 
     private static final EmptyDecorator EMPTY_DECORATOR = new EmptyDecorator();
-    private static final Map<FlowExecution, WeakReference<FlowDecorator>> DECORATORS = new WeakHashMap<>();
+    private static final Map<FlowExecution, WeakReference<TaskListenerDecorator>> DECORATORS = new WeakHashMap<>();
 
     /**
      * Remove the decorator associated with the given execution.
      * @param exec the flow execution for which remove the cached decorator
+     * @return the removed decorator
      */
-    static void clear(FlowExecution exec) {
+    static FlowDecorator clear(FlowExecution exec) {
         synchronized (DECORATORS) {
-            DECORATORS.remove(exec);
+            WeakReference<TaskListenerDecorator> ref = DECORATORS.remove(exec);
+            if (ref != null) {
+                TaskListenerDecorator decorator = ref.get();
+                if (decorator instanceof FlowDecorator) {
+                    return (FlowDecorator) decorator;
+                }
+            }
         }
+        return null;
     }
 
     @Override
@@ -38,20 +46,26 @@ public class FlowDecoratorFactory implements TaskListenerDecorator.Factory {
             return EMPTY_DECORATOR;
         }
         synchronized (DECORATORS) {
-            WeakReference<FlowDecorator> decoratorRef = DECORATORS.get(execution);
+            WeakReference<TaskListenerDecorator> decoratorRef = DECORATORS.get(execution);
             if (decoratorRef != null && decoratorRef.get() != null) {
                 return decoratorRef.get();
             }
         }
         FlowDecorator decorator = new FlowDecorator(execution);
-        execution.addListener(decorator);
         synchronized (DECORATORS) {
-            WeakReference<FlowDecorator> decoratorRef = DECORATORS.get(execution);
+            WeakReference<TaskListenerDecorator> decoratorRef = DECORATORS.get(execution);
             if (decoratorRef != null && decoratorRef.get() != null) {
                 return decoratorRef.get();
             }
-            DECORATORS.put(execution, new WeakReference<>(decorator));
-            return decorator;
+            TaskListenerDecorator dec;
+            if (decorator.isEnabled()) {
+                dec = decorator;
+                execution.addListener(decorator);
+            } else {
+                dec = EMPTY_DECORATOR;
+            }
+            DECORATORS.put(execution, new WeakReference<>(dec));
+            return dec;
         }
     }
 
