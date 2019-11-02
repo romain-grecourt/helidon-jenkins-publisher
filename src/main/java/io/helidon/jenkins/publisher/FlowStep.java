@@ -4,6 +4,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import org.jenkinsci.plugins.workflow.actions.ArgumentsAction;
+import org.jenkinsci.plugins.workflow.actions.TimingAction;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepAtomNode;
 
 /**
@@ -20,6 +21,9 @@ final class FlowStep {
     private final FlowStage.Steps stage;
     private final StepAtomNode node;
     private final boolean declared;
+    private FlowStatus status;
+    private final long startTime;
+    private long endTime;
 
     /**
      * Create a new flow step instance.
@@ -42,6 +46,8 @@ final class FlowStep {
         this.path = p;
         this.parentIndex = stage.index();
         this.declared = signatures.contains(this.path);
+        this.startTime = TimingAction.getStartTime(node);
+        this.endTime = -1;
     }
 
     /**
@@ -123,28 +129,54 @@ final class FlowStep {
      */
     FlowStep previous() {
         List<FlowStep> sequence = stage.steps();
-        if (parentIndex > 0 && sequence.size() > parentIndex + 1) {
+        if (parentIndex > 0 && sequence.size() >= parentIndex) {
             return sequence.get(parentIndex - 1);
         }
         return null;
     }
 
     /**
-     * Create a status for this step.
+     * Get the start time in milliseconds for this step.
+     * @return long
+     */
+    long startTime() {
+        return startTime;
+    }
+
+    /**
+     * Get the end time in milliseconds for this step.
+     * @return long
+     */
+    long endTime() {
+        if (endTime < 0 && status != null && status.state == FlowStatus.FlowState.FINISHED) {
+            List<FlowStep> sequence = stage.steps();
+            if (parentIndex + 1 < sequence.size()) {
+                // end time is the start time of the next step
+                endTime = sequence.get(parentIndex + 1).startTime;
+            } else {
+                // end time is the end time of the state
+                endTime = stage.endTime();
+            }
+        }
+        return endTime;
+    }
+
+    /**
+     * Get the status for this step.
      * @return FlowStatus
      */
-    FlowStatus createStatus() {
-        return new FlowStatus(node);
+    FlowStatus status() {
+        if (status == null || status.state != FlowStatus.FlowState.FINISHED) {
+            status = new FlowStatus(node);
+        }
+        return status;
     }
 
     @Override
     public String toString() {
-        return FlowStep.class.getSimpleName() + "{ "
-                + "id=" + id
-                + ", stepName=" + name
-                + ", args=" + args
-                + ", meta=" + meta
-                + ", path=" + path
+        return FlowStep.class.getSimpleName() + "{"
+                + " id=" + id
+                + ", stage=" + stage.id
                 + "}";
     }
 

@@ -10,7 +10,9 @@ import org.jenkinsci.plugins.workflow.cps.nodes.StepAtomNode;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
 import org.jenkinsci.plugins.workflow.cps.steps.ParallelStep;
 import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
+import org.jenkinsci.plugins.workflow.graph.FlowEndNode;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
+import org.jenkinsci.plugins.workflow.graph.FlowStartNode;
 import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 
 /**
@@ -25,26 +27,54 @@ final class FlowGraph {
     private final LinkedList<StepAtomNode> headNodes = new LinkedList<>();
     private final Map<String, FlowStep> steps;
     private final Map<String, FlowStage> stages;
-    private final FlowStage.Sequence root;
+    private FlowStage.Sequence root;
 
     /**
-     * Status listener.
+     * Event type.
      */
-    interface StatusListener {
+    enum Event {
 
         /**
-         * Status event for a step.
+         * This event is related to the current head of the flow.
+         */
+        HEAD,
+
+        /**
+         * This event is related to the element before the head of the flow in the current sequence.
+         */
+        BEFORE_HEAD
+    }
+
+    /**
+     * Event listener.
+     */
+    interface EventListener {
+
+        /**
+         * Flow start event.
+         * @param root top-level stage
+         */
+        void onFlowStart(FlowStage.Sequence root);
+
+        /**
+         * Flow end event.
+         * @param root top-level stage
+         */
+        void onFlowEnd(FlowStage.Sequence root);
+
+        /**
+         * Step event.
          * @param step the corresponding step
          * @param status the status
          */
-        void onStepStatus(FlowStep step, FlowStatus status);
+        void onStepEvent(FlowStep step, Event event);
 
         /**
-         * Status event for a stage.
+         * Stage event.
          * @param stage the corresponding stage
          * @param status the status
          */
-        void onStageStatus(FlowStage stage, FlowStatus status);
+        void onStageEvent(FlowStage stage, Event event);
     }
 
     /**
@@ -55,7 +85,6 @@ final class FlowGraph {
     FlowGraph(FlowStepSignatures signatures) {
         Objects.requireNonNull(signatures, "signatures is null");
         this.signatures = signatures;
-        this.root = new FlowStage.Sequence();
         this.steps = new HashMap<>();
         this.stages = new HashMap<>();
         this.stages.put(root.id(), root);
@@ -64,8 +93,12 @@ final class FlowGraph {
     /**
      * Get the top level stage sequence.
      * @return StageSequence
+     * @throw IllegalStateException if the root is not set yet
      */
     FlowStage.Sequence root() {
+        if (root == null) {
+            throw new IllegalStateException("Graph is empty");
+        }
         return root;
     }
 
@@ -95,26 +128,31 @@ final class FlowGraph {
      * @param node new head
      * @param listener listener to consume the status events
      */
-    void offer(FlowNode node, StatusListener listener) {
+    void offer(FlowNode node, EventListener listener) {
         Objects.requireNonNull(node, "node is null");
         Objects.requireNonNull(listener, "listener is null");
-        if ((node instanceof StepAtomNode)) {
+        if (node instanceof FlowStartNode) {
+            root = new FlowStage.Sequence((FlowStartNode)node);
+            listener.onFlowStart(root);
+        } else if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);
             FlowStep step = createFlowStep((StepAtomNode)node);
-            listener.onStepStatus(step, step.createStatus());
+            listener.onStepEvent(step, Event.HEAD);
             FlowStep previous = step.previous();
             if (previous != null) {
-                listener.onStepStatus(previous, previous.createStatus());
+                listener.onStepEvent(previous, Event.BEFORE_HEAD);
             }
         } else if (node instanceof StepStartNode) {
             FlowStage.Stages stage = createFlowStages((StepStartNode) node);
             if (stage != null) {
-                listener.onStageStatus(stage, stage.createStatus());
+                listener.onStageEvent(stage,  Event.HEAD);
                 FlowStage previous = stage.previous();
                 if (previous != null) {
-                    listener.onStageStatus(previous, previous.createStatus());
+                    listener.onStageEvent(previous, Event.BEFORE_HEAD);
                 }
             }
+        } else if (node instanceof FlowEndNode) {
+            listener.onFlowEnd(root);
         }
     }
 
@@ -126,9 +164,9 @@ final class FlowGraph {
     private FlowStep createFlowStep(StepAtomNode node) {
         FlowStage.Sequence parentStage = findParentStage(node).asSequence();
         FlowStage.Steps stepsStage = null;
-        String parentId = parentStage.id() + "__steps-wrapper__";
+        String parentId = parentStage.id() + ".";
         for (int i = 1 ; stepsStage == null ; i++) {
-            String stepsStageId = parentId + "#" +i;
+            String stepsStageId = parentId +i;
             if (stages.containsKey(stepsStageId)) {
                 stepsStage = stages.get(stepsStageId).asSteps();
                 if (!stepsStage.head()) {
@@ -195,9 +233,9 @@ final class FlowGraph {
             if (parent instanceof StepStartNode) {
                 return (StepStartNode) parent;
             }
-            throw new IllegalStateException("not a step start node");
+            throw new IllegalStateException("Invalid parent node");
         }
-        throw new IllegalStateException("node has no parents");
+        throw new IllegalStateException("Node has no parent");
     }
 
     /**

@@ -96,4 +96,12 @@ final class FlowStatus {
             }
         }
     }
+
+    @Override
+    public String toString() {
+        return FlowStatus.class.getSimpleName() + "{"
+                + " state=" + state
+                + ", result=" + result
+                + "}";
+    }
 }

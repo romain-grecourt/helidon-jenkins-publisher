@@ -57,7 +57,7 @@ final class FlowStepOutputStream extends LineTransformationOutputStream {
     @Override
     public String toString() {
         return FlowStepOutputStream.class.getSimpleName() + "{"
-                + "id=" + id
+                + " id=" + id
                 + ", step=" + step.id()
                 + "}";
     }

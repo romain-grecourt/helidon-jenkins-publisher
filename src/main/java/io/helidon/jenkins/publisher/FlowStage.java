@@ -6,20 +6,27 @@ import java.util.List;
 import java.util.Objects;
 import org.jenkinsci.plugins.workflow.actions.LabelAction;
 import org.jenkinsci.plugins.workflow.actions.ThreadNameAction;
+import org.jenkinsci.plugins.workflow.actions.TimingAction;
 import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
+import org.jenkinsci.plugins.workflow.graph.BlockEndNode;
+import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
+import org.jenkinsci.plugins.workflow.graph.FlowStartNode;
 
 /**
  * A stage or meta stage.
  */
 abstract class FlowStage {
 
-    protected final StepStartNode node;
+    protected final BlockStartNode node;
     protected final FlowStage parent;
     protected final String id;
     protected final String name;
     protected final int parentIndex;
     protected final String path;
     protected int index = 0;
+    protected FlowStatus status;
+    protected final long startTime;
+    protected long endTime;
 
     /**
      * Create a new stage.
@@ -29,15 +36,16 @@ abstract class FlowStage {
      * @param parent parent stage, may be {@code null}
      * @param synthetic if {@code true}, this stage path is equal to the parent path
      */
-    protected FlowStage(String id, StepStartNode node, FlowStage parent, boolean synthetic) {
+    protected FlowStage(String id, BlockStartNode node, FlowStage parent, boolean synthetic) {
         if (id == null || id.isEmpty()) {
-            throw new IllegalArgumentException("stage id is null or empty");
+            throw new IllegalArgumentException("Stage id is null or empty");
         }
+        Objects.requireNonNull(node, "node is null");
         this.id = id;
         String p;
-        if (parent != null && node != null) {
-            this.node = node;
-            this.parent = parent;
+        this.node = node;
+        this.parent = parent;
+        if (parent != null) {
             LabelAction action = node.getAction(LabelAction.class);
             if (action != null) {
                 if (action instanceof ThreadNameAction) {
@@ -51,8 +59,10 @@ abstract class FlowStage {
             this.parentIndex = parent.index + 1;
             p = parent.path;
             if (!synthetic) {
-                p += node.getDescriptor().getFunctionName();
-                if (node.isBody() && this.name != null && !this.name.isEmpty()) {
+                if (node instanceof StepStartNode) {
+                    p += ((StepStartNode)node).getDescriptor().getFunctionName();
+                }
+                if (((StepStartNode)node).isBody() && this.name != null && !this.name.isEmpty()) {
                     p += "[";
                     if (parent instanceof Parallel) {
                         p += "Branch: ";
@@ -62,13 +72,13 @@ abstract class FlowStage {
                 p += "/";
             }
         } else {
-            this.node = null;
             this.name = null;
-            this.parent = null;
             this.parentIndex = -1;
             p = "/";
         }
         this.path = p;
+        this.startTime = TimingAction.getStartTime(node);
+        this.endTime = -1;
     }
 
     /**
@@ -78,7 +88,7 @@ abstract class FlowStage {
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      */
-    protected FlowStage(StepStartNode node, FlowStage parent, boolean synthetic) {
+    protected FlowStage(BlockStartNode node, FlowStage parent, boolean synthetic) {
         this(node != null ? node.getId() : "0", node, parent, synthetic);
     }
 
@@ -88,7 +98,7 @@ abstract class FlowStage {
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      */
-    protected FlowStage(StepStartNode node, FlowStage parent) {
+    protected FlowStage(BlockStartNode node, FlowStage parent) {
         this(node, parent, /* synthetic */ false);
     }
 
@@ -113,6 +123,28 @@ abstract class FlowStage {
      */
     boolean head() {
         return parentIndex == parent.index;
+    }
+
+    /**
+     * Get the start time in milliseconds for this step.
+     * @return long
+     */
+    long startTime() {
+        return startTime;
+    }
+
+    /**
+     * Get the end time in milliseconds for this step.
+     * @return long
+     */
+    long endTime() {
+        if (endTime <= 0 && status != null && status.state == FlowStatus.FlowState.FINISHED) {
+            BlockEndNode endNode = node.getEndNode();
+            if (endNode != null) {
+                endTime = TimingAction.getStartTime(endNode);
+            }
+        }
+        return endTime;
     }
 
     /**
@@ -164,11 +196,38 @@ abstract class FlowStage {
     }
 
     /**
-     * Create a new flow status for this stage.
+     * Indicate if this stage is a stage sequence.
+     * @return {@code true} if this stage is a stage sequence.
+     */
+    boolean isSequence() {
+        return this instanceof Sequence;
+    }
+
+    /**
+     * Indicate if this stage is a parallel stage.
+     * @return {@code true} if this stage is a parallel stage.
+     */
+    boolean isParallel() {
+        return this instanceof Parallel;
+    }
+
+    /**
+     * Indicate if this stage is a steps sequence.
+     * @return {@code true} if this stage is a steps sequence.
+     */
+    boolean isSteps() {
+        return this instanceof Steps;
+    }
+
+    /**
+     * Get the status for this stage.
      * @return FlowStatus
      */
-    FlowStatus createStatus() {
-        return new FlowStatus(node);
+    FlowStatus status() {
+        if (status == null || status.state != FlowStatus.FlowState.FINISHED) {
+            status = new FlowStatus(node);
+        }
+        return status;
     }
 
     /**
@@ -176,7 +235,7 @@ abstract class FlowStage {
      *
      * @return v
      */
-    StepStartNode node() {
+    BlockStartNode node() {
         return node;
     }
 
@@ -234,6 +293,24 @@ abstract class FlowStage {
         return index;
     }
 
+    @Override
+    public String toString() {
+        String type;
+        if (this instanceof Steps) {
+            type = Steps.class.getSimpleName();
+        } else if (this instanceof Sequence) {
+            type = Sequence.class.getSimpleName();
+        } else if (this instanceof Parallel) {
+            type = Parallel.class.getSimpleName();
+        } else {
+            throw new IllegalStateException("Unknown stage implementation");
+        }
+        return type + "{"
+                + " id=" + id
+                + ", parentId=" + (parent != null ? parent.id : "-1")
+                + "}";
+    }
+
     /**
      * An ordered sequence of steps.
      */
@@ -251,7 +328,7 @@ abstract class FlowStage {
          * @param steps ordered list of steps
          * @param parentIndex index in the parent sequence
          */
-        Steps(String id, StepStartNode node, FlowStage parent) {
+        Steps(String id, BlockStartNode node, FlowStage parent) {
             super(id, node, parent, /* true */ true);
         }
 
@@ -311,7 +388,7 @@ abstract class FlowStage {
          * @param node original graph node
          * @param parent parent stage
          */
-        protected Stages(StepStartNode node, Stages parent) {
+        protected Stages(BlockStartNode node, Stages parent) {
             super(node, parent);
         }
 
@@ -436,8 +513,8 @@ abstract class FlowStage {
         /**
          * Create a new top level sequence.
          */
-        Sequence() {
-            super(/* node */null, /* parent */ null);
+        Sequence(FlowStartNode node) {
+            super(node, /* parent */ null);
         }
 
         /**
