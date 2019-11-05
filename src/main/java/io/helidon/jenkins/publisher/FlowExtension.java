@@ -25,58 +25,37 @@ import org.kohsuke.accmod.restrictions.suppressions.SuppressRestrictedWarnings;
  * events flow events.
  */
 @SuppressRestrictedWarnings({TaskListenerDecorator.class})
-final class FlowExtension extends TaskListenerDecorator implements GraphListener.Synchronous, FlowGraph.EventListener {
+final class FlowExtension extends TaskListenerDecorator implements GraphListener.Synchronous {
 
-    private final boolean enabled;
+    private static final EmptyDecorator EMPTY_DECORATOR = new EmptyDecorator();
+    private static final Map<FlowExecution, WeakReference<TaskListenerDecorator>> DECORATORS = new WeakHashMap<>();
+
     private final FlowGraph graph;
-    private final String scmHead;
-    private final String scmHash;
-    private final String publisherUrl;
-    private boolean declaredOnly;
-    private boolean skipMeta;
+    private final HelidonPublisherClient client;
 
     FlowExtension(FlowExecution execution) {
         WorkflowRun run = FlowHelper.getRun(execution.getOwner());
         WorkflowMultiBranchProject project = FlowHelper.getProject(run.getParent());
         HelidonPublisherFolderProperty prop = project.getProperties().get(HelidonPublisherFolderProperty.class);
         SCMRevision rev = getSCMRevision(run);
-        scmHead = rev.getHead().getName();
-        scmHash = rev.toString();
+        String scmHead = rev.getHead().getName();
         if (prop != null && !isBranchExcluded(scmHead, prop.getBranchExcludes())) {
-            graph = new FlowGraph(FlowStepSignatures.getOrCreate(execution));
-            publisherUrl = prop.getServerUrl();
-            declaredOnly = true; // TODO make a folder/job config option for this
-            skipMeta = true; // TODO make a folder/job config option for this
-            enabled = true;
+            FlowStepSignatures signatures = FlowStepSignatures.getOrCreate(execution);
+            graph = new FlowGraph(signatures, /* declaredOnly */ true, /* skipMeta */ true,
+                    new FlowRun(project.getName(), scmHead, run.getNumber(), run.getTimeInMillis(), rev.toString()));
+            client = HelidonPublisherClient.getOrCreate(prop.getServerUrl(), /* nThreads*/ 5);
         } else {
-            enabled = false;
-            publisherUrl = null;
             graph = null;
+            client = null;
         }
-    }
-
-    /**
-     * Get the flow graph.
-     * @return FlowGraph
-     */
-    FlowGraph graph() {
-        return graph;
-    }
-
-    /**
-     * Test if this decorator is enabled.
-     * @return {@code true} if enabled, {@code false} otherwise
-     */
-    boolean isEnabled() {
-        return enabled;
     }
 
     @Override
     public OutputStream decorate(OutputStream out) throws IOException, InterruptedException {
-        if (enabled) {
+        if (graph != null) {
             FlowStep step = graph.poll();
-            if (step != null && declaredOnly && step.declared() && skipMeta && !step.meta()) {
-                return new FlowStepOutputStream(out, step);
+            if (step != null) {
+                return new FlowStepOutputStream(out, step, client);
             }
         }
         return out;
@@ -84,35 +63,8 @@ final class FlowExtension extends TaskListenerDecorator implements GraphListener
 
     @Override
     public void onNewHead(FlowNode node) {
-        if (enabled) {
-            graph.offer(node, /* status listener */ this);
-        }
-    }
-
-    @Override
-    public void onFlowStart(FlowStage.Sequence root) {
-        System.out.println("onFlowStart");
-    }
-
-    @Override
-    public void onFlowEnd(FlowStage.Sequence root) {
-        System.out.println("onFlowEnd");
-        System.out.println(graph.root().prettyPrint("", true, true));
-    }
-
-    @Override
-    public void onStepEvent(FlowStep step, FlowGraph.Event event) {
-        if (step.declared() && !step.meta()) {
-            FlowStatus status = step.status();
-            System.out.println("onStepStatus: " + step + ", event: " + event + " , state:" + status.state + ", result:" + status.result);
-        }
-    }
-
-    @Override
-    public void onStageEvent(FlowStage stage, FlowGraph.Event event) {
-        if (stage.isSequence()) {
-            FlowStatus status = stage.status();
-            System.out.println("onStageStatus: " + stage + ", event: " + event + " , state:" + status.state + ", result:" + status.result);
+        if (graph != null) {
+            graph.offer(node, client);
         }
     }
 
@@ -147,33 +99,12 @@ final class FlowExtension extends TaskListenerDecorator implements GraphListener
         return false;
     }
 
-    private static final EmptyDecorator EMPTY_DECORATOR = new EmptyDecorator();
-    private static final Map<FlowExecution, WeakReference<TaskListenerDecorator>> DECORATORS = new WeakHashMap<>();
-
     /**
      * TaskListenerDecorator factory.
      */
     @SuppressRestrictedWarnings({TaskListenerDecorator.Factory.class, TaskListenerDecorator.class})
     @Extension
     public static final class Factory implements TaskListenerDecorator.Factory {
-
-        /**
-         * Remove the decorator associated with the given execution.
-         * @param exec the flow execution for which remove the cached decorator
-         * @return the removed decorator
-         */
-        static FlowExtension clear(FlowExecution exec) {
-            synchronized (DECORATORS) {
-                WeakReference<TaskListenerDecorator> ref = DECORATORS.remove(exec);
-                if (ref != null) {
-                    TaskListenerDecorator decorator = ref.get();
-                    if (decorator instanceof FlowExtension) {
-                        return (FlowExtension) decorator;
-                    }
-                }
-            }
-            return null;
-        }
 
         @Override
         public TaskListenerDecorator of(FlowExecutionOwner owner) {
@@ -194,7 +125,7 @@ final class FlowExtension extends TaskListenerDecorator implements GraphListener
                     return decoratorRef.get();
                 }
                 TaskListenerDecorator dec;
-                if (decorator.isEnabled()) {
+                if (decorator.graph != null) {
                     dec = decorator;
                     execution.addListener(decorator);
                 } else {
@@ -226,12 +157,20 @@ final class FlowExtension extends TaskListenerDecorator implements GraphListener
 
         @Override
         public void onCompleted(FlowExecution execution) {
-            FlowExtension decorator = Factory.clear(execution);
-            if (decorator == null) {
-                WorkflowRun run = FlowHelper.getRun(execution.getOwner());
-                Result result = run.getResult();
-                System.out.println("TODO force push result: " + run.getFullDisplayName() + ", result: " + result);
+            synchronized (DECORATORS) {
+                WeakReference<TaskListenerDecorator> ref = DECORATORS.remove(execution);
+                if (ref != null) {
+                    TaskListenerDecorator decorator = ref.get();
+                    if (decorator != null) {
+                        return;
+                    }
+                }
             }
+            // force the result, just in case the decorator got gced.
+            WorkflowRun run = FlowHelper.getRun(execution.getOwner());
+            Result result = run.getResult();
+            // TODO force the result
+            System.out.println("TODO force push result: " + run.getFullDisplayName() + ", result: " + result);
         }
 
         @Override

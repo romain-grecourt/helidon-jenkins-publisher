@@ -1,9 +1,17 @@
 package io.helidon.jenkins.publisher;
 
+import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
+import java.net.URLEncoder;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import javax.json.Json;
+import javax.json.JsonBuilderFactory;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
 import org.jenkinsci.plugins.workflow.actions.LabelAction;
 import org.jenkinsci.plugins.workflow.actions.ThreadNameAction;
 import org.jenkinsci.plugins.workflow.actions.TimingAction;
@@ -17,12 +25,15 @@ import org.jenkinsci.plugins.workflow.graph.FlowStartNode;
  */
 abstract class FlowStage {
 
+    private static final JsonBuilderFactory JSON_BUILDER_FACTORY = Json.createBuilderFactory(new HashMap<>());
+
+    protected final FlowRun flowRun;
     protected final BlockStartNode node;
     protected final FlowStage parent;
     protected final String id;
     protected final String name;
     protected final int parentIndex;
-    protected final String path;
+    protected final String uri;
     protected int index = 0;
     protected FlowStatus status;
     protected final long startTime;
@@ -31,18 +42,21 @@ abstract class FlowStage {
     /**
      * Create a new stage.
      *
+     * @param flowRun the flow run that this stage belongs to
      * @param id the node id to use
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      * @param synthetic if {@code true}, this stage path is equal to the parent path
      */
-    protected FlowStage(String id, BlockStartNode node, FlowStage parent, boolean synthetic) {
+    protected FlowStage(FlowRun flowRun, String id, BlockStartNode node, FlowStage parent, boolean synthetic) {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("Stage id is null or empty");
         }
         Objects.requireNonNull(node, "node is null");
+        Objects.requireNonNull(flowRun, "run is null");
+        this.flowRun = flowRun;
         this.id = id;
-        String p;
+        String u;
         this.node = node;
         this.parent = parent;
         if (parent != null) {
@@ -57,26 +71,29 @@ abstract class FlowStage {
                 this.name = null;
             }
             this.parentIndex = parent.index + 1;
-            p = parent.path;
+            u = parent.uri;
             if (!synthetic) {
                 if (node instanceof StepStartNode) {
-                    p += ((StepStartNode)node).getDescriptor().getFunctionName();
+                    u += ((StepStartNode)node).getDescriptor().getFunctionName();
                 }
                 if (((StepStartNode)node).isBody() && this.name != null && !this.name.isEmpty()) {
-                    p += "[";
                     if (parent instanceof Parallel) {
-                        p += "Branch: ";
+                        u += "/";
                     }
-                    p += name + "]";
+                    try {
+                        u += URLEncoder.encode(name, "UTF-8");
+                    } catch (UnsupportedEncodingException ex) {
+                        throw new IllegalStateException(ex);
+                    }
                 }
-                p += "/";
+                u += "/";
             }
         } else {
             this.name = null;
             this.parentIndex = -1;
-            p = "/";
+            u = "/";
         }
-        this.path = p;
+        this.uri = u;
         this.startTime = TimingAction.getStartTime(node);
         this.endTime = -1;
     }
@@ -84,22 +101,24 @@ abstract class FlowStage {
     /**
      * Create a new stage.
      *
+     * @param flowRun the flow run that this stage belongs to
      * @param id the node id to use
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      */
-    protected FlowStage(BlockStartNode node, FlowStage parent, boolean synthetic) {
-        this(node != null ? node.getId() : "0", node, parent, synthetic);
+    protected FlowStage(FlowRun flowRun, BlockStartNode node, FlowStage parent, boolean synthetic) {
+        this(flowRun, node != null ? node.getId() : "0", node, parent, synthetic);
     }
 
     /**
      * Create a new stage.
      *
+     * @param flowRun the flow run that this stage belongs to
      * @param node original graph node, may be {@code null}
      * @param parent parent stage, may be {@code null}
      */
-    protected FlowStage(BlockStartNode node, FlowStage parent) {
-        this(node, parent, /* synthetic */ false);
+    protected FlowStage(FlowRun flowRun, BlockStartNode node, FlowStage parent) {
+        this(flowRun, node, parent, /* synthetic */ false);
     }
 
     /**
@@ -107,7 +126,7 @@ abstract class FlowStage {
      *
      * @return FlowStage or {@code null} if the parent is not a {@link Sequence} or there is no previous stage in the sequence
      */
-    FlowStage previous() {
+    final FlowStage previous() {
         if (parent instanceof FlowStage.Sequence && parentIndex > 0) {
             List<FlowStage> sequence = ((FlowStage.Sequence) parent).stages;
             if (parentIndex > 0 && sequence.size() > parentIndex + 1) {
@@ -121,7 +140,7 @@ abstract class FlowStage {
      * Indicate that this stage is the head of the parent sequence. 
      * @return {@code true} if this stage is the current head of the parent sequence
      */
-    boolean head() {
+    final boolean head() {
         return parentIndex == parent.index;
     }
 
@@ -129,7 +148,7 @@ abstract class FlowStage {
      * Get the start time in milliseconds for this step.
      * @return long
      */
-    long startTime() {
+    final long startTime() {
         return startTime;
     }
 
@@ -137,7 +156,7 @@ abstract class FlowStage {
      * Get the end time in milliseconds for this step.
      * @return long
      */
-    long endTime() {
+    final long endTime() {
         if (endTime <= 0 && status != null && status.state == FlowStatus.FlowState.FINISHED) {
             BlockEndNode endNode = node.getEndNode();
             if (endNode != null) {
@@ -152,7 +171,7 @@ abstract class FlowStage {
      * @return Steps
      * @throws IllegalStateException if this instance is not a steps stage
      */
-    Steps asSteps() {
+    final Steps asSteps() {
         if (this instanceof Steps) {
             return (Steps) this;
         }
@@ -164,7 +183,7 @@ abstract class FlowStage {
      * @return Stages
      * @throws IllegalStateException if this instance is not a multi stage
      */
-    Stages asStages() {
+    final Stages asStages() {
         if (this instanceof Stages) {
             return (Stages) this;
         }
@@ -176,7 +195,7 @@ abstract class FlowStage {
      * @return Parallel
      * @throws IllegalStateException if this instance is not a parallel stage
      */
-    Parallel asParallel() {
+    final Parallel asParallel() {
         if (this instanceof Parallel) {
             return (Parallel) this;
         }
@@ -188,7 +207,7 @@ abstract class FlowStage {
      * @return Sequence
      * @throws IllegalStateException if this instance is not a sequence
      */
-    Sequence asSequence() {
+    final Sequence asSequence() {
         if (this instanceof Sequence) {
             return (Sequence) this;
         }
@@ -199,7 +218,7 @@ abstract class FlowStage {
      * Indicate if this stage is a stage sequence.
      * @return {@code true} if this stage is a stage sequence.
      */
-    boolean isSequence() {
+    final boolean isSequence() {
         return this instanceof Sequence;
     }
 
@@ -207,7 +226,7 @@ abstract class FlowStage {
      * Indicate if this stage is a parallel stage.
      * @return {@code true} if this stage is a parallel stage.
      */
-    boolean isParallel() {
+    final boolean isParallel() {
         return this instanceof Parallel;
     }
 
@@ -215,15 +234,24 @@ abstract class FlowStage {
      * Indicate if this stage is a steps sequence.
      * @return {@code true} if this stage is a steps sequence.
      */
-    boolean isSteps() {
+    final boolean isSteps() {
         return this instanceof Steps;
+    }
+
+    /**
+     * Get the identifier for that this stage belongs to.
+     *
+     * @return FlowRun
+     */
+    final FlowRun flowRun() {
+        return flowRun;
     }
 
     /**
      * Get the status for this stage.
      * @return FlowStatus
      */
-    FlowStatus status() {
+    final FlowStatus status() {
         if (status == null || status.state != FlowStatus.FlowState.FINISHED) {
             status = new FlowStatus(node);
         }
@@ -235,17 +263,17 @@ abstract class FlowStage {
      *
      * @return v
      */
-    BlockStartNode node() {
+    final BlockStartNode node() {
         return node;
     }
 
     /**
-     * Get the path of this stage.
+     * Get the URI of this stage.
      *
      * @return String
      */
-    String path() {
-        return path;
+    final String uri() {
+        return uri;
     }
 
     /**
@@ -253,7 +281,7 @@ abstract class FlowStage {
      *
      * @return String
      */
-    String getName() {
+    final String getName() {
         return name;
     }
 
@@ -262,7 +290,7 @@ abstract class FlowStage {
      *
      * @return int
      */
-    int parentIndex() {
+    final int parentIndex() {
         return parentIndex;
     }
 
@@ -271,7 +299,7 @@ abstract class FlowStage {
      *
      * @return String
      */
-    String id() {
+    final String id() {
         return id;
     }
 
@@ -280,7 +308,7 @@ abstract class FlowStage {
      *
      * @return FlowStage or {@code null} if this is the root stage.
      */
-    FlowStage parent() {
+    final FlowStage parent() {
         return parent;
     }
 
@@ -289,7 +317,7 @@ abstract class FlowStage {
      *
      * @return int
      */
-    int index() {
+    final int index() {
         return index;
     }
 
@@ -308,7 +336,28 @@ abstract class FlowStage {
         return type + "{"
                 + " id=" + id
                 + ", parentId=" + (parent != null ? parent.id : "-1")
+                + ", flowRun=" + flowRun.desc()
                 + "}";
+    }
+
+    /**
+     * Build a JSON object representation of this event.
+     * @return JsonObject
+     */
+    final JsonObject toJson() {
+        JsonObjectBuilder stage = JSON_BUILDER_FACTORY.createObjectBuilder()
+                .add("id", id)
+                .add("parentId", parent != null ? parent.id() : "-1");
+        if (this instanceof Steps) {
+            stage.add("type", "steps");
+        } else if (this instanceof Sequence) {
+            stage.add("type", "sequence");
+        } else if (this instanceof Parallel) {
+            stage.add("type", "parallel");
+        } else {
+            throw new IllegalStateException("Unknown stage implementation");
+        }
+        return stage.build();
     }
 
     /**
@@ -321,15 +370,12 @@ abstract class FlowStage {
         /**
          * Create a new steps sequence.
          *
+         * @param flowRun the flow run that this stage belongs to
          * @param node original graph node
          * @param parent parent stage
-         * @param id unique node id
-         * @param name stage name, may be {@code null}
-         * @param steps ordered list of steps
-         * @param parentIndex index in the parent sequence
          */
-        Steps(String id, BlockStartNode node, FlowStage parent) {
-            super(id, node, parent, /* true */ true);
+        Steps(FlowRun flowRun, String id, BlockStartNode node, FlowStage parent) {
+            super(flowRun, id, node, parent, /* true */ true);
         }
 
         /**
@@ -337,7 +383,7 @@ abstract class FlowStage {
          *
          * @return immutable list of {@link Step}
          */
-        List<FlowStep> steps() {
+        final List<FlowStep> steps() {
             return Collections.unmodifiableList(steps);
         }
 
@@ -346,7 +392,7 @@ abstract class FlowStage {
          *
          * @param step to add
          */
-        void addStep(FlowStep step) {
+        final void addStep(FlowStep step) {
             steps.add(step);
             index++;
         }
@@ -358,7 +404,7 @@ abstract class FlowStage {
          * @param skipMeta skip meta steps if {@code true}
          * @return String
          */
-        String prettyPrint(String indent, boolean declaredOnly, boolean skipMeta) {
+        final String prettyPrint(String indent, boolean declaredOnly, boolean skipMeta) {
             StringBuilder sb = new StringBuilder();
             sb.append(indent).append("steps {\n");
             indent += "  ";
@@ -385,22 +431,24 @@ abstract class FlowStage {
         /**
          * Create a new multi stage.
          *
+         * @param flowRun the flow run that this stage belongs to
          * @param node original graph node
          * @param parent parent stage
          */
-        protected Stages(BlockStartNode node, Stages parent) {
-            super(node, parent);
+        protected Stages(FlowRun flowRun, BlockStartNode node, Stages parent) {
+            super(flowRun, node, parent);
         }
 
         /**
          * Create a new multi stage.
          *
+         * @param flowRun the flow run that this stage belongs to
          * @param node the original graph nodes
          * @param parent parent stage
          * @param synthetic if {@code true}, this stage path is equal to the parent path
          */
-        protected Stages(StepStartNode node, Stages parent, boolean synthetic) {
-            super(node, parent, synthetic);
+        protected Stages(FlowRun flowRun, StepStartNode node, Stages parent, boolean synthetic) {
+            super(flowRun, node, parent, synthetic);
         }
 
         /**
@@ -408,7 +456,7 @@ abstract class FlowStage {
          *
          * @param stage stage to add
          */
-        void addStage(FlowStage stage) {
+        final void addStage(FlowStage stage) {
             stages.add(stage);
             index++;
         }
@@ -418,7 +466,7 @@ abstract class FlowStage {
          *
          * @return
          */
-        List<FlowStage> stages() {
+        final List<FlowStage> stages() {
             return Collections.unmodifiableList(stages);
         }
 
@@ -429,7 +477,7 @@ abstract class FlowStage {
          * @param skipMeta skip the meta steps
          * @return String
          */
-        String prettyPrint(String indent, boolean declaredOnly, boolean skipMeta) {
+        final String prettyPrint(String indent, boolean declaredOnly, boolean skipMeta) {
             Objects.requireNonNull(indent, "indent is null");
             StringBuilder sb = new StringBuilder(indent);
             if (parent() != null) {
@@ -497,11 +545,12 @@ abstract class FlowStage {
         /**
          * Create a new parallel stages.
          *
+         * @param flowRun the flow run that this stage belongs to
          * @param node original graph node
          * @param parent parent stage
          */
-        Parallel(StepStartNode node, Stages parent) {
-            super(node, parent, /* synthetic */ true);
+        Parallel(FlowRun flowRun, StepStartNode node, Stages parent) {
+            super(flowRun, node, parent, /* synthetic */ true);
         }
     }
 
@@ -512,19 +561,22 @@ abstract class FlowStage {
 
         /**
          * Create a new top level sequence.
+         * @param flowRun the flow run that this stage belongs to
+         * @param node the original graph node
          */
-        Sequence(FlowStartNode node) {
-            super(node, /* parent */ null);
+        Sequence(FlowRun flowRun, FlowStartNode node) {
+            super(flowRun, node, /* parent */ null);
         }
 
         /**
          * Create a new stage sequence
          *
+         * @param flowRun the flow run that this stage belongs to
          * @param node original graph node
          * @param parent parent stage
          */
-        Sequence(StepStartNode node, Stages parent) {
-            super(node, parent);
+        Sequence(FlowRun flowRun, StepStartNode node, Stages parent) {
+            super(flowRun, node, parent);
         }
     }
 }

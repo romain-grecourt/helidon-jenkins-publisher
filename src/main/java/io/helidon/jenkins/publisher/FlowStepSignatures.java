@@ -12,7 +12,9 @@ import groovy.lang.Script;
 import hudson.model.Actionable;
 import hudson.model.Queue.Executable;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.ref.WeakReference;
+import java.net.URLEncoder;
 import java.util.AbstractMap;
 import java.util.Base64;
 import java.util.Collections;
@@ -184,8 +186,12 @@ final class FlowStepSignatures {
                         Object arg = entry.getValue();
                         String branchName = entry.getKey().toString();
                         if (arg instanceof ScriptedStepsSequence) {
-                            sigs.addAll(createSignatures(((ScriptedStepsSequence) arg).steps,
-                                    sig + "parallel[Branch: " + branchName + "]/"));
+                            try {
+                                sigs.addAll(createSignatures(((ScriptedStepsSequence) arg).steps,
+                                        sig + "parallel/" + URLEncoder.encode(branchName, "UTF-8" + "/")));
+                            } catch (UnsupportedEncodingException ex) {
+                                throw new IllegalStateException(ex);
+                            }
                         }
                     }
                 }

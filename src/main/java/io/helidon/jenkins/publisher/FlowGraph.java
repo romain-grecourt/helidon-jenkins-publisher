@@ -27,67 +27,25 @@ final class FlowGraph {
     private final LinkedList<StepAtomNode> headNodes = new LinkedList<>();
     private final Map<String, FlowStep> steps;
     private final Map<String, FlowStage> stages;
+    private final boolean declaredOnly;
+    private final boolean skipMeta;
+    private final FlowRun run;
     private FlowStage.Sequence root;
-
-    /**
-     * Event type.
-     */
-    enum Event {
-
-        /**
-         * This event is related to the current head of the flow.
-         */
-        HEAD,
-
-        /**
-         * This event is related to the element before the head of the flow in the current sequence.
-         */
-        BEFORE_HEAD
-    }
-
-    /**
-     * Event listener.
-     */
-    interface EventListener {
-
-        /**
-         * Flow start event.
-         * @param root top-level stage
-         */
-        void onFlowStart(FlowStage.Sequence root);
-
-        /**
-         * Flow end event.
-         * @param root top-level stage
-         */
-        void onFlowEnd(FlowStage.Sequence root);
-
-        /**
-         * Step event.
-         * @param step the corresponding step
-         * @param status the status
-         */
-        void onStepEvent(FlowStep step, Event event);
-
-        /**
-         * Stage event.
-         * @param stage the corresponding stage
-         * @param status the status
-         */
-        void onStageEvent(FlowStage stage, Event event);
-    }
 
     /**
      * Create a new flow graph.
      * @param signatures the signatures used to identify the step node that are declared
-     * @param node the root node
+     * @param declaredOnly if {@code true} fire events only for declared steps
+     * @param skipMeta if {@code true} fire events only for non meta steps
      */
-    FlowGraph(FlowStepSignatures signatures) {
+    FlowGraph(FlowStepSignatures signatures, boolean declaredOnly, boolean skipMeta, FlowRun run) {
         Objects.requireNonNull(signatures, "signatures is null");
         this.signatures = signatures;
         this.steps = new HashMap<>();
         this.stages = new HashMap<>();
-        this.stages.put(root.id(), root);
+        this.declaredOnly = declaredOnly;
+        this.skipMeta = skipMeta;
+        this.run = run;
     }
 
     /**
@@ -128,31 +86,36 @@ final class FlowGraph {
      * @param node new head
      * @param listener listener to consume the status events
      */
-    void offer(FlowNode node, EventListener listener) {
+    void offer(FlowNode node, FlowEvent.Listener listener) {
         Objects.requireNonNull(node, "node is null");
         Objects.requireNonNull(listener, "listener is null");
-        if (node instanceof FlowStartNode) {
-            root = new FlowStage.Sequence((FlowStartNode)node);
-            listener.onFlowStart(root);
+        if (root == null) {
+            root = new FlowStage.Sequence(run, findRootNode(node));
+            stages.put(root.id, root);
+            listener.onEvent(new FlowEvent.GlobalEvent(root, /* completed */ false));
         } else if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);
             FlowStep step = createFlowStep((StepAtomNode)node);
-            listener.onStepEvent(step, Event.HEAD);
+            if (step.isIncluded(declaredOnly, skipMeta)) {
+                listener.onEvent(new FlowEvent.StepEvent(step, /* completed */ true));
+            }
             FlowStep previous = step.previous();
             if (previous != null) {
-                listener.onStepEvent(previous, Event.BEFORE_HEAD);
+                if (previous.isIncluded(declaredOnly, skipMeta)) {
+                    listener.onEvent(new FlowEvent.StepEvent(previous, /* completed */ true));
+                }
             }
         } else if (node instanceof StepStartNode) {
             FlowStage.Stages stage = createFlowStages((StepStartNode) node);
             if (stage != null) {
-                listener.onStageEvent(stage,  Event.HEAD);
+                listener.onEvent(new FlowEvent.StageEvent(stage, /* completed */ false));
                 FlowStage previous = stage.previous();
                 if (previous != null) {
-                    listener.onStageEvent(previous, Event.BEFORE_HEAD);
+                    listener.onEvent(new FlowEvent.StageEvent(previous, /* completed */ true));
                 }
             }
         } else if (node instanceof FlowEndNode) {
-            listener.onFlowEnd(root);
+            listener.onEvent(new FlowEvent.GlobalEvent(root, /* completed */ true));
         }
     }
 
@@ -173,12 +136,12 @@ final class FlowGraph {
                     stepsStage = null;
                 }
             } else {
-                stepsStage = new FlowStage.Steps(stepsStageId, parentStage.node(), parentStage);
+                stepsStage = new FlowStage.Steps(run, stepsStageId, parentStage.node(), parentStage);
                 parentStage.addStage(stepsStage);
                 stages.put(stepsStageId, stepsStage);
             }
         }
-        FlowStep step = new FlowStep((StepAtomNode)node, stepsStage, signatures);
+        FlowStep step = new FlowStep(run, (StepAtomNode)node, stepsStage, signatures);
         stepsStage.addStep(step);
         steps.put(step.id(), step);
         return step;
@@ -194,7 +157,7 @@ final class FlowGraph {
             FlowStage.Stages parentStage = findParentStage(node).asStages();
             String descId = node.getDescriptor().getId();
             if (STAGE_DESC_ID.equals(descId)) {
-                FlowStage.Stages stage = new FlowStage.Sequence(node, parentStage);
+                FlowStage.Stages stage = new FlowStage.Sequence(run, node, parentStage);
                 parentStage.addStage(stage);
                 stages.put(stage.id(), stage);
                 return stage;
@@ -206,11 +169,11 @@ final class FlowGraph {
                     if (stages.containsKey(parentId)) {
                         parallelStage = stages.get(parentId).asParallel();
                     } else {
-                        parallelStage = new FlowStage.Parallel(nodeParent, parentStage);
+                        parallelStage = new FlowStage.Parallel(run, nodeParent, parentStage);
                         parentStage.addStage(parallelStage);
                         stages.put(parentId, parallelStage);
                     }
-                    FlowStage.Stages stage = new FlowStage.Sequence(node, parallelStage);
+                    FlowStage.Stages stage = new FlowStage.Sequence(run, node, parallelStage);
                     parallelStage.addStage(stage);
                     stages.put(stage.id(), stage);
                     return stage;
@@ -236,6 +199,25 @@ final class FlowGraph {
             throw new IllegalStateException("Invalid parent node");
         }
         throw new IllegalStateException("Node has no parent");
+    }
+
+    /**
+     * Find the root node.
+     * @param node the node to walk
+     * @return FlowStartNode
+     * @throws IllegalStateException if the root node is not found
+     */
+    private FlowStartNode findRootNode(FlowNode node) {
+        List<FlowNode> parents = node.getParents();
+        while (!parents.isEmpty()) {
+            FlowNode parent = parents.get(0);
+            if (parent instanceof FlowStartNode) {
+                return (FlowStartNode) parent;
+            } else if (parent != null) {
+                parents = parent.getParents();
+            }
+        }
+        throw new IllegalStateException("Root node not found");
     }
 
     /**

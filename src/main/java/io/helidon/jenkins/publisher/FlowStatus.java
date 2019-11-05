@@ -1,6 +1,11 @@
 package io.helidon.jenkins.publisher;
 
 import hudson.model.Result;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import javax.json.Json;
+import javax.json.JsonBuilderFactory;
+import javax.json.JsonObject;
 import org.jenkinsci.plugins.workflow.actions.ErrorAction;
 import org.jenkinsci.plugins.workflow.actions.NotExecutedNodeAction;
 import org.jenkinsci.plugins.workflow.actions.QueueItemAction;
@@ -12,6 +17,8 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException;
  * Flow status.
  */
 final class FlowStatus {
+
+    private static final JsonBuilderFactory JSON_BUILDER_FACTORY = Json.createBuilderFactory(new HashMap<>());
 
     /**
      * Flow result.
@@ -103,5 +110,16 @@ final class FlowStatus {
                 + " state=" + state
                 + ", result=" + result
                 + "}";
+    }
+
+    /**
+     * Build a JSON object representation of this status.
+     * @return JsonObject
+     */
+    JsonObject toJson() {
+        return JSON_BUILDER_FACTORY.createObjectBuilder()
+                .add("state", state.toString())
+                .add("result", result.toString())
+                .build();
     }
 }
