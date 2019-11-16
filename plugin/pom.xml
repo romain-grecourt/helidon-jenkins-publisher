@@ -7,11 +7,11 @@
         <version>3.50</version>
         <relativePath />
     </parent>
-    <groupId>io.helidon.build</groupId>
-    <artifactId>helidon-jenkins-publisher-plugin</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>io.helidon.build.publisher</groupId>
+    <artifactId>helidon-build-publisher-plugin</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>hpi</packaging>
-    <name>Helidon Jenkins Publisher Plugin</name>
+    <name>Helidon Build Publisher Jenkins Plugin</name>
 
     <properties>
         <jenkins.version>2.190.1</jenkins.version>
@@ -101,6 +101,17 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>io.helidon.build.publisher</groupId>
+            <artifactId>helidon-build-publisher-model</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.jenkins-ci.plugins.workflow</groupId>
             <artifactId>workflow-job</artifactId>

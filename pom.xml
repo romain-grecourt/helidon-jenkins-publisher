@@ -4,13 +4,17 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.helidon.build</groupId>
-    <artifactId>helidon-jenkins-publisher-project</artifactId>
+    <groupId>io.helidon.build.publisher</groupId>
+    <artifactId>helidon-builders-publisher-project</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <name>Helidon Build Publisher Project</name>
     <packaging>pom</packaging>
 
     <modules>
         <module>plugin</module>
-        <module>webapp</module>
+        <module>model</module>
+        <module>frontend</module>
+        <module>backend</module>
+        <module>storage</module>
     </modules>
 </project>
