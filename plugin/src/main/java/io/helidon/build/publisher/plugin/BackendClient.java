@@ -2,7 +2,6 @@ package io.helidon.build.publisher.plugin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.helidon.build.publisher.model.PipelineEvents;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -20,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Publisher client.
@@ -37,6 +36,7 @@ final class BackendClient implements PipelineEvents.EventListener {
     private final ExecutorService executor;
     private final String serverUrl;
     private final int nThreads;
+    private final ObjectMapper mapper;
 
     /**
      * Get or create the client for the given server URL.
@@ -80,6 +80,7 @@ final class BackendClient implements PipelineEvents.EventListener {
         this.nThreads = nThreads;
         this.queues = new BlockingQueue[nThreads];
         this.executor = Executors.newFixedThreadPool(nThreads);
+        this.mapper = new ObjectMapper();
     }
 
     @Override
@@ -96,7 +97,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                     queueId
                 });
             }
-            executor.submit(new ClientThread(serverUrl, queueId, queue));
+            executor.submit(new ClientThread(serverUrl, queueId, queue, mapper));
         }
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.log(Level.FINE, "Adding event to queue, serverUrl={0}, queueId={1}", new Object[]{
@@ -132,17 +133,19 @@ final class BackendClient implements PipelineEvents.EventListener {
         private final BlockingQueue<PipelineEvents.Event> queue;
         private final String serverUrl;
         private final int queueId;
+        private final ObjectMapper mapper;
 
         /**
          * Create a new client thread bound to the given queue.
          * @param serverUrl the serverUrl
          * @param queue the queue that this thread processes
          */
-        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvents.Event> queue) {
+        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvents.Event> queue, ObjectMapper mapper) {
             Objects.requireNonNull(queue, "queue is null");
             this.queue = queue;
             this.queueId = queueId;
             this.serverUrl = serverUrl;
+            this.mapper = mapper;
         }
 
         @Override
@@ -203,9 +206,6 @@ final class BackendClient implements PipelineEvents.EventListener {
                         }
                         break;
                     case OUTPUT_DATA:
-                        if (e.eventType() == PipelineEvents.EventType.OUTPUT_DATA && e.runId().equals(event.runId())) {
-                            outputFound = true;
-                        }
                         break;
                     default:
                         LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -226,20 +226,15 @@ final class BackendClient implements PipelineEvents.EventListener {
                 });
             }
 
-            // convert to JSON
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.writeValue(baos, new PipelineEvents(events));
-
             URLConnection con = url.openConnection();
             if (!(con instanceof HttpURLConnection)) {
                 throw new IllegalStateException("Not an HttpURLConnection");
             }
             HttpURLConnection hcon = (HttpURLConnection) con;
-            hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "application/json");
             hcon.setRequestMethod("PUT");
-            hcon.connect();
+            hcon.setDoOutput(true);
+            mapper.writeValue(hcon.getOutputStream(), new PipelineEvents(events));
             int code = hcon.getResponseCode();
             if (200 != code) {
                 LOGGER.log(Level.WARNING, "Invalid response code for event, url: {0}, code: {1}",
@@ -272,8 +267,8 @@ final class BackendClient implements PipelineEvents.EventListener {
             HttpURLConnection hcon = (HttpURLConnection) con;
             hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "text/plain");
-            hcon.connect();
-            try (DeflaterOutputStream out = new DeflaterOutputStream(hcon.getOutputStream())) {
+            hcon.addRequestProperty("Content-Encoding", "gzip");
+            try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream())) {
                 byte[] data = outputEvent.data();
                 out.write(data, 0, data.length);
                 int len = data.length;

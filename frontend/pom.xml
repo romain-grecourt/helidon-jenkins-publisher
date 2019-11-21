@@ -13,7 +13,7 @@
     <name>Helidon Build Publisher FrontEnd</name>
 
     <properties>
-        <mainClass>io.helidon.build.publisher.webapp.Main</mainClass>
+        <mainClass>io.helidon.build.publisher.frontend.Main</mainClass>
     </properties>
 
     <dependencies>

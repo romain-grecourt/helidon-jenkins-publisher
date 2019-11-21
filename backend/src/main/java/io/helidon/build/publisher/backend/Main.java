@@ -1,13 +1,12 @@
 package io.helidon.build.publisher.backend;
 
-import io.helidon.build.publisher.storage.EventBus;
-import io.helidon.build.publisher.storage.Storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.LogManager;
 import io.helidon.config.Config;
 import io.helidon.health.HealthSupport;
 import io.helidon.health.checks.HealthChecks;
+import io.helidon.media.jackson.server.JacksonSupport;
 import io.helidon.media.jsonp.server.JsonSupport;
 import io.helidon.metrics.MetricsSupport;
 import io.helidon.webserver.Routing;
@@ -49,7 +48,7 @@ public final class Main {
         WebServer server = WebServer.create(serverConfig, createRouting(config));
         server.start()
             .thenAccept(ws -> {
-                System.out.println( "WEB server is up! http://localhost:" + ws.port() + "/greet");
+                System.out.println( "WEB server is up! http://localhost:" + ws.port());
                 ws.whenShutdown().thenRun(()
                     -> System.out.println("WEB server is DOWN. Good bye!"));
                 })
@@ -67,15 +66,14 @@ public final class Main {
      * @param config configuration of this server
      */
     private static Routing createRouting(Config config) {
-        Config storageConfig = config.get("storage");
-        Storage storage = new Storage(
-                storageConfig.get("cacheLocation").asString().get(),
-                storageConfig.get("appenderThreads").asInt().orElse(2));
+        BackendService backendService = new BackendService(
+                config.get("storageLocation").asString().get(),
+                config.get("appenderThreads").asInt().orElse(2));
         return Routing.builder()
-                .register(JsonSupport.create())
+                .register(JacksonSupport.create())
                 .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))
                 .register(MetricsSupport.create())
-                .register(new BackendService(new EventBus(), storage))
+                .register(backendService)
                 .build();
     }
 

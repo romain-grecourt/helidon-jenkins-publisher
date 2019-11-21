@@ -13,7 +13,7 @@
     <name>Helidon Build Publisher Backend</name>
 
     <properties>
-        <mainClass>io.helidon.build.publisher.webapp.Main</mainClass>
+        <mainClass>io.helidon.build.publisher.backend.Main</mainClass>
     </properties>
 
     <dependencies>
@@ -42,13 +42,12 @@
             <artifactId>helidon-health-checks</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.helidon.build.publisher</groupId>
-            <artifactId>helidon-build-publisher-model</artifactId>
-            <version>${project.version}</version>
+            <groupId>io.helidon.media.jackson</groupId>
+            <artifactId>helidon-media-jackson-server</artifactId>
         </dependency>
         <dependency>
             <groupId>io.helidon.build.publisher</groupId>
-            <artifactId>helidon-build-publisher-storage</artifactId>
+            <artifactId>helidon-build-publisher-model</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

@@ -17,7 +17,7 @@ public final class PipelineRun {
     final Pipeline pipeline;
 
     /**
-     * Create a new pipeline run from a {@link FlowEvents.EventType#RUN_CREATED} event.
+     * Create a new pipeline run from a {@link PipelineEvents.EventType#RUN_CREATED} event.
      * @param runCreated event
      */
     public PipelineRun(PipelineEvents.PipelineCreated runCreated) {
@@ -90,7 +90,7 @@ public final class PipelineRun {
 
     /**
      * Get the pipeline.
-     * @return Flow
+     * @return Pipeline
      */
     @JsonProperty
     public Pipeline pipeline() {

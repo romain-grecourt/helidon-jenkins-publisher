@@ -3,6 +3,7 @@ package io.helidon.build.publisher.plugin;
 import hudson.Extension;
 import io.helidon.build.publisher.model.Pipeline;
 import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.PipelineEvents.NodeEventType;
 import io.helidon.build.publisher.model.Status;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -157,6 +158,7 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
                                         dec.runInfo.excludeSyntheticSteps)
                             });
                         }
+                        dec.emitter.run().fireEvent(dec.client, NodeEventType.COMPLETED, dec.runInfo.id);
                         return;
                     }
                 }

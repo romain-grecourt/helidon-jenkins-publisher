@@ -50,7 +50,7 @@ public final class Main {
         WebServer server = WebServer.create(serverConfig, createRouting(config));
         server.start()
             .thenAccept(ws -> {
-                System.out.println( "WEB server is up! http://localhost:" + ws.port() + "/greet");
+                System.out.println( "WEB server is up! http://localhost:" + ws.port());
                 ws.whenShutdown().thenRun(()
                     -> System.out.println("WEB server is DOWN. Good bye!"));
                 })
@@ -68,15 +68,12 @@ public final class Main {
      * @param config configuration of this server
      */
     private static Routing createRouting(Config config) {
-        Config storageConfig = config.get("storage");
-        Storage storage = new Storage(
-                storageConfig.get("cacheLocation").asString().get(),
-                storageConfig.get("appenderThreads").asInt().orElse(2));
+        FrontendService frontendService = new FrontendService(
+                config.get("cacheLocation").asString().get());
         return Routing.builder()
-                .register(JsonSupport.create())
                 .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))
                 .register(MetricsSupport.create())
-                .register(new FrontendService(new EventBus(), storage))
+                .register(frontendService)
                 .register(StaticContentSupport.builder("/webapp").welcomeFileName("index.html"))
                 .build();
     }

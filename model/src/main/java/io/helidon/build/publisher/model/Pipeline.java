@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Flow graph.
+ * Pipeline model.
  */
 @JsonDeserialize(using = Pipeline.Deserializer.class)
 public final class Pipeline {
@@ -61,9 +61,10 @@ public final class Pipeline {
 
         if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
             listener.onEvent(new PipelineEvents.PipelineCreated(runId, run.jobName, run.scmHead, run.scmHash,
-                    stages.timings.startTime, stages.status.state));
+                    stages.timings.startTime, stages.state()));
+        } else {
+            listener.onEvent(new PipelineEvents.PipelineCompleted(runId, stages.state(), stages.result(), stages.endTime()));
         }
-        listener.onEvent(new PipelineEvents.PipelineCompleted(runId, stages.state(), stages.result(), stages.endTime()));
     }
 
     /**
@@ -132,10 +133,10 @@ public final class Pipeline {
 
     /**
      * Apply the given events.
-     * @param flowEvents the events to apply
+     * @param events the events to apply
      */
-    public void applyEvents(List<PipelineEvents.Event> flowEvents) {
-        for (PipelineEvents.Event event : flowEvents) {
+    public void applyEvents(List<PipelineEvents.Event> events) {
+        for (PipelineEvents.Event event : events) {
             switch (event.eventType()) {
                 case PIPELINE_COMPLETED:
                 case STEP_COMPLETED:
@@ -347,7 +348,7 @@ public final class Pipeline {
         /**
          * Get the result.
          *
-         * @return FlowStatus.State
+         * @return Status.State
          */
         @JsonProperty
         public final Status.State state() {
@@ -357,7 +358,7 @@ public final class Pipeline {
         /**
          * Get the result.
          *
-         * @return FlowStatus.Result
+         * @return Status.Result
          */
         @JsonProperty
         public final Status.Result result() {
@@ -584,14 +585,15 @@ public final class Pipeline {
             if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
                 int parentId = parent == null ? -1 : parent.id;
                 listener.onEvent(new PipelineEvents.StageCreated(runId, id, parentId, index(), name, path, timings.startTime,
-                        status.state, type));
+                        state(), type));
+            } else {
+                listener.onEvent(new PipelineEvents.StageCompleted(runId, id, state(), result(), endTime()));
             }
-            listener.onEvent(new PipelineEvents.StageCompleted(runId, id, state(), result(), endTime()));
         }
 
         /**
          * Infer status from the graph.
-         * @return FlowStatus
+         * @return Status
          */
         public abstract Status status();
     }
@@ -861,9 +863,10 @@ public final class Pipeline {
             if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
                 int parentId = parent == null ? -1 : parent.id;
                 listener.onEvent(new PipelineEvents.StepCreated(runId, id, parentId, index(), name,timings.startTime,
-                        status.state, args, meta, declared));
+                        state(), args, meta, declared));
+            } else {
+                listener.onEvent(new PipelineEvents.StepCompleted(runId, id, state(), result(), endTime()));
             }
-            listener.onEvent(new PipelineEvents.StepCompleted(runId, id, state(), result(), endTime()));
         }
 
         /**
@@ -1106,7 +1109,7 @@ public final class Pipeline {
             }
             Node parent = graph.stages;
             while (!stack.isEmpty()) {
-                JsonNode stageNode = stack.pop();
+                JsonNode stageNode = stack.peek();
                 int stageId = stageNode.get("id").asInt(-1);
                 Stage.StageType stageType = Stage.StageType.valueOf(stageNode.get("type").asText());
                 if (stageType == Stage.StageType.STEPS) {
@@ -1121,13 +1124,12 @@ public final class Pipeline {
                                 createStatus(nestedStep), createTimings(nestedStep)));
                     }
                     ((Stages)parent).addStage(steps);
-                    parent = parent.parent;
                     stack.pop();
                 } else {
                     // tree node
                     if (parent.id == stageId) {
                         // leaving a node (2nd pass)
-                        parent = parent.parent;
+                        parent = parent.parent != null ? parent.parent : parent;
                         stack.pop();
                     } else {
                         // entering a node
@@ -1153,12 +1155,12 @@ public final class Pipeline {
                         if (nestedStages.size() > 0) {
                             Iterator<JsonNode> nestedStagesIt = nestedStages.elements();
                             while (nestedStagesIt.hasNext()) {
-                                stack.add(nestedStagesIt.next());
+                                stack.push(nestedStagesIt.next());
                             }
                             parent = stage;
                         } else {
                             // one pass only
-                            parent = parent.parent;
+                            parent = parent.parent != null ? parent.parent : parent;
                             stack.pop();
                         }
                     }
