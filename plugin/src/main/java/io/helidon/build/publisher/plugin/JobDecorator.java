@@ -73,16 +73,16 @@ public final class JobDecorator {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
             }
-            Pipeline pipeline = new Pipeline(status, timings);
+            Pipeline pipeline = new Pipeline(runInfo.id, status, timings, client);
             pipelineRun = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.scmHead, runInfo.scmHash, pipeline);
-            pipelineRun.fireEvent(client, PipelineEvents.NodeEventType.CREATED, runInfo.id);
+            pipelineRun.fireCreated();
             Pipeline.Sequence root = pipeline.stages();
             steps = new Pipeline.Steps(root, status, timings);
             root.addStage(steps);
-            steps.fireEvent(client, PipelineEvents.NodeEventType.CREATED, runInfo.id);
+            steps.fireCreated();
             step = new Pipeline.Step(steps, "exec", "", false, true, status, timings);
             steps.addStep(step);
-            step.fireEvent(client, PipelineEvents.NodeEventType.CREATED, runInfo.id);
+            step.fireCreated();
         }
     }
 
@@ -94,9 +94,9 @@ public final class JobDecorator {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Completing pipeline, runId={0}", runInfo.id);
             }
-            step.fireEvent(client, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-            steps.fireEvent(client, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-            pipelineRun.fireEvent(client, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
+            step.fireCompleted();
+            steps.fireCompleted();
+            pipelineRun.fireCompleted();
         }
     }
 
@@ -181,11 +181,10 @@ public final class JobDecorator {
         }
 
         @Override
-        protected long computeEndTime() {
-            if (!run.isBuilding()) {
-                return run.getDuration();
+        protected void refresh() {
+            if (super.endTime == 0 && !run.isBuilding()) {
+                 super.endTime = run.getDuration();
             }
-            return 0;
         }
     }
 
@@ -197,24 +196,13 @@ public final class JobDecorator {
         private final Run run;
 
         StatusImpl(Run run) {
-            super(stateOf(run));
+            super(run.isBuilding() ? State.RUNNING : State.FINISHED);
             this.run = run;
         }
 
         @Override
-        protected void refresh(Pipeline.Node node) {
-            state = stateOf(run);
+        protected void refresh() {
             result = Helper.convertResult(run.getResult());
-        }
-
-        private static State stateOf(Run run) {
-            if (run.isBuilding()) {
-                if (run.hasntStartedYet()) {
-                    return State.QUEUED;
-                }
-                return State.RUNNING;
-            }
-            return State.FINISHED;
         }
     }
 }

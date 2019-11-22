@@ -35,13 +35,14 @@ public class PipelineEventsTest {
     public void testJSON() throws IOException {
         List<PipelineEvents.Event> events = new LinkedList<>();
         String runId = "abcdefgh";
-        events.add(new PipelineCreated(runId, "testJob", "master", "123456789", System.currentTimeMillis(), State.RUNNING));
-        events.add(new StageCreated(runId, 1, 0, 0, "build", null, System.currentTimeMillis(), State.RUNNING, StageType.STEPS));
-        events.add(new StepCreated(runId, 2, 1, 0, "sh", System.currentTimeMillis(), State.RUNNING, "echo foo", false, true));
+        events.add(new PipelineCreated(runId, "testJob", "master", "123456789", System.currentTimeMillis()));
+        events.add(new StageCreated(runId, 1, 0, 0, "build", null, System.currentTimeMillis(), StageType.STEPS));
+        events.add(new StepCreated(runId, 2, 1, 0, "sh", "/build/step(sh)=echo%20foo", System.currentTimeMillis(), "echo foo", false, true));
         events.add(new Output(runId, 2));
-        events.add(new StepCompleted(runId, 2, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
-        events.add(new StageCompleted(runId, 1, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
-        events.add(new PipelineCompleted(runId, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StepCompleted(runId, 2, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCompleted(runId, 1, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCompleted(runId, 0, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new PipelineCompleted(runId));
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectMapper mapper = new ObjectMapper();
@@ -60,25 +61,26 @@ public class PipelineEventsTest {
     @Test
     public void testApplyEvents() {
         String runId = "abcdefgh";
-        PipelineCreated runCreated = new PipelineCreated(runId, "testJob", "master", "123456789", System.currentTimeMillis(), State.RUNNING);
+        PipelineCreated runCreated = new PipelineCreated(runId, "testJob", "master", "123456789", System.currentTimeMillis());
         PipelineRun run = new PipelineRun(runCreated);
         List<PipelineEvents.Event> events = new LinkedList<>();
-        events.add(new StageCreated(runId, 1, 0, 0, "build", "/build", System.currentTimeMillis(), State.RUNNING, StageType.SEQUENCE));
-        events.add(new StageCreated(runId, 2, 1, 0, null, null, System.currentTimeMillis(), State.RUNNING, StageType.STEPS));
-        events.add(new StepCreated(runId, 3, 2, 0, "sh", System.currentTimeMillis(), State.RUNNING, "echo foo", false, true));
-        events.add(new StepCompleted(runId, 3, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
-        events.add(new StageCompleted(runId, 2, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
-        events.add(new StageCompleted(runId, 1, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
-        events.add(new PipelineCompleted(runId, State.FINISHED, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCreated(runId, 1, 0, 0, "build", "/build", System.currentTimeMillis(), StageType.SEQUENCE));
+        events.add(new StageCreated(runId, 2, 1, 0, null, null, System.currentTimeMillis(), StageType.STEPS));
+        events.add(new StepCreated(runId, 3, 2, 0, "sh", "/build/step(sh)=echo%20foo", System.currentTimeMillis(), "echo foo", false, true));
+        events.add(new StepCompleted(runId, 3, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCompleted(runId, 2, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCompleted(runId, 1, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new StageCompleted(runId, 0, Result.SUCCESS, System.currentTimeMillis()));
+        events.add(new PipelineCompleted(runId));
         run.pipeline.applyEvents(events);
 
         // pretty print
         System.out.println(run.pipeline.prettyPrint("", true, true));
 
-        assertThat(run.pipeline.stages.stages.size(), is(1));
-        assertThat(run.pipeline.stages.status.state, is(State.FINISHED));
-        assertThat(run.pipeline.stages.status.result, is(Result.SUCCESS));
-        Stage stage = run.pipeline.stages.stages.get(0);
+        assertThat(run.pipeline.sequence.stages.size(), is(1));
+        assertThat(run.pipeline.sequence.status.state, is(State.FINISHED));
+        assertThat(run.pipeline.sequence.status.result, is(Result.SUCCESS));
+        Stage stage = run.pipeline.sequence.stages.get(0);
         assertThat(stage.id, is(1));
         assertThat(stage.name, is("build"));
         assertThat(stage.type, is(Stage.StageType.SEQUENCE));

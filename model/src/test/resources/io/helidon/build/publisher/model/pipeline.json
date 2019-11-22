@@ -1,0 +1,183 @@
+{
+  "id": "968102A54E274A08544123A433386F62",
+  "jobName": "jenkins-pipeline-example",
+  "scmHead": "master",
+  "scmHash": "7edb20887226ba3d30cad237f435ff7ed73ed289",
+  "pipeline": {
+    "stages": {
+      "id": 0,
+      "name": null,
+      "path": "/",
+      "state": "RUNNING",
+      "result": "SUCCESS",
+      "startTime": 1574357011343,
+      "endTime": 0,
+      "type": "SEQUENCE",
+      "stages": [
+        {
+          "id": 1,
+          "name": "Build",
+          "path": "/stage[Build]/",
+          "state": "FINISHED",
+          "result": "SUCCESS",
+          "startTime": 1574357011425,
+          "endTime": 1574357021092,
+          "type": "SEQUENCE",
+          "stages": [
+            {
+              "id": 2,
+              "state": "RUNNING",
+              "result": "UNKNOWN",
+              "startTime": 1574357012345,
+              "endTime": 0,
+              "type": "STEPS",
+              "steps": [
+                {
+                  "id": 3,
+                  "name": "checkout",
+                  "path": "/stage[Build]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357012343,
+                  "endTime": 1574357014432,
+                  "args": "",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 4,
+                  "name": "isUnix",
+                  "path": "/stage[Build]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357014432,
+                  "endTime": 1574357014441,
+                  "args": "",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 5,
+                  "name": "sh",
+                  "path": "/stage[Build]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357014441,
+                  "endTime": 1574357018495,
+                  "args": "docker inspect -f . maven:3-alpine",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 6,
+                  "name": "sh",
+                  "path": "/stage[Build]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357018495,
+                  "endTime": 0,
+                  "args": "\n          echo 'Building :) ${BUILD_ID}' > build.txt\n        ",
+                  "meta": false,
+                  "declared": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "Test",
+          "path": "/stage[Test]/",
+          "state": "RUNNING",
+          "result": "SUCCESS",
+          "startTime": 1574357021129,
+          "endTime": 0,
+          "type": "SEQUENCE",
+          "stages": [
+            {
+              "id": 8,
+              "state": "FINISHED",
+              "result": "UNKNOWN",
+              "startTime": 1574357021210,
+              "endTime": 1574357025650,
+              "type": "STEPS",
+              "steps": [
+                {
+                  "id": 9,
+                  "name": "checkout",
+                  "path": "/stage[Test]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357021207,
+                  "endTime": 1574357022607,
+                  "args": "",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 10,
+                  "name": "isUnix",
+                  "path": "/stage[Test]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357022607,
+                  "endTime": 1574357022618,
+                  "args": "",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 11,
+                  "name": "sh",
+                  "path": "/stage[Test]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357022618,
+                  "endTime": 1574357024422,
+                  "args": "docker inspect -f . node:7-alpine",
+                  "meta": false,
+                  "declared": false
+                },
+                {
+                  "id": 12,
+                  "name": "sh",
+                  "path": "/stage[Test]/",
+                  "state": "FINISHED",
+                  "result": "SUCCESS",
+                  "startTime": 1574357024422,
+                  "endTime": 1574357025049,
+                  "args": "echo blah",
+                  "meta": false,
+                  "declared": true
+                },
+                {
+                  "id": 13,
+                  "name": "sh",
+                  "path": "/stage[Test]/",
+                  "state": "RUNNING",
+                  "result": "UNKNOWN",
+                  "startTime": 1574357025049,
+                  "endTime": 0,
+                  "args": "echo duh",
+                  "meta": false,
+                  "declared": true
+                }
+              ]
+            },
+            {
+              "id": 14,
+              "name": "test1",
+              "path": "/stage[Test]/",
+              "state": "RUNNING",
+              "result": "SUCCESS",
+              "startTime": 1574357025650,
+              "endTime": 0,
+              "type": "PARALLEL",
+              "stages": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

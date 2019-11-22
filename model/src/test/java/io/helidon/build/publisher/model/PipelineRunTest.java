@@ -22,14 +22,16 @@ public class PipelineRunTest {
 
     @Test
     public void testJSON() throws IOException {
-        PipelineRun run = new PipelineRun("abcdefgh", "testJob", "master", "123456789", new Pipeline(new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
+        String runId = "abcdefgh";
+        PipelineRun run = new PipelineRun(runId, "testJob", "master", "123456789",
+                new Pipeline(runId, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
 
-        Steps steps = new Steps(run.pipeline.stages, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
-        run.pipeline.stages.addStage(steps);
+        Steps steps = new Steps(run.pipeline.sequence, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        run.pipeline.sequence.addStage(steps);
         steps.addStep(new Step(steps, "sh", "echo foo", false, true, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
 
-        Parallel parallel = new Parallel(run.pipeline.stages, "tests", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
-        run.pipeline.stages.addStage(parallel);
+        Parallel parallel = new Parallel(run.pipeline.sequence, "tests", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        run.pipeline.sequence.addStage(parallel);
 
         Sequence test1 = new Sequence(parallel, "test1", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
         parallel.addStage(test1);
@@ -57,5 +59,11 @@ public class PipelineRunTest {
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         PipelineRun fromJson = mapper.readValue(bais, PipelineRun.class);
         assertThat(fromJson, is(equalTo(run)));
+    }
+
+    @Test
+    public void testJSONFile() throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        PipelineRun fromJson = mapper.readValue(PipelineRunTest.class.getResourceAsStream("pipeline.json"), PipelineRun.class);
     }
 }

@@ -268,6 +268,7 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "text/plain");
             hcon.addRequestProperty("Content-Encoding", "gzip");
+            hcon.setRequestMethod("PUT");
             try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream())) {
                 byte[] data = outputEvent.data();
                 out.write(data, 0, data.length);

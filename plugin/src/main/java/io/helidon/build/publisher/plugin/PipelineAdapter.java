@@ -5,14 +5,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.Pipeline;
 import io.helidon.build.publisher.model.PipelineEvents;
 import io.helidon.build.publisher.model.PipelineRun;
 import io.helidon.build.publisher.model.Status;
 import io.helidon.build.publisher.model.Timings;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.jenkinsci.plugins.workflow.actions.ArgumentsAction;
 import org.jenkinsci.plugins.workflow.actions.ErrorAction;
@@ -27,7 +27,6 @@ import org.jenkinsci.plugins.workflow.cps.nodes.StepStartNode;
 import org.jenkinsci.plugins.workflow.cps.steps.ParallelStep;
 import org.jenkinsci.plugins.workflow.graph.BlockEndNode;
 import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
-import org.jenkinsci.plugins.workflow.graph.FlowEndNode;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException;
 import org.jenkinsci.plugins.workflow.support.steps.StageStep;
@@ -35,7 +34,7 @@ import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 /**
  * Pipeline event emitter.
  */
-final class PipelineEventsEmitter {
+final class PipelineAdapter {
 
     private static final Logger LOGGER = Logger.getLogger(FlowDecorator.class.getName());
     private static final String STAGE_DESC_ID = StageStep.class.getName();
@@ -46,17 +45,21 @@ final class PipelineEventsEmitter {
     private final Map<String, Pipeline.Step> steps;
     private final Map<String, Pipeline.Stage> stages;
     private final PipelineRunInfo runInfo;
+    private final PipelineEvents.EventListener listener;
     private PipelineRun run;
 
     /**
      * Create a new flow graph.
      * @param signatures the signatures used to identify the step node that are declared
      * @param runInfo run info
+     * @param listener event listener
      */
-    PipelineEventsEmitter(PipelineSignatures signatures, PipelineRunInfo runInfo) {
+    PipelineAdapter(PipelineSignatures signatures, PipelineRunInfo runInfo, PipelineEvents.EventListener listener) {
         Objects.requireNonNull(signatures, "signatures is null");
         Objects.requireNonNull(runInfo, "runInfo is null");
+        Objects.requireNonNull(listener, "listener is null");
         this.signatures = signatures;
+        this.listener = listener;
         this.steps = new HashMap<>();
         this.stages = new HashMap<>();
         this.runInfo = runInfo;
@@ -99,86 +102,110 @@ final class PipelineEventsEmitter {
     /**
      * Store the new current head and fires the status events if any.
      * @param node new head
-     * @param listener listener to consume the status events
      * @throws NullPointerException if node or listener is {@code null}
      */
-    void offer(FlowNode node, PipelineEvents.EventListener listener) {
+    void offer(FlowNode node) {
         Objects.requireNonNull(node, "node is null");
-        Objects.requireNonNull(listener, "listener is null");
         if (run == null) {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
             }
-            Pipeline pipeline = new Pipeline(new StatusImpl(node), new TimingsImpl(node));
+            Pipeline pipeline = new Pipeline(runInfo.id, new StatusImpl(node), new TimingsImpl(node), listener);
             run = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.scmHead, runInfo.scmHash, pipeline);
-            run.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
+            run.fireCreated();
         } else if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);
-            createStep((StepAtomNode)node, listener);
+            createStep((StepAtomNode)node);
         } else if (node instanceof StepStartNode) {
-            createFlowStage((StepStartNode) node, listener);
-            if (stage != null) {
-                stage.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-                Pipeline.Stage previous = stage.previous();
-                if (previous != null) {
-                    previous.fireEvent(listener, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-                }
-            }
+            createFlowStage((StepStartNode) node);
         }
     }
 
-    private void createStep(StepAtomNode node, PipelineEvents.EventListener listener) {
+    private void createStep(StepAtomNode node) {
         Pipeline.Stage pstage = findParentStage(node);
         if (!(pstage instanceof Pipeline.Sequence)) {
             throw new IllegalStateException("Not a sequence stage");
-        }
-        Pipeline.Sequence psequence = (Pipeline.Sequence) pstage;
-        Pipeline.Steps psteps = null;
-        String parentId = pstage.id() + ".";
-        for (int i = 1 ; psteps == null ; i++) {
-            String stepsStageId = parentId +i;
-            if (stages.containsKey(stepsStageId)) {
-                Pipeline.Stage stage = stages.get(stepsStageId);
-                if (!(stage instanceof Pipeline.Steps)) {
-                    throw new IllegalStateException("Not a steps stage");
-                }
-                psteps = (Pipeline.Steps) stage;
-                if (!psteps.head()) {
-                    psteps = null;
-                }
-            } else {
-                psteps = new Pipeline.Steps(pstage, new StatusImpl(), new TimingsImpl());
-                psequence.addStage(psteps);
-                stages.put(stepsStageId, psteps);
-                psteps.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-            }
         }
         String name = node.getDisplayFunctionName();
         String stepArgs = ArgumentsAction.getStepArgumentsAsString(node);
         String args = stepArgs != null ? stepArgs : "";
         boolean meta = node.getDescriptor().isMetaStep();
-        String sig = Pipeline.Step.createPath(psteps.path(), name, args);
+        String sig = Pipeline.Step.createPath(pstage.path(), name, args);
         boolean declared = signatures.contains(sig);
+        if (!isStepIncluded(declared, meta)) {
+            if (LOGGER.isLoggable(Level.FINE)) {
+                LOGGER.log(Level.FINE, "Excluding step, runId={0}, signature={1}, stepId={2}, ", new Object[]{
+                    node.getId(),
+                    runInfo.id,
+                    sig
+                });
+            }
+            return;
+        }
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Creating pipeline step, runId={0}, signature={1}, declared={2}", new Object[]{
+            LOGGER.log(Level.FINE, "Creating step, runId={0}, signature={1}", new Object[]{
                 runInfo.id,
                 sig,
-                declared
             });
         }
-        Pipeline.Step step = new Pipeline.Step(psteps, name, args, meta, declared, new StatusImpl(node), new TimingsImpl(node));
+        Pipeline.Steps psteps = getOrCreateSteps((Pipeline.Sequence) pstage);
+        Pipeline.Step step = new Pipeline.Step(psteps, name, truncateStepArgs(args), meta, declared, new StatusImpl(node),
+                new TimingsImpl(node));
         psteps.addStep(step);
         steps.put(node.getId(), step);
-        step.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-        Pipeline.Step previous = step.previous();
-        if (previous != null) {
-            if (previous.isIncluded(runInfo.excludeSyntheticSteps, runInfo.excludeMetaSteps)) {
-                previous.fireEvent(listener, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
+        step.fireCreated();
+    }
+
+    private boolean isStepIncluded(boolean declared, boolean meta) {
+        return ((runInfo.excludeSyntheticSteps && declared) || (!runInfo.excludeSyntheticSteps && declared))
+                && ((runInfo.excludeMetaSteps && !meta) || (!runInfo.excludeMetaSteps && meta));
+    }
+
+    private String truncateStepArgs(String args) {
+        String[] argsLines = args.trim().split("[\\r\\n]+");
+        for (String argsLine : argsLines) {
+            argsLine = argsLine.trim();
+            if (argsLine.isEmpty()) {
+                continue;
+            }
+            if (argsLine.length() > 50) {
+                return argsLine.substring(0, 50) + " [...]";
+            }
+            return argsLine;
+        }
+        return "";
+    }
+
+    private Pipeline.Steps getOrCreateSteps(Pipeline.Sequence parent) {
+        String parentId = parent.id() + ".";
+        for (int i = 1 ;; i++) {
+            String stepsStageId = parentId + i;
+            if (stages.containsKey(stepsStageId)) {
+                Pipeline.Stage stage = stages.get(stepsStageId);
+                if (!(stage instanceof Pipeline.Steps)) {
+                    throw new IllegalStateException("Not a steps stage");
+                }
+                Pipeline.Steps psteps = (Pipeline.Steps) stage;
+                if (psteps.head()) {
+                    return psteps;
+                }
+            } else {
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Creating steps stage, runId={0}, parentId={1}", new Object[]{
+                        runInfo.id,
+                        parent.id()
+                    });
+                }
+                Pipeline.Steps psteps = new Pipeline.Steps(parent, new StatusImpl(), new TimingsImpl());
+                parent.addStage(psteps);
+                stages.put(stepsStageId, psteps);
+                psteps.fireCreated();
+                return psteps;
             }
         }
     }
 
-    private void createFlowStage(StepStartNode node, PipelineEvents.EventListener listener) {
+    private void createFlowStage(StepStartNode node) {
         if (node.getAction(LabelAction.class) != null) {
             Pipeline.Stage pstage = findParentStage(node);
             if (!(pstage instanceof Pipeline.Stages)) {
@@ -196,14 +223,16 @@ final class PipelineEventsEmitter {
                 }
             }
             if (STAGE_DESC_ID.equals(descId)) {
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Creating sequence stage, runId={0}, parentId={1}", new Object[]{
+                        runInfo.id,
+                        pstages.id()
+                    });
+                }
                 Pipeline.Stages sequence = new Pipeline.Sequence(pstages, name, new StatusImpl(node), new TimingsImpl(node));
                 pstages.addStage(sequence);
                 stages.put(node.getId(), sequence);
-                sequence.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-                Pipeline.Stage previous = sequence.previous();
-                if (previous != null) {
-                    previous.fireEvent(listener, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-                }
+                sequence.fireCreated();
             } else if (PARALLEL_DESC_ID.equals(descId) && node.isBody()) {
                 StepStartNode pnode;
                 List<FlowNode> parents = node.getParents();
@@ -227,23 +256,29 @@ final class PipelineEventsEmitter {
                         }
                         parallel = (Pipeline.Parallel) ppstage;
                     } else {
+                        if (LOGGER.isLoggable(Level.FINE)) {
+                            LOGGER.log(Level.FINE, "Creating parallel stage, runId={0}, parentId={1}, name={2}", new Object[]{
+                                runInfo.id,
+                                pstages.id(),
+                                name
+                            });
+                        }
                         parallel = new Pipeline.Parallel(pstages, name, new StatusImpl(pnode), new TimingsImpl(pnode));
                         pstages.addStage(parallel);
                         stages.put(parentId, parallel);
-                        parallel.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-                        Pipeline.Stage previous = parallel.previous();
-                        if (previous != null) {
-                            previous.fireEvent(listener, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-                        }
+                        parallel.fireCreated();
+                    }
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.log(Level.FINE, "Creating sequence stage, runId={0}, parentId={1}, name={2}", new Object[]{
+                            runInfo.id,
+                            parallel.id(),
+                            name
+                        });
                     }
                     Pipeline.Sequence sequence = new Pipeline.Sequence(parallel, name, new StatusImpl(node), new TimingsImpl(node));
                     parallel.addStage(sequence);
                     stages.put(node.getId(), sequence);
-                    sequence.fireEvent(listener, PipelineEvents.NodeEventType.CREATED, runInfo.id);
-                    Pipeline.Stage previous = sequence.previous();
-                    if (previous != null) {
-                        previous.fireEvent(listener, PipelineEvents.NodeEventType.COMPLETED, runInfo.id);
-                    }
+                    sequence.fireCreated();
                 }
             }
         }
@@ -270,7 +305,7 @@ final class PipelineEventsEmitter {
          * Create a new timing with start time set to the current time.
          */
         TimingsImpl() {
-            super(System.currentTimeMillis());
+            super();
             this.source = null;
         }
 
@@ -284,14 +319,13 @@ final class PipelineEventsEmitter {
         }
 
         @Override
-        protected long computeEndTime() {
-            if (source != null && source instanceof BlockStartNode) {
+        protected void refresh() {
+            if (super.endTime == 0 && source != null && source instanceof BlockStartNode) {
                 BlockEndNode endNode = ((BlockStartNode) source).getEndNode();
                 if (endNode != null) {
-                    return TimingAction.getStartTime(endNode);
+                    super.endTime = TimingAction.getStartTime(endNode);
                 }
             }
-            return 0;
         }
     }
 
@@ -313,9 +347,8 @@ final class PipelineEventsEmitter {
         }
 
         @Override
-        protected void refresh(Pipeline.Node node) {
+        protected void refresh() {
             if (source == null) {
-                super.refresh(node);
                 return;
             }
             hudson.model.Result res = null;
@@ -330,25 +363,18 @@ final class PipelineEventsEmitter {
                 } else {
                     result = Result.ABORTED;
                 }
-                state = source.isActive() ? State.RUNNING : State.FINISHED;
             } else if (warningAction != null) {
                 result = Helper.convertResult(warningAction.getResult());
-                state = source.isActive() ? State.RUNNING : State.FINISHED;
             } else if (QueueItemAction.getNodeState(source) == QueueItemAction.QueueState.QUEUED) {
                 result = Result.UNKNOWN;
-                state = State.QUEUED;
             } else if (QueueItemAction.getNodeState(source) == QueueItemAction.QueueState.CANCELLED) {
                 result = Result.ABORTED;
-                state = State.FINISHED;
             } else if (source.isActive()) {
                 result = Result.UNKNOWN;
-                state = State.RUNNING;
             } else if (NotExecutedNodeAction.isExecuted(source)) {
                 result = Result.SUCCESS;
-                state = State.FINISHED;
             } else {
                 result = Result.NOT_BUILT;
-                state = State.QUEUED;
             }
         }
     }

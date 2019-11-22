@@ -10,14 +10,17 @@ public class Timings {
 
     /**
      * Create a new timings instance.
+     */
+    public Timings() {
+        this.startTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Create a new timings instance.
      * @param startTime start timestamp
-     * @throws IllegalArgumentException if startTime is not a positive value
      */
     public Timings(long startTime) {
-        if (startTime <= 0) {
-            throw new IllegalArgumentException("Invalid startTime: " + startTime);
-        }
-        this.startTime = startTime;
+        this.startTime = startTime > 0 ? startTime : System.currentTimeMillis();
         this.endTime = 0;
     }
 
@@ -33,7 +36,7 @@ public class Timings {
     }
 
     /**
-     * Get the start time.
+     * Get the start timestamp.
      * @return long
      */
     public final long startTime() {
@@ -41,30 +44,8 @@ public class Timings {
     }
 
     /**
-     * Get the end time.
-     * @param node the node to compute the endTime of
-     * @return long
+     * Refresh the end timestamp.
      */
-    public final long endTime(Pipeline.Node node) {
-        if (endTime == 0) {
-            long computed = computeEndTime();
-            if (computed > 0) {
-                endTime = computed;
-            } else {
-                Pipeline.Node next = node.next();
-                if (next != null) {
-                    endTime = next.startTime();
-                }
-            }
-        }
-        return endTime;
-    }
-
-    /**
-     * Implementations should override this method.
-     * @return {@code 0}
-     */
-    protected long computeEndTime() {
-        return 0;
+    protected void refresh() {
     }
 }

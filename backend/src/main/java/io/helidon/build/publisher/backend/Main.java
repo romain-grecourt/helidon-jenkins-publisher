@@ -7,7 +7,6 @@ import io.helidon.config.Config;
 import io.helidon.health.HealthSupport;
 import io.helidon.health.checks.HealthChecks;
 import io.helidon.media.jackson.server.JacksonSupport;
-import io.helidon.media.jsonp.server.JsonSupport;
 import io.helidon.metrics.MetricsSupport;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerConfiguration;

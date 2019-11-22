@@ -23,7 +23,6 @@ public class Status {
      * State.
      */
     public enum State {
-        QUEUED,
         RUNNING,
         FINISHED
     }
@@ -35,7 +34,7 @@ public class Status {
      * Create a new status.
      */
     protected Status() {
-        this.state = State.QUEUED;
+        this.state = State.RUNNING;
         this.result = Result.UNKNOWN;
     }
 
@@ -61,39 +60,9 @@ public class Status {
     }
 
     /**
-     * Compute the result.
-     * @param node the node to compute the result of
-     * @return Result
+     * Refresh the status.
      */
-    public final Result result(Pipeline.Node node) {
-        if (state != State.FINISHED) {
-            refresh(node);
-        }
-        return result;
-    }
-
-    /**
-     * Compute the state.
-     * @param node the node to compute the state of
-     * @return State
-     */
-    public final State state(Pipeline.Node node) {
-        if (state != State.FINISHED) {
-            refresh(node);
-        }
-        return state;
-    }
-
-    /**
-     * refresh the status for the given node.
-     * @param node the node to compute the status of
-     */
-    protected void refresh(Pipeline.Node node) {
-        if (node instanceof Pipeline.Stage) {
-            Status delegate = ((Pipeline.Stage)node).status();
-            state = delegate.state;
-            result = delegate.result;
-        }
+    protected void refresh() {
     }
 
     @Override

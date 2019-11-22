@@ -1,10 +1,5 @@
 package io.helidon.build.publisher.plugin;
 
-import hudson.Extension;
-import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
-import io.helidon.build.publisher.model.PipelineEvents.NodeEventType;
-import io.helidon.build.publisher.model.Status;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
@@ -12,6 +7,13 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import io.helidon.build.publisher.model.Pipeline;
+import io.helidon.build.publisher.model.PipelineEvents.PipelineCompleted;
+import io.helidon.build.publisher.model.Status;
+
+import hudson.Extension;
+import io.helidon.build.publisher.model.PipelineEvents;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionListener;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
@@ -32,7 +34,7 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
     private static final EmptyDecorator EMPTY_DECORATOR = new EmptyDecorator();
     private static final Map<FlowExecution, WeakReference<TaskListenerDecorator>> DECORATORS = new WeakHashMap<>();
 
-    private final PipelineEventsEmitter emitter;
+    private final PipelineAdapter emitter;
     private final BackendClient client;
     private final PipelineRunInfo runInfo;
 
@@ -46,8 +48,8 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
                     signatures.signatures
                 });
             }
-            emitter = new PipelineEventsEmitter(signatures, runInfo);
             client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            emitter = new PipelineAdapter(signatures, runInfo, client);
         } else {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Pipeline NOT enabled, runInfo={0}", runInfo);
@@ -83,7 +85,7 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
                     node
                 });
             }
-            emitter.offer(node, client);
+            emitter.offer(node);
         }
     }
 
@@ -158,7 +160,7 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
                                         dec.runInfo.excludeSyntheticSteps)
                             });
                         }
-                        dec.emitter.run().fireEvent(dec.client, NodeEventType.COMPLETED, dec.runInfo.id);
+                        dec.emitter.run().fireCompleted();
                         return;
                     }
                 }
@@ -173,9 +175,9 @@ final class FlowDecorator extends TaskListenerDecorator implements GraphListener
                     result
                 });
             }
-            BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads)
-                    .onEvent(new PipelineEvents.PipelineCompleted(runInfo.id, Status.State.FINISHED, result,
-                            System.currentTimeMillis()));
+            BackendClient client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            client.onEvent(new PipelineEvents.StageCompleted(runInfo.id, 0, result, run.getDuration()));
+            client.onEvent(new PipelineCompleted(runInfo.id));
         }
 
         @Override

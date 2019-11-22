@@ -1,15 +1,8 @@
 package io.helidon.build.publisher.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,24 +12,71 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import io.helidon.build.publisher.model.PipelineEvents.Event;
+import io.helidon.build.publisher.model.PipelineEvents.EventListener;
+import io.helidon.build.publisher.model.PipelineEvents.EventType;
+import io.helidon.build.publisher.model.PipelineEvents.NodeCompletedEvent;
+import io.helidon.build.publisher.model.PipelineEvents.StageCompleted;
+import io.helidon.build.publisher.model.PipelineEvents.StageCreated;
+import io.helidon.build.publisher.model.PipelineEvents.StepCompleted;
+import io.helidon.build.publisher.model.PipelineEvents.StepCreated;
+import io.helidon.build.publisher.model.Status.Result;
+import io.helidon.build.publisher.model.Status.State;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import static io.helidon.build.publisher.model.PipelineEvents.EventType.PIPELINE_COMPLETED;
+import static io.helidon.build.publisher.model.PipelineEvents.EventType.STAGE_COMPLETED;
+import static io.helidon.build.publisher.model.PipelineEvents.EventType.STAGE_CREATED;
+import static io.helidon.build.publisher.model.PipelineEvents.EventType.STEP_COMPLETED;
+import static io.helidon.build.publisher.model.PipelineEvents.EventType.STEP_CREATED;
+import static io.helidon.build.publisher.model.Pipeline.Stage.StageType.PARALLEL;
+import static io.helidon.build.publisher.model.Pipeline.Stage.StageType.SEQUENCE;
+import static io.helidon.build.publisher.model.Pipeline.Stage.StageType.STEPS;
 
 /**
  * Pipeline model.
  */
-@JsonDeserialize(using = Pipeline.Deserializer.class)
 public final class Pipeline {
 
-    final Sequence stages;
+    private static final Logger LOGGER = Logger.getLogger(Pipeline.class.getName());
+
+    final Sequence sequence;
+    final EventListener listener;
+    final String runId;
+
+    /**
+     * Create a new pipeline instance.
+     *
+     * @param runId pipeline run id
+     * @param status the status object
+     * @param timings the timings object
+     * @throws NullPointerException if status or timings is {@code null}
+     */
+    public Pipeline(String runId, Status status, Timings timings) {
+        this(runId, status, timings, PipelineEvents.NOOP_LISTENER);
+    }
 
     /**
      * Create a new pipeline instance.
      *
      * @param status the status object
      * @param timings the timings object
+     * @param listener event listener
+     * @param runId pipeline run id
      * @throws NullPointerException if status or timings is {@code null}
      */
-    public Pipeline(Status status, Timings timings) {
-        stages = new Sequence(status, timings);
+    public Pipeline(String runId, Status status, Timings timings, EventListener listener) {
+        this.runId = runId;
+        this.listener = listener;
+        this.sequence = new Sequence(status, timings, listener, runId);
     }
 
     /**
@@ -45,26 +85,7 @@ public final class Pipeline {
      */
     @JsonProperty
     public Sequence stages() {
-        return stages;
-    }
-
-    /**
-     * Fire an event.
-     *
-     * @param listener consumer of the event
-     * @param nodeEventType the node event type
-     * @param runId the run id
-     * @param run the run
-     */
-    void fireEvent(PipelineEvents.EventListener listener, PipelineEvents.NodeEventType nodeEventType, String runId,
-            PipelineRun run) {
-
-        if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
-            listener.onEvent(new PipelineEvents.PipelineCreated(runId, run.jobName, run.scmHead, run.scmHash,
-                    stages.timings.startTime, stages.state()));
-        } else {
-            listener.onEvent(new PipelineEvents.PipelineCompleted(runId, stages.state(), stages.result(), stages.endTime()));
-        }
+        return sequence;
     }
 
     /**
@@ -81,7 +102,7 @@ public final class Pipeline {
         StringBuilder sb = new StringBuilder(indent);
         sb.append("pipeline {\n");
         indent += "  ";
-        LinkedList<Stage> stack = new LinkedList<>(stages.stages);
+        LinkedList<Stage> stack = new LinkedList<>(sequence.stages);
         int parentId = 0;
         while (!stack.isEmpty()) {
             Stage stage = stack.peek();
@@ -135,63 +156,75 @@ public final class Pipeline {
      * Apply the given events.
      * @param events the events to apply
      */
-    public void applyEvents(List<PipelineEvents.Event> events) {
-        for (PipelineEvents.Event event : events) {
-            switch (event.eventType()) {
+    public void applyEvents(List<Event> events) {
+        for (Event event : events) {
+            EventType eventType = event.eventType();
+            if (sequence.status.state == State.FINISHED && eventType != EventType.PIPELINE_COMPLETED) {
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Skipping event, pipeline is in FINISHED state: {0}", event);
+                }
+                continue;
+            }
+            if (LOGGER.isLoggable(Level.FINE)) {
+                LOGGER.log(Level.FINE, "Applying event: {0}", event);
+            }
+            switch (eventType) {
                 case PIPELINE_COMPLETED:
+                    if (sequence.status.state != State.FINISHED) {
+                        sequence.status.state = State.FINISHED;
+                        sequence.status.result = Result.UNKNOWN;
+                    }
+                    break;
                 case STEP_COMPLETED:
                 case STAGE_COMPLETED:
-                    PipelineEvents.NodeCompletedEvent nodeCompleted = (PipelineEvents.NodeCompletedEvent) event;
-                    Node node = stages.nodesByIds.get(nodeCompleted.id);
+                    NodeCompletedEvent ncpt = (NodeCompletedEvent) event;
+                    Node node = sequence.nodesByIds.get(ncpt.id);
                     if (node == null) {
-                        throw new IllegalStateException("Unkown node, id=" + nodeCompleted.id);
+                        throw new IllegalStateException("Unkown node, id=" + ncpt.id);
                     }
-                    node.status.state = nodeCompleted.state;
-                    node.status.result = nodeCompleted.result;
-                    node.timings.endTime = nodeCompleted.endTime;
+                    node.status.state = State.FINISHED;
+                    node.status.result = ncpt.result;
+                    node.timings.endTime = ncpt.endTime;
                     break;
                 case STEP_CREATED:
-                    PipelineEvents.StepCreated stepCreated = (PipelineEvents.StepCreated) event;
-                    Node stepParent = stages.nodesByIds.get(stepCreated.parentId);
+                    StepCreated spcrt = (StepCreated) event;
+                    Node stepParent = sequence.nodesByIds.get(spcrt.parentId);
                     if (stepParent == null) {
-                        throw new IllegalStateException("Unkown node, id=" + stepCreated.parentId);
+                        throw new IllegalStateException("Unkown node, id=" + spcrt.parentId);
                     }
                     if (!(stepParent instanceof Steps)) {
                         throw new IllegalStateException("Invalid step parent node");
                     }
-                    if (stepCreated.index != ((Steps) stepParent).steps.size()) {
+                    if (spcrt.index != ((Steps) stepParent).steps.size()) {
                         throw new IllegalStateException("Invalid index");
                     }
-                    ((Steps) stepParent).addStep(new Step(stepCreated.id, (Steps) stepParent, stepCreated.name,
-                            stepCreated.path, stepCreated.args, stepCreated.meta, stepCreated.declared,
-                            new Status(stepCreated.state), new Timings(stepCreated.startTime)));
+                    ((Steps) stepParent).addStep(new Step(spcrt.id, (Steps) stepParent, spcrt.name, spcrt.path, spcrt.args,
+                            spcrt.meta, spcrt.declared, new Status(), new Timings(spcrt.startTime)));
                     break;
                 case STAGE_CREATED:
-                    PipelineEvents.StageCreated stageCreated = (PipelineEvents.StageCreated) event;
-                    Node stageParent = stages.nodesByIds.get(stageCreated.parentId);
+                    StageCreated sgcrt = (StageCreated) event;
+                    Node stageParent = sequence.nodesByIds.get(sgcrt.parentId);
                     if (stageParent == null) {
-                        throw new IllegalStateException("Unkown node, id=" + stageCreated.parentId);
+                        throw new IllegalStateException("Unkown node, id=" + sgcrt.parentId);
                     }
                     if (!(stageParent instanceof Stages)) {
                         throw new IllegalStateException("Invalid stage parent node");
                     }
-                    if (stageCreated.index != ((Stages) stageParent).stages.size()) {
+                    if (sgcrt.index != ((Stages) stageParent).stages.size()) {
                         throw new IllegalStateException("Invalid index");
                     }
-                    switch (stageCreated.stageType) {
+                    switch (sgcrt.stageType) {
                         case PARALLEL:
-                            ((Stages) stageParent).addStage(new Parallel(stageCreated.id, stageParent,
-                                    stageCreated.name, stageCreated.path,
-                                    new Status(stageCreated.state), new Timings(stageCreated.startTime)));
+                            ((Stages) stageParent).addStage(new Parallel(sgcrt.id, stageParent, sgcrt.name, sgcrt.path,
+                                    new Status(), new Timings(sgcrt.startTime)));
                             break;
                         case SEQUENCE:
-                            ((Stages) stageParent).addStage(new Sequence(stageCreated.id, stageParent,
-                                    stageCreated.name, stageCreated.path,
-                                    new Status(stageCreated.state), new Timings(stageCreated.startTime)));
+                            ((Stages) stageParent).addStage(new Sequence(sgcrt.id, stageParent, sgcrt.name, sgcrt.path,
+                                    new Status(), new Timings(sgcrt.startTime)));
                             break;
                         case STEPS:
-                            ((Stages) stageParent).addStage(new Steps(stageCreated.id, stageParent,
-                                    new Status(stageCreated.state), new Timings(stageCreated.startTime)));
+                            ((Stages) stageParent).addStage(new Steps(sgcrt.id, stageParent, new Status(),
+                                    new Timings(sgcrt.startTime)));
                             break;
                         default:
                         // do nothing
@@ -217,17 +250,14 @@ public final class Pipeline {
         final String path;
         final Status status;
         final Timings timings;
+        final EventListener listener;
+        final String runId;
 
-        /**
-         * Create a new root graph node.
-         *
-         * @param status the status object
-         * @param timings the timings object
-         * @throws NullPointerException if status or timings is {@code null}
-         */
-        private Node(Status status, Timings timings) {
+        private Node(Status status, Timings timings, EventListener listener, String runId) {
             this.status = Objects.requireNonNull(status, "status is null");
             this.timings = Objects.requireNonNull(timings, "timings is null");
+            this.listener = Objects.requireNonNull(listener, "listener is null");
+            this.runId = Objects.requireNonNull(runId, "runId is null");
             this.parent = null;
             this.name = null;
             this.path = "/";
@@ -237,24 +267,12 @@ public final class Pipeline {
             this.nodesByIds.put(id, this);
         }
 
-        /**
-         * Create a new graph node.
-         *
-         * @param id the id
-         * @param parent enclosing node, must be non {@code null}
-         * @param name stage name, may be {@code null}
-         * @param path stage path, must be a valid {@code String} starting with a {@code /}
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws IllegalArgumentException if path does not start with a {@code /}
-         * @throws NullPointerException if parent, status or timings is {@code null}
-         */
         private Node(int id, Node parent, String name, String path, Status status, Timings timings) {
             this.status = Objects.requireNonNull(status, "status is null");
             this.timings = Objects.requireNonNull(timings, "timings is null");
             this.parent = Objects.requireNonNull(parent, "parent is null");
+            this.listener = parent.listener;
+            this.runId = parent.runId;
             this.nodesByIds = parent.nodesByIds;
             this.nextId = parent.nextId;
             if (id <= 0) {
@@ -342,36 +360,38 @@ public final class Pipeline {
          */
         @JsonProperty
         public final long endTime() {
-            return timings.endTime(this);
+            return timings.endTime;
+        }
+
+        /**
+         * Get the state.
+         *
+         * @return State
+         */
+        @JsonProperty
+        public final State state() {
+            return status.state;
         }
 
         /**
          * Get the result.
          *
-         * @return Status.State
+         * @return Result
          */
         @JsonProperty
-        public final Status.State state() {
-            return status.state(this);
+        public final Result result() {
+            return status.result;
         }
 
         /**
-         * Get the result.
-         *
-         * @return Status.Result
+         * Fire a created event.
          */
-        @JsonProperty
-        public final Status.Result result() {
-            return status.result(this);
-        }
+        public abstract void fireCreated();
 
         /**
-         * Fire an event.
-         * @param listener consumer of the event
-         * @param nodeEventType the node event type
-         * @param id the run id
+         * Fire a completed event.
          */
-        public abstract void fireEvent(PipelineEvents.EventListener listener, PipelineEvents.NodeEventType nodeEventType, String id);
+        public abstract void fireCompleted();
 
         /**
          * Get the previous Node in the parent node.
@@ -437,31 +457,11 @@ public final class Pipeline {
 
         final StageType type;
 
-        /**
-         * Create a new root stage.
-         * @param type stage type
-         * @param status the status object
-         * @param timings the timings object
-         */
-        private Stage(StageType type, Status status, Timings timings) {
-            super(status, timings);
+        private Stage(StageType type, Status status, Timings timings, EventListener listener, String runId) {
+            super(status, timings, listener, runId);
             this.type = type;
         }
 
-        /**
-         * Create a new stage.
-         *
-         * @param id the node id
-         * @param type the stage type
-         * @param parent the parent stage that this step is part of
-         * @param name the stage name, must be non {@code null} and non empty
-         * @param path the stage path, must be non {@code null} and non empty
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws NullPointerException if type, status or timings is {@code null}
-         */
         private Stage(StageType type, int id, Node parent, String name, String path, Status status, Timings timings) {
             super(id, parent, name, path, status, timings);
             this.type = type;
@@ -496,13 +496,6 @@ public final class Pipeline {
             return prefix + "stage[" + name + "]/";
         }
 
-        /**
-         * Create a stage path.
-         * @param parent the parent node, must be non {@code null}
-         * @param stageType the stage type
-         * @param name the stage name
-         * @return String
-         */
         private static String createPath(Node parent, Stage.StageType stageType, String name) {
             Objects.requireNonNull(parent, "parent is null");
             if (stageType == StageType.SEQUENCE) {
@@ -581,21 +574,14 @@ public final class Pipeline {
         }
 
         @Override
-        public void fireEvent(PipelineEvents.EventListener listener, PipelineEvents.NodeEventType nodeEventType, String runId) {
-            if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
-                int parentId = parent == null ? -1 : parent.id;
-                listener.onEvent(new PipelineEvents.StageCreated(runId, id, parentId, index(), name, path, timings.startTime,
-                        state(), type));
-            } else {
-                listener.onEvent(new PipelineEvents.StageCompleted(runId, id, state(), result(), endTime()));
+        public void fireCreated() {
+            Pipeline.Stage previous = previous();
+            if (previous != null) {
+                previous.fireCompleted();
             }
+            int parentId = parent == null ? -1 : parent.id;
+            listener.onEvent(new StageCreated(runId, id, parentId, index(), name, path, timings.startTime, type));
         }
-
-        /**
-         * Infer status from the graph.
-         * @return Status
-         */
-        public abstract Status status();
     }
 
     /**
@@ -605,17 +591,6 @@ public final class Pipeline {
 
         final List<Step> steps = new LinkedList<>();
 
-        /**
-         * Create a new steps stage.
-         *
-         * @param id the node id
-         * @param parent the parent stage that this step is part of
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws NullPointerException if type, status or timings is {@code null}
-         */
         private Steps(int id, Node parent, Status status, Timings timings) {
             super(StageType.STEPS, id, parent, null, Objects.requireNonNull(parent, "parent").path, status, timings);
         }
@@ -662,20 +637,12 @@ public final class Pipeline {
             steps.add(step);
         }
 
-        /**
-         * Pretty print this step stage.
-         *
-         * @param indent indentation
-         * @param excludeSyntheticSteps if {@code true} the steps that are not declared are filtered out
-         * @param excludeMetaSteps if {@code true} the meta steps are filtered out
-         * @return String
-         */
-        public final String prettyPrint(String indent, boolean excludeSyntheticSteps, boolean excludeMetaSteps) {
+        private String prettyPrint(String indent, boolean excludeSyntheticSteps, boolean excludeMetaSteps) {
             StringBuilder sb = new StringBuilder();
             sb.append(indent).append("steps {\n");
             indent += "  ";
             for (Step step : steps) {
-                sb.append(step.prettyPrint(indent));
+                sb.append(step.name).append(" ").append(step.args);
                 if (!step.isIncluded(excludeSyntheticSteps, excludeMetaSteps)) {
                     sb.append(" // filtered");
                 }
@@ -687,13 +654,16 @@ public final class Pipeline {
         }
 
         @Override
-        public Status status() {
-            Status.State state = head() ? Status.State.RUNNING : Status.State.FINISHED;
-            Status.Result result = Status.Result.SUCCESS;
+        public void fireCompleted() {
+            Step last = null;
             if (!steps.isEmpty()) {
-                result = steps.get(steps.size() - 1).result();
+                last = steps.get(steps.size() - 1);
+                last.fireCompleted();
             }
-            return new Status(state, result);
+            status.state = State.FINISHED;
+            status.result = last != null ? last.result() : Result.SUCCESS;
+            timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
+            listener.onEvent(new StageCompleted(runId, id, status.result, timings.endTime));
         }
     }
 
@@ -706,21 +676,6 @@ public final class Pipeline {
         final boolean meta;
         final boolean declared;
 
-        /**
-         * Create a new step instance.
-         *
-         * @param id the node id
-         * @param parent the parent stage that this step is part of
-         * @param name the step name, must be non {@code null} and non empty
-         * @param args the step arguments
-         * @param meta {@code true} if this step is a meta step
-         * @param declared {@code true} if this step is declared
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws NullPointerException if status or timings is {@code null}
-         */
         private Step(int id, Steps parent, String name, String path, String args, boolean meta, boolean declared,
                 Status status, Timings timings) {
 
@@ -820,53 +775,30 @@ public final class Pipeline {
             return true;
         }
 
-        /**
-         * Test if this step should be included for the given flags.
-         *
-         * @param excludeSyntheticSteps if {@code true} this step is included only if declared
-         * @param excludeMetaSteps if {@code true} this step is not included if meta
-         * @return {@code true} if included, {@code false} if excluded
-         */
-        public boolean isIncluded(boolean excludeSyntheticSteps, boolean excludeMetaSteps) {
+        private boolean isIncluded(boolean excludeSyntheticSteps, boolean excludeMetaSteps) {
             return ((excludeSyntheticSteps && declared) || (!excludeSyntheticSteps && declared))
                     && ((excludeMetaSteps && !meta) || (!excludeMetaSteps && meta));
         }
 
-        /**
-         * Pretty print this step.
-         *
-         * @param indent indentation
-         * @return String
-         */
-        public String prettyPrint(String indent) {
-            StringBuilder sb = new StringBuilder();
-            sb.append(indent).append(name);
-            if (!args.isEmpty()) {
-                String[] argsLines = args.split("\\r?\\n");
-                sb.append(" ");
-                for (String line : argsLines) {
-                    String argPreview = line.trim();
-                    if (!argPreview.isEmpty()) {
-                        sb.append(argPreview);
-                        break;
-                    }
-                }
-                if (argsLines.length > 1) {
-                    sb.append(" [...]");
-                }
+        @Override
+        public void fireCreated() {
+            Pipeline.Step previous = previous();
+            if (previous != null) {
+                previous.fireCompleted();
             }
-            return sb.toString();
+            int parentId = parent == null ? -1 : parent.id;
+            listener.onEvent(new StepCreated(runId, id, parentId, index(), name, path, timings.startTime, args, meta, declared));
         }
 
         @Override
-        public void fireEvent(PipelineEvents.EventListener listener, PipelineEvents.NodeEventType nodeEventType, String runId) {
-            if (nodeEventType == PipelineEvents.NodeEventType.CREATED) {
-                int parentId = parent == null ? -1 : parent.id;
-                listener.onEvent(new PipelineEvents.StepCreated(runId, id, parentId, index(), name,timings.startTime,
-                        state(), args, meta, declared));
-            } else {
-                listener.onEvent(new PipelineEvents.StepCompleted(runId, id, state(), result(), endTime()));
+        public void fireCompleted() {
+            status.refresh();
+            timings.refresh();
+            status.state = State.FINISHED;
+            if (timings.endTime == 0) {
+                timings.endTime = System.currentTimeMillis();
             }
+            listener.onEvent(new StepCompleted(runId, id, status.result, timings.endTime));
         }
 
         /**
@@ -884,16 +816,15 @@ public final class Pipeline {
             return s;
         }
 
-        /**
-         * Create a step path.
-         * @param parent the parent node, must be non {@code null}
-         * @param stageType the stage type
-         * @param name the stage name
-         * @return String
-         */
         private static String createPath(Node parent, String name, String args) {
             Objects.requireNonNull(parent, "parent is null");
-            return createPath(parent.path, name, args);
+            String s = parent.path + "step(" + name + ")";
+            if (!args.isEmpty()) {
+                try {
+                    s += "=" + URLEncoder.encode(args, "UTF-8").replace("\\+", "%20");
+                } catch (UnsupportedEncodingException ex) { }
+            }
+            return s;
         }
     }
 
@@ -904,31 +835,10 @@ public final class Pipeline {
 
         final List<Stage> stages = new LinkedList<>();
 
-        /**
-         * Create a new root stages.
-         * @param type stage type
-         * @param status the status object
-         * @param timings the timings object
-         */
-        private Stages(StageType type, Status status, Timings timings) {
-            super(type, status, timings);
+        private Stages(StageType type, Status status, Timings timings, EventListener listener, String runId) {
+            super(type, status, timings, listener, runId);
         }
 
-        /**
-         * Create a new multi stage.
-         *
-         * @param type stage type, must be non {@code null}
-         * @param id node id
-         * @param parent parent stage, may be {@code null}
-         * @param name stage name, may be {@code null}
-         * @param path run id, must be a valid {@code String} starting with a {@code /}
-         * @param status the status object
-         * @param timing the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws IllegalArgumentException if path does not start with a {@code /}
-         * @throws NullPointerException if type, status or timings is {@code null}
-         */
         private Stages(StageType type, int id, Node parent, String name, String path, Status status, Timings timings) {
             super(type, id, parent, name, path, status, timings);
         }
@@ -975,20 +885,6 @@ public final class Pipeline {
      */
     public static final class Parallel extends Stages {
 
-        /**
-         * Create a new parallel stages.
-         *
-         * @param id the node id
-         * @param parent parent stage, may be {@code null}
-         * @param name stage name, may be {@code null}
-         * @param path run id, must be a valid {@code String} starting with a {@code /}
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws IllegalArgumentException if path does not start with a {@code /}
-         * @throws NullPointerException if status or timings is {@code null}
-         */
         private Parallel(int id, Node parent, String name, String path, Status status, Timings timings) {
             super(StageType.PARALLEL, id, parent, name, path, status, timings);
         }
@@ -1008,16 +904,25 @@ public final class Pipeline {
         }
 
         @Override
-        public Status status() {
-            Status.State state = head() ? Status.State.RUNNING : Status.State.FINISHED;
-            Status.Result result = Status.Result.SUCCESS;
-            for (Pipeline.Stage stage : stages) {
-                Status.Result res = stage.result();
+        public void fireCompleted() {
+            Result result = Result.SUCCESS;
+            long endTime = 0;
+            // result is the worst nested result
+            // endTime is the longest nested endTime
+            for(Stage stage : stages) {
+                stage.fireCompleted();
+                Result res = stage.status.result;
                 if (res.ordinal() < result.ordinal()) {
-                    result = res;
+                    result  = res;
+                }
+                if (stage.timings.endTime > endTime) {
+                    endTime = stage.timings.endTime;
                 }
             }
-            return new Status(state, result);
+            status.state = State.FINISHED;
+            status.result = result;
+            timings.endTime = endTime > 0 ? endTime : System.currentTimeMillis();
+            listener.onEvent(new StageCompleted(runId, id, status.result, timings.endTime));
         }
     }
 
@@ -1030,25 +935,13 @@ public final class Pipeline {
          * Create a new root sequence stage.
          * @param status the status object
          * @param timings the timings object
+         * @param listener event listener
+         * @param runId pipeline run id
          */
-        private Sequence(Status status, Timings timings) {
-            super(StageType.SEQUENCE, status, timings);
+        private Sequence(Status status, Timings timings, EventListener listener, String runId) {
+            super(StageType.SEQUENCE, status, timings, listener, runId);
         }
 
-        /**
-         * Create a new sequence stages.
-         *
-         * @param id the node id
-         * @param parent parent stage, may be {@code null}
-         * @param name stage name, may be {@code null}
-         * @param path run id, must be a valid {@code String} starting with a {@code /}
-         * @param status the status object
-         * @param timings the timings object
-         * @throws IllegalArgumentException if id is {@code <= 0}
-         * @throws IllegalArgumentException if id is already used
-         * @throws IllegalArgumentException if path does not start with a {@code /}
-         * @throws NullPointerException if status or timings is {@code null}
-         */
         private Sequence(int id, Node parent, String name, String path, Status status, Timings timings) {
             super(StageType.SEQUENCE, id, parent, name, path, status, timings);
         }
@@ -1068,117 +961,101 @@ public final class Pipeline {
         }
 
         @Override
-        public Status status() {
-            Status.State state = head() ? Status.State.RUNNING : Status.State.FINISHED;
-            Status.Result result = Status.Result.SUCCESS;
+        public void fireCompleted() {
+            Stage last = null;
             if (!stages.isEmpty()) {
-                  result = stages.get(stages.size() - 1).result();
+                last = stages.get(stages.size() - 1);
+                last.fireCompleted();
             }
-            return new Status(state, result);
+            status.state = State.FINISHED;
+            status.result = last != null ? last.result() : Result.SUCCESS;
+            timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
+            listener.onEvent(new StageCompleted(runId, id, status.result, timings.endTime));
         }
     }
 
-    /**
-     * Custom {@link Deserializer} for {@link Pipeline}.
-     */
-    public static final class Deserializer extends StdDeserializer<Pipeline> {
+    static Pipeline readPipeline(JsonNode node, String runId) throws IOException, JsonProcessingException {
+        JsonNode rootNode = node.get("stages"); 
+        Status status = readStatus(rootNode);
+        Timings timings = readTimings(rootNode);
+        Pipeline graph = new Pipeline(runId, status, timings);
 
-        public Deserializer() {
-            this(null);
+        // create the stages (depth first)
+        LinkedList<JsonNode> stack = new LinkedList<>();
+        Iterator<JsonNode> stagesNodes = rootNode.get("stages").elements();
+        while (stagesNodes.hasNext()) {
+            stack.add(stagesNodes.next());
         }
-
-        public Deserializer(Class<?> vc) {
-            super(vc);
-        }
-
-        @Override
-        public Pipeline deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-            JsonNode node = jp.getCodec().readTree(jp);
-
-            // create the run.
-            JsonNode root = node.get("stages");
-            Status status = createStatus(root);
-            Timings timings = createTimings(root);
-            Pipeline graph = new Pipeline(status, timings);
-
-            // create the stages (depth first)
-            LinkedList<JsonNode> stack = new LinkedList<>();
-            Iterator<JsonNode> stages = root.get("stages").elements();
-            while (stages.hasNext()) {
-                stack.add(stages.next());
-            }
-            Node parent = graph.stages;
-            while (!stack.isEmpty()) {
-                JsonNode stageNode = stack.peek();
-                int stageId = stageNode.get("id").asInt(-1);
-                Stage.StageType stageType = Stage.StageType.valueOf(stageNode.get("type").asText());
-                if (stageType == Stage.StageType.STEPS) {
-                    // tree leaf
-                    Steps steps = new Steps(stageId, parent, createStatus(stageNode), createTimings(stageNode));
-                    Iterator<JsonNode> nestedSteps = stageNode.get("steps").elements();
-                    while (nestedSteps.hasNext()) {
-                        JsonNode nestedStep = nestedSteps.next();
-                        steps.addStep(new Step(nestedStep.get("id").asInt(), steps, nestedStep.get("name").asText(),
-                                nestedStep.get("path").asText(), nestedStep.get("args").asText(),
-                                nestedStep.get("meta").asBoolean(), nestedStep.get("declared").asBoolean(),
-                                createStatus(nestedStep), createTimings(nestedStep)));
-                    }
-                    ((Stages)parent).addStage(steps);
+        Node parent = graph.sequence;
+        while (!stack.isEmpty()) {
+            JsonNode stageNode = stack.peek();
+            int stageId = stageNode.get("id").asInt(-1);
+            Stage.StageType stageType = Stage.StageType.valueOf(stageNode.get("type").asText());
+            if (stageType == Stage.StageType.STEPS) {
+                // tree leaf
+                Steps steps = new Steps(stageId, parent, readStatus(stageNode), readTimings(stageNode));
+                Iterator<JsonNode> nestedSteps = stageNode.get("steps").elements();
+                while (nestedSteps.hasNext()) {
+                    JsonNode nestedStep = nestedSteps.next();
+                    steps.addStep(new Step(nestedStep.get("id").asInt(), steps, nestedStep.get("name").asText(),
+                            nestedStep.get("path").asText(), nestedStep.get("args").asText(),
+                            nestedStep.get("meta").asBoolean(), nestedStep.get("declared").asBoolean(),
+                            readStatus(nestedStep), readTimings(nestedStep)));
+                }
+                ((Stages) parent).addStage(steps);
+                stack.pop();
+            } else {
+                // tree node
+                if (parent.id == stageId) {
+                    // leaving a node (2nd pass)
+                    parent = parent.parent;
                     stack.pop();
                 } else {
-                    // tree node
-                    if (parent.id == stageId) {
-                        // leaving a node (2nd pass)
-                        parent = parent.parent != null ? parent.parent : parent;
-                        stack.pop();
+                    // entering a node
+
+                    // create the stage
+                    Stages stage;
+                    switch (stageType) {
+                        case SEQUENCE:
+                            stage = new Sequence(stageId, parent, stageNode.get("name").asText(),
+                                    stageNode.get("path").asText(null), readStatus(stageNode), readTimings(stageNode));
+                            break;
+                        case PARALLEL:
+                            stage = new Parallel(stageId, parent, stageNode.get("name").asText(),
+                                    stageNode.get("path").asText(null), readStatus(stageNode), readTimings(stageNode));
+                            break;
+                        default:
+                            throw new IllegalStateException("Unknown type: " + stageType);
+                    }
+                    ((Stages) parent).addStage(stage);
+
+                    // add nested stages on the stack
+                    JsonNode nestedStages = stageNode.get("stages");
+                    if (nestedStages.size() > 0) {
+                        Iterator<JsonNode> nestedStagesIt = nestedStages.elements();
+                        while (nestedStagesIt.hasNext()) {
+                            stack.push(nestedStagesIt.next());
+                        }
+                        parent = stage;
                     } else {
-                        // entering a node
-
-                        // create the stage
-                        Stages stage;
-                        switch (stageType) {
-                            case SEQUENCE:
-                                stage = new Sequence(stageId, parent, stageNode.get("name").asText(),
-                                        stageNode.get("path").asText(null), createStatus(stageNode), createTimings(stageNode));
-                                break;
-                            case PARALLEL:
-                                stage = new Parallel(stageId, parent, stageNode.get("name").asText(),
-                                        stageNode.get("path").asText(null), createStatus(stageNode), createTimings(stageNode));
-                                break;
-                            default:
-                                throw new IllegalStateException("Unknown type: " + stageType);
-                        }
-                        ((Stages)parent).addStage(stage);
-
-                        // add nested stages on the stack
-                        JsonNode nestedStages = stageNode.get("stages");
-                        if (nestedStages.size() > 0) {
-                            Iterator<JsonNode> nestedStagesIt = nestedStages.elements();
-                            while (nestedStagesIt.hasNext()) {
-                                stack.push(nestedStagesIt.next());
-                            }
-                            parent = stage;
-                        } else {
-                            // one pass only
-                            parent = parent.parent != null ? parent.parent : parent;
-                            stack.pop();
-                        }
+                        // one pass only
+                        stack.pop();
                     }
                 }
             }
-            return graph;
         }
+        return graph;
+    }
 
-        private static Status createStatus(JsonNode node) {
-            String state = node.get("state").asText(null);
-            String result = node.get("result").asText(null);
-            return new Status(Status.State.valueOf(state), result != null ? Status.Result.valueOf(result) : null);
-        }
+    private static Status readStatus(JsonNode node) {
+        String state = node.get("state").asText(null);
+        String result = node.get("result").asText(null);
+        return new Status(State.valueOf(state), result != null ? Result.valueOf(result) : null);
+    }
 
-        private static Timings createTimings(JsonNode node) {
-            long startTime = node.get("startTime").asLong(-1);
-            long endTime = node.get("endTime").asLong(-1);
-            return new Timings(startTime, endTime);
-        }
+    private static Timings readTimings(JsonNode node) {
+        long startTime = node.get("startTime").asLong(-1);
+        long endTime = node.get("endTime").asLong(-1);
+        return new Timings(startTime, endTime);
     }
 }

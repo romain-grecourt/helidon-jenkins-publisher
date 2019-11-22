@@ -1,13 +1,22 @@
 package io.helidon.build.publisher.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import java.util.Objects;
+import java.io.IOException;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import io.helidon.build.publisher.model.PipelineEvents.PipelineCompleted;
+import io.helidon.build.publisher.model.PipelineEvents.PipelineCreated;
 
 /**
  * Pipeline run.
  */
+@JsonDeserialize(using = PipelineRun.Deserializer.class)
 public final class PipelineRun {
 
     final String jobName;
@@ -22,7 +31,7 @@ public final class PipelineRun {
      */
     public PipelineRun(PipelineEvents.PipelineCreated runCreated) {
         this(runCreated.runId, runCreated.jobName, runCreated.scmHead, runCreated.scmHash,
-                new Pipeline(new Status(runCreated.state), new Timings(runCreated.startTime)));
+                new Pipeline(runCreated.runId, new Status(), new Timings(runCreated.startTime)));
     }
 
     /**
@@ -34,14 +43,9 @@ public final class PipelineRun {
      * @param scmHash the GIT commit id that this run was triggered against, must be a valid {@code String}
      * @param pipeline the pipeline, must be non {@code null}
      * @throws IllegalArgumentException if jobName, scmHead or scmHash are not valid {@code String}
-     * @throws IllegalArgumentException if buildNumber or not a positive value
      * @throws NullPointerException if pipeline {@code null}
      */
-    @JsonCreator
-    public PipelineRun(@JsonProperty("id") String id, @JsonProperty("jobName") String jobName,
-            @JsonProperty("scmHead") String scmHead, @JsonProperty("scmHash") String scmHash,
-            @JsonProperty("pipeline") Pipeline pipeline) {
-
+    public PipelineRun(String id, String jobName, String scmHead, String scmHash, Pipeline pipeline) {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("id is null or empty");
         }
@@ -58,7 +62,7 @@ public final class PipelineRun {
         this.jobName = jobName;
         this.scmHead = scmHead;
         this.scmHash = scmHash;
-        this.pipeline = pipeline;
+        this.pipeline = Objects.requireNonNull(pipeline, "pipeline is null!");
     }
 
     /**
@@ -129,14 +133,22 @@ public final class PipelineRun {
     }
 
     /**
-     * Fire an event.
-     *
-     * @param listener consumer of the event
-     * @param nodeEventType the node event type
-     * @param runId the run id
+     * Fire a created event.
      */
-    public void fireEvent(PipelineEvents.EventListener listener, PipelineEvents.NodeEventType nodeEventType, String runId) {
-        pipeline.fireEvent(listener, nodeEventType, runId, this);
+    public void fireCreated() {
+        if (pipeline != null) {
+            pipeline.listener.onEvent(new PipelineCreated(id, jobName, scmHead, scmHash, pipeline.sequence.timings.startTime));
+        }
+    }
+
+    /**
+     * Fire a completed event.
+     */
+    public void fireCompleted() {
+        if (pipeline != null) {
+            pipeline.sequence.fireCompleted();
+            pipeline.listener.onEvent(new PipelineCompleted(id));
+        }
     }
 
     @Override
@@ -159,5 +171,30 @@ public final class PipelineRun {
         }
         final PipelineRun other = (PipelineRun) obj;
         return Objects.equals(this.id, other.id);
+    }
+
+    /**
+     * Custom {@link Deserializer} for {@link PipelineRun}.
+     */
+    public static final class Deserializer extends StdDeserializer<PipelineRun> {
+
+        public Deserializer() {
+            this(null);
+        }
+
+        public Deserializer(Class<?> vc) {
+            super(vc);
+        }
+
+        @Override
+        public PipelineRun deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            JsonNode node = jp.getCodec().readTree(jp);
+            String id = node.get("id").asText();
+            String jobName = node.get("jobName").asText();
+            String scmHead = node.get("scmHead").asText();
+            String scmHash = node.get("scmHash").asText();
+            Pipeline pipeline = Pipeline.readPipeline(node.get("pipeline"), id);
+            return new PipelineRun(id, jobName, scmHead, scmHash, pipeline);
+        }
     }
 }
