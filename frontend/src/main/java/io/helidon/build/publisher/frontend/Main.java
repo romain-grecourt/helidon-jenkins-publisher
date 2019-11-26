@@ -74,7 +74,7 @@ public final class Main {
                 .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))
                 .register(MetricsSupport.create())
                 .register(frontendService)
-                .register(StaticContentSupport.builder("/webapp").welcomeFileName("index.html"))
+                .register(StaticContentSupport.builder("/WEB").welcomeFileName("index.html"))
                 .build();
     }
 

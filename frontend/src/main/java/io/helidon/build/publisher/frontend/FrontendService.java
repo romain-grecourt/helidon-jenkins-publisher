@@ -35,7 +35,11 @@ final class FrontendService implements Service {
     FrontendService(String path) {
         Path dirPath = FileSystems.getDefault().getPath(path);
         if (!Files.exists(dirPath)) {
-            throw new IllegalArgumentException("local storage does not exist");
+            try {
+                Files.createDirectory(dirPath);
+            } catch (IOException ex) {
+                throw new IllegalStateException("Error initializing storage directory", ex);
+            }
         }
         this.storagePath = dirPath;
     }

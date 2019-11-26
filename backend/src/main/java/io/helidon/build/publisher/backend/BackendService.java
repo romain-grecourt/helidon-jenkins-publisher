@@ -39,7 +39,11 @@ final class BackendService implements Service {
     BackendService(String path, int appenderThreads) {
         Path dirPath = FileSystems.getDefault().getPath(path);
         if (!Files.exists(dirPath)) {
-            throw new IllegalArgumentException("local storage does not exist: " + dirPath);
+            try {
+                Files.createDirectory(dirPath);
+            } catch (IOException ex) {
+                throw new IllegalStateException("Error initializing storage directory", ex);
+            }
         }
         this.storagePath = dirPath;
         this.appender = new OutputAppender(storagePath, appenderThreads);

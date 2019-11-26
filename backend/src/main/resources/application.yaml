@@ -2,4 +2,4 @@ server:
   port: 9090
   host: 0.0.0.0
 
-storageLocation: "./storage"
+storageLocation: "../.storage"
