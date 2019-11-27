@@ -6,7 +6,6 @@ import vuetify from './plugins/vuetify'
 import App from './App.vue'
 import routes from './routes'
 import './static/favicon.png'
-import './static/helidon_logo_white_outline.png'
 
 
 Vue.use(VueRouter)
