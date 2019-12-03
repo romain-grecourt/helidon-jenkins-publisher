@@ -5,8 +5,8 @@
     <h2>Artifacts</h2>
     <v-subheader>9 files.</v-subheader>
     <v-row justify="center" class="px-5 mt-4">
-      <v-expansion-panels accordion multiple>
-        <v-expansion-panel v-for="item in items">
+      <v-expansion-panels accordion multiple :value="panel">
+        <v-expansion-panel v-for="(item,i) in items" v-bind:key="i">
           <v-expansion-panel-header>
             <v-badge overlap
                      class="mr-4 noflex ">
@@ -51,10 +51,18 @@
     background-color: #353434;
     margin-left: 20px;
   }
+  .v-treeview {
+    background-color: #353434;
+  }
 </style>
 <script>
   export default {
     name: 'PipelineArtifacts',
+    computed: {
+      panel(){
+        return this.$route.params.stageid ? [ 0 ] : [];
+      }
+    },
     data: () => ({
       files: {
         html: 'mdi-language-html5',

@@ -7,12 +7,10 @@ const PipelineArtifacts = () => import('@/components/PipelineArtifacts')
 const routes = [
   {
     path: '/',
-    name: 'Pipelines',
     component: Pipelines 
   },
   {
-    path: '/:id/',
-    name: 'Pipeline',
+    path: '/:pipelineid/',
     component: Pipeline,
     children:[
         {
@@ -21,17 +19,26 @@ const routes = [
         },
         {
           path: 'view',
-          name: 'PipelineView',
+          component: PipelineView
+        },
+        {
+          path: 'view/:stepid/',
           component: PipelineView
         },
         {
           path: 'tests',
-          name: 'PipelineTests',
+          component: PipelineTests
+        },
+        {
+          path: 'tests/:stageid/',
           component: PipelineTests
         },
         {
           path: 'artifacts',
-          name: 'PipelineArtifacts',
+          component: PipelineArtifacts
+        },
+        {
+          path: 'artifacts/:stageid/',
           component: PipelineArtifacts
         }
     ]

@@ -7,8 +7,9 @@
       >
         <v-row
           align="center"
-          justify="center">
-          <v-col cols="8">
+          justify="center"
+          class="mx-0">
+          <v-col cols="12" sm="12" md="10" lg="8">
             <h1>Pipelines</h1>
             <v-simple-table class="mt-4 mb-4">
               <template v-slot:default>
@@ -16,8 +17,8 @@
                   <tr>
                     <th class="text-left">Status</th>
                     <th class="text-left">Title</th>
-                    <th class="text-left"><v-icon class="mr-2">mdi-git</v-icon>Repository</th>
-                    <th class="text-left"><v-icon class="mr-2">mdi-source-branch</v-icon>Branch/Tag</th>
+                    <th class="text-left hidden-xs-only"><v-icon class="mr-2">mdi-git</v-icon>Repository</th>
+                    <th class="text-left hidden-xs-only"><v-icon class="mr-2">mdi-source-branch</v-icon>Branch/Tag</th>
                     <th class="text-left"><v-icon class="mr-2">mdi-calendar-clock</v-icon>When</th>
                   </tr>
                 </thead>
@@ -33,8 +34,8 @@
                       <v-icon v-else :color="statusColors[item.status]">{{ statusIcons[item.status] }}</v-icon>
                     </td>
                     <td>{{ item.title }}</td>
-                    <td>{{item.repository}}</td>
-                    <td>{{item.branch}}</td>
+                    <td class="hidden-xs-only">{{item.repository}}</td>
+                    <td class="hidden-xs-only">{{item.branch}}</td>
                     <td>{{ item.when }}</td>
                   </tr>
                 </tbody>

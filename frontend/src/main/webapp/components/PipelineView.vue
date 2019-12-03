@@ -10,26 +10,15 @@
           dense
           hoverable
           shaped
-          openOnClick
           style="width:100%"
           :items="items"
+          v-on:update:open="test"
           >
         <template v-slot:prepend="{ item }">
-          <v-badge v-if="item.type && item.type=='TESTS'"
-                   overlap
-                   class="mr-4"
-                   :color="statusColors[item.status]">
-            <template
-                v-if="item.status=='UNSTABLE'"
-                v-slot:badge
-                >!
-            </template>
-            <v-icon>mdi-bug</v-icon>
-          </v-badge>
-          <v-progress-circular v-else-if="item.status=='RUNNING'"
+          <v-progress-circular v-if="item.status=='RUNNING'"
                                size="20"
                                width="3"
-                               class="mr-4"
+                               class="mr-5"
                                indeterminate
                                color="primary"
                               ></v-progress-circular>
@@ -37,11 +26,7 @@
               v-else-if="item.status"
               :color="statusColors[item.status]"
               class="mr-4"
-              >
-            {{ statusIcons[item.status] }}
-          </v-icon>
-          <v-icon v-else-if="item.type=='ARTIFACTS'" class="mr-4">
-            mdi-cube
+              >{{ statusIcons[item.status] }}
           </v-icon>
           <v-icon v-else-if="item.type=='SEQUENCE'">
             mdi-hexagon-outline
@@ -50,7 +35,91 @@
             mdi-layers-triple-outline
           </v-icon>
         </template>
+        <template v-slot:label="{ item }">
+          {{item.name}}
+          <v-chip v-if="item.tests||item.artifacts" class="ml-4">
+            <v-btn v-if="item.tests"
+                   fab x-small icon
+                   :to="toTests(item.id)">
+              <v-icon class="px-0">mdi-bug-outline</v-icon>
+            </v-btn>
+            <v-btn v-if="item.artifacts"
+                   fab x-small icon
+                   :to="toArtifacts(item.id)">
+              <v-icon class="px-0">mdi-cube-outline</v-icon>
+            </v-btn>
+          </v-chip>
+          <v-chip v-if="item.status" class="ml-4">
+            <v-btn fab x-small icon
+                   @click="logWindow = true">
+              <v-icon class="px-0">mdi-console</v-icon>
+            </v-btn>
+            <v-btn fab x-small icon>
+              <v-icon class="px-0">mdi-download</v-icon>
+            </v-btn>
+          </v-chip>
+        </template>
       </v-treeview>
+      <consoleWindow v-model="logWindow">
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore</div>
+        <div class="line">Last line</div>
+      </consoleWindow>
     </v-row>
   </v-container>
 </template>
@@ -62,9 +131,28 @@
 <script>
   import statusColors from '@/statusColors'
   import statusIcons from '@/statusIcons'
+  import ConsoleWindow from './ConsoleWindow'
   export default {
     name: 'PipelineView',
+    components: {
+      ConsoleWindow
+    },
+    methods: {
+      test(active) {
+        console.log(this.tree, active)
+      },
+      openLog(id) {
+        return id == this.$route.params.stepid
+      },
+      toTests(id) {
+        return '/' + this.$route.params.pipelineid + '/tests/' + id;
+      },
+      toArtifacts(id) {
+        return '/' + this.$route.params.pipelineid + '/artifacts/' + id;
+      }
+    },
     data: () => ({
+      logWindow: false,
       statusColors: statusColors,
       statusIcons: statusIcons,
       tree: [],
@@ -73,22 +161,13 @@
           id: 1,
           name: 'Build',
           type: 'SEQUENCE',
+          tests: true,
+          artifacts: true,
           children: [
             {
               id: 2,
               name: 'sh [\'Building :) ${BUILD_ID}\' > build.txt]',
               status: 'SUCCESS'
-            },
-            {
-              id: 21,
-              name: 'Test results',
-              type: 'TESTS',
-              status: 'SUCCESS'
-            },
-            {
-              id: 22,
-              name: 'Artifacts',
-              type: 'ARTIFACTS'
             }
           ]
         },
@@ -111,6 +190,8 @@
               id: 7,
               name: 'test1',
               type: 'PARALLEL',
+              tests: true,
+              artifacts: true,
               children: [
                 {
                   id: 8,
@@ -121,12 +202,6 @@
                   id: 9,
                   name: 'sh [echo \'Test1b !!!\' > test1b.txt]',
                   status: 'SUCCESS'
-                },
-                {
-                  id: 71,
-                  name: 'Test results',
-                  type: 'TESTS',
-                  status: 'SUCCESS'
                 }
               ]
             },
@@ -134,6 +209,8 @@
               id: 10,
               name: 'test2',
               type: 'PARALLEL',
+              tests: true,
+              artifacts: true,
               children: [
                 {
                   id: 11,
@@ -144,12 +221,6 @@
                   id: 12,
                   name: 'sh [echo \'Test2b !!!\' > test2b.txt]',
                   status: 'FAILURE'
-                },
-                {
-                  id: 101,
-                  name: 'Test results',
-                  type: 'TESTS',
-                  status: 'UNSTABLE'
                 }
               ]
             },

@@ -5,8 +5,8 @@
     <h2>Tests</h2>
     <v-subheader>2830 tests, 1 failures , 83 skipped</v-subheader>
     <v-row justify="center" class="px-5 mt-4">
-      <v-expansion-panels accordion multiple>
-        <v-expansion-panel v-for="item in items">
+      <v-expansion-panels accordion multiple :value="panel">
+        <v-expansion-panel v-for="(item,i) in items" v-bind:key="i">
           <v-expansion-panel-header>
             <v-badge overlap
                      class="mr-4 noflex "
@@ -25,12 +25,14 @@
             <span>{{item.path}}</span></v-expansion-panel-header>
           <v-expansion-panel-content>
           <v-expansion-panels accordion multiple>
-                  <v-expansion-panel class="nested-panel" v-for="child in item.children" :readonly="!child.output">
+                  <v-expansion-panel class="nested-panel" v-for="(child,y) in item.children"  v-bind:key="y" :readonly="!child.output">
                     <v-expansion-panel-header hide-actions>
                       <v-icon class="noflex mr-2" :color="statusColors[child.status]">{{statusIcons[child.status]}}</v-icon>
                       <span>{{child.name}}</span>
                     </v-expansion-panel-header>
-                    <v-expansion-panel-content class="output" v-html="child.output" />
+                    <v-expansion-panel-content class="test-output">
+                      <consoleOutput v-html="child.output" />
+                    </v-expansion-panel-content>
                   </v-expansion-panel>
           </v-expansion-panels>
           </v-expansion-panel-content>
@@ -43,40 +45,12 @@
   .nested-panel.v-expansion-panel::before {
       box-shadow: none
   }
-  .output > .v-expansion-panel-content__wrap {
-    padding: 0px;
+  .test-output > .v-expansion-panel-content__wrap {
+    padding: 0 0 10px 0;
   }
-  .output {
+  .test-output > .v-expansion-panel-content__wrap > .output {
     background-color: #212121;
-    counter-reset: log;
-    margin: 0px 0px 10px 0px;
-    padding: 10px 0px 10px 3em;
-    text-decoration: none;
-    white-space: pre;
-    font: 13px "Source Code Pro", Menlo, Monaco, Consolas, "Courier New", monospace;
-    display: block
-  }
-  div.line {
-    color: #eee;
-    position: relative;
-    display: block;
-    padding: 0px 0 0 3em;
-  }
-  div.line:before {
-    counter-increment: log;
-    content: counter(log);
-    min-width: 2em;
-    position: absolute;
-    display: inline-block;
-    text-align: right;
-    padding-left: 1em;
-    margin-left: -3em;
-    color: #777777;
-  }
-  div.line > span {
-    color: #E0E0E0;
-    position: relative;
-    display: inline-block
+    padding: 10px 10px 10px 20px;
   }
   .noflex {
     flex: none !important;
@@ -85,8 +59,17 @@
 <script>
   import statusIcons from '@/statusIcons'
   import statusColors from '@/statusColors'
+  import ConsoleOutput from './ConsoleOutput'
   export default {
     name: 'PipelineTests',
+    computed: {
+      panel(){
+        return this.$route.params.stageid ? [ 0 ] : [];
+      }
+    },
+    components: {
+      ConsoleOutput
+    },
     data: () => ({
       statusIcons: statusIcons,
       statusColors: statusColors,
@@ -102,7 +85,7 @@
             },
             {
               name: 'io.helidon.Test.testBAR',
-              output: '<div class="line"><span>yo bruh</span></div><div class="line"><span>whassup</span></div>',
+              output: '<div class="line">yo bruh</div><div class="line">whassup</div>',
               status: 'FAILURE'
             },
             {
@@ -122,12 +105,12 @@
             },
             {
               name: 'io.helidon.Test.testBAR',
-              output: '<div class="line"><span>yo bruh</span></div><div class="line"><span>whassup</span></div>',
+              output: '<div class="line"><span>yo bruh</span></div><div class="line">whassup</div>',
               status: 'FAILURE'
             },
             {
               name: 'io.helidon.Test.testBOB',
-              output: '<div class="line"><span>yo bruh</span></div><div class="line"><span>whassup</span></div>',
+              output: '<div class="line">yo bruh</div><div class="line">whassup</div>',
               status: 'FAILURE'
             }
           ]
