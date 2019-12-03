@@ -7,7 +7,6 @@ import App from './App.vue'
 import routes from './routes'
 import './static/favicon.png'
 
-
 Vue.use(VueRouter)
 Vue.config.productionTip = false
 
