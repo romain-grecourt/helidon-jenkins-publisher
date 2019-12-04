@@ -1,8 +1,8 @@
 import Pipelines from '@/components/Pipelines'
 const Pipeline = () => import('@/components/Pipeline')
 const PipelineView = () => import('@/components/PipelineView')
-const PipelineTests = () => import('@/components/PipelineTests')
-const PipelineArtifacts = () => import('@/components/PipelineArtifacts')
+const TestsView = () => import('@/components/TestsView')
+const ArtifactsView = () => import('@/components/ArtifactsView')
 
 const routes = [
   {
@@ -22,24 +22,12 @@ const routes = [
           component: PipelineView
         },
         {
-          path: 'view/:stepid/',
-          component: PipelineView
-        },
-        {
           path: 'tests',
-          component: PipelineTests
-        },
-        {
-          path: 'tests/:stageid/',
-          component: PipelineTests
+          component: TestsView
         },
         {
           path: 'artifacts',
-          component: PipelineArtifacts
-        },
-        {
-          path: 'artifacts/:stageid/',
-          component: PipelineArtifacts
+          component: ArtifactsView
         }
     ]
   }

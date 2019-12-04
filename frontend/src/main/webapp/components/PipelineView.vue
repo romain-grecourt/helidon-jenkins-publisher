@@ -12,7 +12,6 @@
           shaped
           style="width:100%"
           :items="items"
-          v-on:update:open="test"
           >
         <template v-slot:prepend="{ item }">
           <v-progress-circular v-if="item.status=='RUNNING'"
@@ -36,7 +35,7 @@
           </v-icon>
         </template>
         <template v-slot:label="{ item }">
-          {{item.name}}
+          <div class="node-label-text">{{item.name}}</div>
           <v-chip v-if="item.tests||item.artifacts" class="ml-4">
             <v-btn v-if="item.tests"
                    fab x-small icon
@@ -124,8 +123,19 @@
   </v-container>
 </template>
 <style>
+  .v-treeview-node__label {
+    display: flex;
+    align-items: center;
+  }
   .v-treeview-node--leaf > .v-treeview-node__root {
     background-color: #353434;
+  }
+  .node-label-text {
+    flex: 1 1 90%;
+    width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>
 <script>
@@ -138,17 +148,11 @@
       ConsoleWindow
     },
     methods: {
-      test(active) {
-        console.log(this.tree, active)
-      },
-      openLog(id) {
-        return id == this.$route.params.stepid
-      },
       toTests(id) {
-        return '/' + this.$route.params.pipelineid + '/tests/' + id;
+        return '/' + this.$route.params.pipelineid + '/tests/';
       },
       toArtifacts(id) {
-        return '/' + this.$route.params.pipelineid + '/artifacts/' + id;
+        return '/' + this.$route.params.pipelineid + '/artifacts/';
       }
     },
     data: () => ({

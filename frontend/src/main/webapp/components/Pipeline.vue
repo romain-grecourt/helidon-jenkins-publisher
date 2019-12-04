@@ -17,12 +17,14 @@
         <v-app-bar-nav-icon @click.stop="drawerLeft = !drawerLeft" />
         <v-toolbar-title>{{info.title}}</v-toolbar-title>
         <v-spacer />
-        <v-badge left overlap>
-          <template v-slot:badge>
-            <span>6</span>
-          </template>
-          <v-icon @click.stop="drawerRight = !drawerRight">mdi-bell</v-icon>
-        </v-badge>
+        <v-btn icon @click.stop="drawerRight = !drawerRight">
+          <v-badge left overlap>
+            <template v-slot:badge>
+              <span>6</span>
+            </template>
+            <v-icon >mdi-bell</v-icon>
+          </v-badge>
+        </v-btn>
     </v-app-bar>
     <v-navigation-drawer
       v-model="drawerLeft"

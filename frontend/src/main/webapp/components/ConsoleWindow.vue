@@ -8,7 +8,8 @@
         class="headline grey lighten-2"
         primary-title
       >
-        <div class="window-title">Logs: /Build/sh['Build :) ${BUILD_ID}' > build.txt]</div>
+        <v-icon class="mr-4">mdi-console</v-icon>
+        <div class="window-title">/Build/sh['Build :) ${BUILD_ID}' > build.txt]</div>
         <v-spacer></v-spacer>
         <v-btn icon @click="dialog = false"><v-icon>mdi-close</v-icon></v-btn>
       </v-card-title>
@@ -21,9 +22,9 @@
   </v-dialog>
 </template>
 <style>
-  .log-title {
+  .window-title {
     flex: 1 1 90%;
-    width: 50%;
+    width: 90%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
