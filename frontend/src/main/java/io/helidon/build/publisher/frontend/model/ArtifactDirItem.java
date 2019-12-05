@@ -12,8 +12,8 @@ public final class ArtifactDirItem extends ArtifactItem {
 
     final List<ArtifactItem> children;
 
-    private ArtifactDirItem(String name, List<ArtifactItem> children) {
-        super(name);
+    private ArtifactDirItem(String name, String path, List<ArtifactItem> children) {
+        super(name, path);
         this.children = children;
     }
 
@@ -43,6 +43,10 @@ public final class ArtifactDirItem extends ArtifactItem {
          * @return this builder instance
          */
         public Builder child(ArtifactItem.Builder childBuilder) {
+            if (path == null) {
+                path = "/" + name;
+            }
+            childBuilder.path = path + "/" + childBuilder.name;
             this.childrenBuilder.add(childBuilder);
             return this;
         }
@@ -53,7 +57,7 @@ public final class ArtifactDirItem extends ArtifactItem {
             for(ArtifactItem.Builder childBuilder : childrenBuilder) {
                 children.add(childBuilder.build());
             }
-            return new ArtifactDirItem(name, children);
+            return new ArtifactDirItem(name, path == null ? ("/" + name) : path, children);
         }
     }
 }

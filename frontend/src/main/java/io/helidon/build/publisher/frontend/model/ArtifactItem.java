@@ -9,9 +9,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public abstract class ArtifactItem {
 
     final String name;
+    final String path;
 
-    protected ArtifactItem(String name) {
+    protected ArtifactItem(String name, String path) {
         this.name = name;
+        this.path = path;
+    }
+
+    @JsonProperty
+    public String path() {
+        return path;
     }
 
     @JsonProperty
@@ -25,6 +32,7 @@ public abstract class ArtifactItem {
     public static abstract class Builder implements io.helidon.common.Builder<ArtifactItem> {
 
         protected String name;
+        protected String path;
 
         /**
          * Set the name.

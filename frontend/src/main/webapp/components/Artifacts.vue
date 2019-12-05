@@ -4,9 +4,8 @@
     dense
     open-all
     v-bind:items="artifacts.items"
-    item-key="name"
-    open-on-click
-  >
+    item-key="path"
+    open-on-click>
     <template v-slot:prepend="{ item, open }">
       <v-icon v-if="!item.file">
         {{ open ? 'mdi-folder-open' : 'mdi-folder' }}

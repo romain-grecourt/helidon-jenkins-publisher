@@ -10,8 +10,8 @@ public final class ArtifactFileItem extends ArtifactItem {
 
     final String file;
 
-    private ArtifactFileItem(String name, String file) {
-        super(name);
+    private ArtifactFileItem(String name, String path, String file) {
+        super(name, path);
         this.file = file;
     }
 
@@ -47,7 +47,7 @@ public final class ArtifactFileItem extends ArtifactItem {
 
         @Override
         public ArtifactFileItem build() {
-            return new ArtifactFileItem(name, file);
+            return new ArtifactFileItem(name, path == null ? ("/" + name) : path, file);
         }
     }
 }
