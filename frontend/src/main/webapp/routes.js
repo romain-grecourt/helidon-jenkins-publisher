@@ -10,12 +10,12 @@ const routes = [
   {
     path: '/:pipelineid/',
     component: PipelineView,
-    props: true,
+    props: true
   },
   {
     path: '/:pipelineid/:viewid/',
     component: PipelineView,
-    props: true,
+    props: true
   },
   {
     path: '*',

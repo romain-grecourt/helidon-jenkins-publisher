@@ -3,6 +3,7 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
 import Vuex from 'vuex'
+import axios from 'axios'
 import vuetify from './plugins/vuetify'
 import App from './App.vue'
 import routes from './routes'
@@ -20,7 +21,7 @@ const router = new VueRouter({
 Vue.use(Vuex)
 const store = new Vuex.Store({
   state: {
-    pipelineWindowId: 0,
+    pipelineWindowId: 0
   },
   mutations: {
     'PIPELINE_WINDOW_ID' (state, payload) {
@@ -29,10 +30,8 @@ const store = new Vuex.Store({
   }
 })
 
-import axios from 'axios'
-
 Vue.use({
-    install (Vue) {
+  install (Vue) {
     Vue.prototype.$api = axios.create({
       baseURL: 'http://localhost:9191/api/'
     })

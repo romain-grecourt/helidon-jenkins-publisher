@@ -3,15 +3,12 @@
     <notFound />
   </v-app>
 </template>
-<style>
-</style>
 <script>
-  import NotFound from './NotFound'
-  export default {
-    name: 'NotFoundView',
-    components: {
-      NotFound
-    }
+import NotFound from './NotFound'
+export default {
+  name: 'NotFoundView',
+  components: {
+    NotFound
   }
+}
 </script>
-

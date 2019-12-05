@@ -6,4 +6,4 @@ export default {
   ABORTED: 'grey',
   SKIPPED: 'grey',
   UNKNOWN: 'grey'
-};
+}
