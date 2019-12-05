@@ -1,6 +1,6 @@
 export default {
   SUCCESS: 'Passed',
   FAILURE: 'Failed',
-  UNSTABLE: 'Unstabled',
+  UNSTABLE: 'Unstable',
   RUNNING: 'Running'
 }

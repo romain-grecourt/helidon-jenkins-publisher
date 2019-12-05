@@ -45,6 +45,10 @@
             <artifactId>helidon-health-checks</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.helidon.media.jackson</groupId>
+            <artifactId>helidon-media-jackson-server</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.helidon.build.publisher</groupId>
             <artifactId>helidon-build-publisher-model</artifactId>
             <version>${project.version}</version>

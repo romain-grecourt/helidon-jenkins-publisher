@@ -1,62 +1,21 @@
 <template>
   <v-list dense nav>
-    <v-subheader>MORE PIPELINES</v-subheader>
+    <v-subheader>NOTIFICATIONS</v-subheader>
     <v-list-item-group>
-    <v-list-item three-line>
-      <v-list-item-icon>
-          <v-icon color="green">mdi-checkbox-marked-circle</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-subtitle>
-          Pull Request #1148: WIP: MP Reactive Messaging POC
-        </v-list-item-subtitle>
-        <v-list-item-subtitle>
-          <a href="https://github.com/oracle/helidon">oracle/helidon</a>
-        </v-list-item-subtitle>
-      </v-list-item-content>
-    </v-list-item>
-    <v-divider />
-    <v-list-item three-line>
-      <v-list-item-icon>
-          <v-icon color="red">mdi-close-circle</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-subtitle>
-          Pull Request #1148: WIP: MP Reactive Messaging POC
-        </v-list-item-subtitle>
-        <v-list-item-subtitle>
-          <a href="https://github.com/oracle/helidon">oracle/helidon</a>
-        </v-list-item-subtitle>
-      </v-list-item-content>
-    </v-list-item>
-    <v-divider />
-    <v-list-item three-line>
-      <v-list-item-icon>
-          <v-icon color="orange">mdi-alert-circle</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-subtitle>
-          Pull Request #1148: WIP: MP Reactive Messaging POC
-        </v-list-item-subtitle>
-        <v-list-item-subtitle>
-          <a href="https://github.com/oracle/helidon">oracle/helidon</a>
-        </v-list-item-subtitle>
-      </v-list-item-content>
-    </v-list-item>
-    <v-divider />
-    <v-list-item three-line>
-      <v-list-item-icon>
-          <v-icon color="blue">mdi-cached</v-icon>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-subtitle>
-          Pull Request #1148: WIP: MP Reactive Messaging POC
-        </v-list-item-subtitle>
-        <v-list-item-subtitle>
-          <a href="https://github.com/oracle/helidon">oracle/helidon</a>
-        </v-list-item-subtitle>
-      </v-list-item-content>
-    </v-list-item>
+      <template v-for="(item,i) in items">
+      <v-list-item three-line v-bind:key="i">
+        <v-list-item-icon>
+            <v-icon v-bind:color="statusColors[item.status]">{{statusIcons[item.status]}}</v-icon>
+        </v-list-item-icon>
+        <v-list-item-content>
+          <v-list-item-subtitle>{{item.title}}</v-list-item-subtitle>
+          <v-list-item-subtitle>
+            <a v-bind:href="item.repositoryLink">{{item.repository}}</a>
+          </v-list-item-subtitle>
+        </v-list-item-content>
+      </v-list-item>
+      <v-divider v-if="item < items.length" />
+      </template>
     </v-list-item-group>
   </v-list>
 </template>
@@ -70,6 +29,32 @@
       statusColors: statusColors,
       statusIcons: statusIcons,
       statusText: statusText,
+      items: [
+        {
+          title: 'Pull Request #1148: WIP: MP Reactive Messaging POC',
+          repository: 'oracle/helidon',
+          repositoryLink: 'https://github.com/oracle/helidon',
+          status: 'SUCCESS'
+        },
+        {
+          title: 'Pull Request #1148: WIP: MP Reactive Messaging POC',
+          repository: 'oracle/helidon',
+          repositoryLink: 'https://github.com/oracle/helidon',
+          status: 'FAILURE'
+        },
+        {
+          title: 'Pull Request #1148: WIP: MP Reactive Messaging POC',
+          repository: 'oracle/helidon',
+          repositoryLink: 'https://github.com/oracle/helidon',
+          status: 'UNSTABLE'
+        },
+        {
+          title: 'Pull Request #1148: WIP: MP Reactive Messaging POC',
+          repository: 'oracle/helidon',
+          repositoryLink: 'https://github.com/oracle/helidon',
+          status: 'RUNNING'
+        }
+      ]
     })
   }
 </script>

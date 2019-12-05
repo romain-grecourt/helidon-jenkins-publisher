@@ -1,14 +1,12 @@
 package io.helidon.build.publisher.frontend;
 
-import io.helidon.build.publisher.storage.EventBus;
-import io.helidon.build.publisher.storage.Storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.LogManager;
 import io.helidon.config.Config;
 import io.helidon.health.HealthSupport;
 import io.helidon.health.checks.HealthChecks;
-import io.helidon.media.jsonp.server.JsonSupport;
+import io.helidon.media.jackson.server.JacksonSupport;
 import io.helidon.metrics.MetricsSupport;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerConfiguration;
@@ -69,11 +67,12 @@ public final class Main {
      */
     private static Routing createRouting(Config config) {
         FrontendService frontendService = new FrontendService(
-                config.get("cacheLocation").asString().get());
+                config.get("storageLocation").asString().get());
         return Routing.builder()
+                .register(JacksonSupport.create())
                 .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))
                 .register(MetricsSupport.create())
-                .register(frontendService)
+                .register("/api", frontendService)
                 .register(StaticContentSupport.builder("/WEB").welcomeFileName("index.html"))
                 .build();
     }

@@ -8,6 +8,7 @@ import io.helidon.common.reactive.Flow.Publisher;
 import io.helidon.common.reactive.Flow.Subscriber;
 import io.helidon.common.reactive.RetrySchema;
 import io.helidon.media.common.ReadableByteChannelPublisher;
+import io.helidon.webserver.ResponseHeaders;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
@@ -46,8 +47,30 @@ final class FrontendService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        rules.get("/{pipelineId}", this::getDescriptor)
+        rules.get("/", this::listPipelines)
+             .get("/{pipelineId}", this::getPipeline)
              .get("/{pipelineId}/output/{stepId}", this::getOutput);
+    }
+
+    private void listPipelines(ServerRequest req, ServerResponse res) {
+        int page = req.queryParams().first("page").map(Integer::parseInt).orElse(1);
+        int numitems = req.queryParams().first("numitems").map(Integer::parseInt).orElse(20);
+        ResponseHeaders headers = res.headers();
+        headers.contentType(MediaType.APPLICATION_JSON);
+        headers.put("Access-Control-Allow-Origin", "*");
+        res.send(MockHelper.mockPipelines(page, numitems));
+    }
+
+    private void getPipeline(ServerRequest req, ServerResponse res) {
+        String pipelineId = req.path().param("pipelineId");
+        ResponseHeaders headers = res.headers();
+        headers.contentType(MediaType.APPLICATION_JSON);
+        headers.put("Access-Control-Allow-Origin", "*");
+        if ("non-existent".equals(pipelineId)) {
+            res.status(404).send();
+        } else {
+            res.send(MockHelper.mockPipeline(pipelineId));
+        }
     }
 
     private void getDescriptor(ServerRequest req, ServerResponse res) {

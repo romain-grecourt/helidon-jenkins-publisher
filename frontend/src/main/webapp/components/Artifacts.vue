@@ -2,7 +2,8 @@
   <v-treeview
     v-model="tree"
     dense
-    :items="items"
+    open-all
+    v-bind:items="artifacts.items"
     item-key="name"
     open-on-click
   >
@@ -25,7 +26,10 @@
   export default {
     name: 'Artifacts',
     props: {
-      items: Array
+      artifacts: {
+        type: Object,
+        required: true
+      }
     },
     data: () => ({
       fileIcons: {
