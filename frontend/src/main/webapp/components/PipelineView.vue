@@ -7,6 +7,7 @@
           dense
           hoverable
           shaped
+          open-on-click
           style="width:100%"
           v-bind:items="items">
         <template v-slot:prepend="{ item }">
@@ -57,7 +58,7 @@
           <v-chip v-if="item.tests||item.artifacts" class="ml-4">
             <v-btn v-if="item.tests"
                    fab x-small icon
-                   @click="openWindow(item.id + '-tests')">
+                   @click.stop="openWindow(item.id + '-tests')">
               <v-badge v-if="item.tests.failed > 0"
                        class="small-badge"
                        overlap
@@ -69,13 +70,13 @@
             </v-btn>
             <v-btn v-if="item.artifacts"
                    fab x-small icon
-                   @click="openWindow(item.id + '-artifacts')">
+                   @click.stop="openWindow(item.id + '-artifacts')">
               <v-icon class="px-0">mdi-cube-outline</v-icon>
             </v-btn>
           </v-chip>
           <v-chip v-if="item.status" class="ml-4">
             <v-btn fab x-small icon
-                   @click="openWindow(item.id + '-console')">
+                   @click.stop="openWindow(item.id + '-console')">
               <v-icon class="px-0">mdi-console</v-icon>
             </v-btn>
             <v-btn fab x-small icon>
