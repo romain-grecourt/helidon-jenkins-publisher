@@ -4,11 +4,24 @@ const PipelineView = () => import('@/components/PipelineView')
 const TestsView = () => import('@/components/TestsView')
 const ArtifactsView = () => import('@/components/ArtifactsView')
 const NotFound = () => import('@/components/NotFound')
+const Error = () => import('@/components/Error')
 
 const routes = [
   {
     path: '/',
     component: Pipelines 
+  },
+  {
+    path: '/notfound',
+    name: 'NotFound',
+    component: NotFound,
+    props: true
+  },
+  {
+    path: '/error',
+    name: 'Error',
+    component: Error,
+    props: true
   },
   {
     path: '/:pipelineid/',
@@ -33,13 +46,8 @@ const routes = [
     ]
   },
   {
-    path: '/notfound',
-    name: 'NotFound',
-    component: NotFound
-  },
-  {
     path: '*',
-    redirect: 'notfound'
+    redirect: '/notfound'
   }
 ]
 

@@ -9,7 +9,7 @@
             align="center"
             justify="center"
             class="mx-0">
-            <v-icon size="128">mdi-emoticon-sad</v-icon>
+            <v-icon size="128">mdi-emoticon-dead</v-icon>
             <h1>{{message}}</h1>
             <v-btn class="mt-6" to="/">GO TO PIPELINES</v-btn>
           </v-content>
@@ -22,11 +22,11 @@
 </style>
 <script>
   export default {
-    name: 'NotFound',
+    name: 'Error',
     props: {
       message: {
         type: String,
-        default: 'Not found !'
+        default: 'Error !'
       }
     }
   }

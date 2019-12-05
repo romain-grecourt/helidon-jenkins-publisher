@@ -86,8 +86,18 @@
         .then((response) => {
           this.pipeline = response.data
           this.dataLoaded = true
-      }).catch((error) => {
-          this.$router.push({ name: 'NotFound' })
+      }).catch(error => {
+        if (error.response.status === 404) {
+          this.$router.push({name: 'NotFound', params: {
+              message: 'Pipeline not found: ' + this.$route.params.pipelineid
+            }
+          })
+        } else {
+          this.$router.push({name: 'Error', params: {
+              message: error.message
+            }
+          })
+        }
       })
     }
   }

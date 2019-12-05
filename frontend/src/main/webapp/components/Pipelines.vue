@@ -72,13 +72,26 @@
       },
       onPageChange: function(pageId) {
         this.$api.get("?page=" + pageId)
-          .then(response => (this.pipelines = response.data))
+          .then(response => {
+            this.pipelines = response.data
+            this.dataLoaded = true
+        }).catch(error => {
+          this.$router.push({name: 'Error', params: {
+              message: error.message
+            }
+          })
+        })
       },
       refresh: function() {
         this.$api.get(this.pipelines.page === 0 ? "" : "?page=" + this.pipelines.page)
           .then(response => {
             this.pipelines = response.data
             this.dataLoaded = true
+        }).catch(error => {
+          this.$router.push({name: 'Error', params: {
+              message: error.message
+            }
+          })
         })
       }
     },
