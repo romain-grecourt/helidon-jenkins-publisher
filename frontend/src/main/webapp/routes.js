@@ -1,53 +1,25 @@
-import Pipelines from '@/components/Pipelines'
-const Pipeline = () => import('@/components/Pipeline')
-const PipelineView = () => import('@/components/PipelineView')
-const TestsView = () => import('@/components/TestsView')
-const ArtifactsView = () => import('@/components/ArtifactsView')
-const NotFound = () => import('@/components/NotFound')
-const Error = () => import('@/components/Error')
+import PipelinesView from '@/components/PipelinesView'
+import PipelineView from '@/components/PipelineView'
+import NotFoundView from '@/components/NotFoundView'
 
 const routes = [
   {
     path: '/',
-    component: Pipelines 
-  },
-  {
-    path: '/notfound',
-    name: 'NotFound',
-    component: NotFound,
-    props: true
-  },
-  {
-    path: '/error',
-    name: 'Error',
-    component: Error,
-    props: true
+    component: PipelinesView
   },
   {
     path: '/:pipelineid/',
-    component: Pipeline,
-    children:[
-        {
-          path: '',
-          redirect: 'view'
-        },
-        {
-          path: 'view',
-          component: PipelineView
-        },
-        {
-          path: 'tests',
-          component: TestsView
-        },
-        {
-          path: 'artifacts',
-          component: ArtifactsView
-        }
-    ]
+    component: PipelineView,
+    props: true,
+  },
+  {
+    path: '/:pipelineid/:viewid/',
+    component: PipelineView,
+    props: true,
   },
   {
     path: '*',
-    redirect: '/notfound'
+    component: NotFoundView
   }
 ]
 

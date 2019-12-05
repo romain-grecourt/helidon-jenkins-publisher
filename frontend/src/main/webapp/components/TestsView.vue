@@ -33,62 +33,16 @@
 <script>
   import statusColors from '@/statusColors'
   import ConsoleOutput from './ConsoleOutput'
-  import utils from '@/utils'
   import Tests from './Tests'
   export default {
     name: 'TestsView',
     components: {
       Tests
     },
-    computed: {
-      tests() {
-        let p = utils.getParent(this, 'Pipeline')
-        if (p === false) {
-          return {}
-        }
-        if (typeof p.pipeline.items === 'undefined') {
-          return {}
-        }
-        let res = {}
-        res.items = []
-        res.passed = 0
-        res.failed = 0
-        res.skipped = 0
-
-        // depth first traversal of the pipeline items
-        var stack = []
-        for (var i=p.pipeline.items.length -1 ; i >= 0 ; i--) {
-          stack.push({
-            path: '',
-            item: p.pipeline.items[i]
-          })
-        }
-        while (stack.length > 0) {
-          var elt = stack.pop()
-          if (typeof elt.item.tests !== 'undefined') {
-            let copy = {}
-            copy.passed = elt.item.tests.passed
-            res.passed += copy.passed
-            copy.failed = elt.item.tests.failed
-            res.failed += copy.failed
-            copy.skipped = elt.item.tests.skipped
-            res.skipped += copy.skipped
-            copy.status = copy.failed === 0 ? 'SUCCESS' : 'UNSTABLE'
-            copy.items = elt.item.tests.items
-            copy.path = elt.path + '/' + elt.item.name
-            copy.type = elt.item.type
-            res.items.push(copy)
-          }
-          if (typeof elt.item.children !== 'undefined') {
-            for (var i=elt.item.children.length -1 ; i >= 0 ; i--) {
-              stack.push({
-                path: elt.path + '/' + elt.item.name,
-                item: elt.item.children[i]
-              })
-            }
-          }
-        }
-        return res
+    props: {
+      tests: {
+        type: Object,
+        required: true
       }
     },
     data: () => ({

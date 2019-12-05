@@ -1,152 +1,208 @@
 <template>
-  <v-container fluid>
-    <h2 class="mb-4">View</h2>
-    <v-row class="px-5">
-      <v-treeview
-          open-all
+  <v-app dark>
+    <template v-if="loading">
+      <!-- TODO -->
+    </template>
+    <notFound v-else-if="notfound"
+              message="Pipeline not found!" />
+    <notFound v-else-if="viewIdNotFound" />
+    <error v-else-if="errored"
+           v-bind:message="errored" />
+    <template v-else>
+      <v-navigation-drawer
+          v-model="drawerRight"
+          app
+          right
+          temporary
+          disable-route-watcher
+          >
+        <pipelineNotifications />
+      </v-navigation-drawer>
+      <v-app-bar
+          app
           dense
-          hoverable
-          shaped
-          open-on-click
-          style="width:100%"
-          v-bind:items="items">
-        <template v-slot:prepend="{ item }">
-          <v-progress-circular v-if="item.status=='RUNNING'"
-                               size="20"
-                               width="3"
-                               class="mr-5"
-                               indeterminate
-                               color="primary" />
-          <v-icon
-              v-else-if="item.status"
-              v-bind:color="statusColors[item.status]"
-              class="mr-4">{{ statusIcons[item.status] }}</v-icon>
-          <v-icon v-else-if="item.type=='SEQUENCE'">mdi-hexagon-outline</v-icon>
-          <v-icon v-else-if="item.type=='PARALLEL'">mdi-layers-triple-outline</v-icon>
-        </template>
-        <template v-slot:label="{ item }">
-          <window v-if="item.status"
-                  v-bind:id="item.id"
-                  type="console"
-                  v-bind:title="item.name">
-            <template v-slot:prepend>
-              <v-icon class="mr-4">mdi-console</v-icon>
-            </template>
-            <consoleOutput>
-              <div class="line">line</div>
-            </consoleoutput>
-          </window>
-          <window v-if="item.tests"
-                  v-bind:id="item.id"
-                  type="tests"
-                  v-bind:title="item.name">
-            <template v-slot:prepend>
-              <v-icon class="mr-4">mdi-bug</v-icon>
-            </template>
-            <tests v-bind:tests="item.tests" />
-          </window>
-          <window v-if="item.artifacts"
-                  v-bind:id="item.id"
-                  type="artifacts"
-                  v-bind:title="item.name">
-            <template v-slot:prepend>
-              <v-icon class="mr-4">mdi-cube</v-icon>
-            </template>
-            <artifacts v-bind:artifacts="item.artifacts" />
-          </window>
-          <div class="node-label-text">{{item.name}}</div>
-          <v-chip v-if="item.tests||item.artifacts" class="ml-4">
-            <v-btn v-if="item.tests"
-                   fab x-small icon
-                   @click.stop="openWindow(item.id + '-tests')">
-              <v-badge v-if="item.tests.failed > 0"
-                       class="small-badge"
-                       overlap
-                       v-bind:color="statusColors['UNSTABLE']">
-                <template v-slot:badge>!</template>
-                <v-icon class="px-0">mdi-bug-outline</v-icon>
-              </v-badge>
-              <v-icon v-else class="px-0">mdi-bug-outline</v-icon>
-            </v-btn>
-            <v-btn v-if="item.artifacts"
-                   fab x-small icon
-                   @click.stop="openWindow(item.id + '-artifacts')">
-              <v-icon class="px-0">mdi-cube-outline</v-icon>
-            </v-btn>
-          </v-chip>
-          <v-chip v-if="item.status" class="ml-4">
-            <v-btn fab x-small icon
-                   @click.stop="openWindow(item.id + '-console')">
-              <v-icon class="px-0">mdi-console</v-icon>
-            </v-btn>
-            <v-btn fab x-small icon>
-              <v-icon class="px-0">mdi-download</v-icon>
-            </v-btn>
-          </v-chip>
-        </template>
-      </v-treeview>
-    </v-row>
-  </v-container>
+          clipped-left
+          >
+          <v-app-bar-nav-icon @click.stop="drawerLeft = !drawerLeft" />
+          <v-toolbar-title>{{pipeline.title}}</v-toolbar-title>
+          <v-spacer />
+          <v-btn icon @click.stop="drawerRight = !drawerRight">
+            <v-badge left overlap>
+              <template v-slot:badge>
+                <span>6</span>
+              </template>
+              <v-icon >mdi-bell</v-icon>
+            </v-badge>
+          </v-btn>
+      </v-app-bar>
+      <v-navigation-drawer
+        v-model="drawerLeft"
+        app
+        clipped>
+        <v-list dense nav flat>
+          <v-list-item-group>
+            <v-list-item to="/">
+              <v-list-item-icon>
+                <v-icon>mdi-arrow-left</v-icon>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title>BACK</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+          </v-list-item-group>
+        </v-list>
+        <v-divider />
+        <pipelineInfo v-bind:pipeline="pipeline"/>
+        <v-divider />
+        <pipelineMenu />
+      </v-navigation-drawer>
+      <v-content>
+        <testsView v-if="viewid=='tests'"
+                  v-bind:tests="tests"/>
+        <artifactsView v-else-if="viewid=='artifacts'"
+                       v-bind:artifacts="artifacts"/>
+        <pipelineTreeView v-else
+                      v-bind:items="pipeline.items"/>
+      </v-content>
+    </template>
+  </v-app>
 </template>
 <style>
-  .v-treeview-node__label {
-    display: flex;
-    align-items: center;
-  }
-  .v-treeview-node--leaf > .v-treeview-node__root {
-    background-color: #353434;
-  }
-  .small-badge > .v-badge__badge {
-    font-size: 12px;
-    height: 14px;
-    min-width: 14px;
-    padding: 0px 1px 0px 0px;
-    top: -5px;
-    right: -8px;
-  }
-  .node-label-text {
-    flex: 1 1 90%;
-    width: 50%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 </style>
 <script>
   import statusColors from '@/statusColors'
   import statusIcons from '@/statusIcons'
-  import utils from '@/utils'
-  import ConsoleOutput from './ConsoleOutput'
-  import Window from './Window'
-  import Tests from './Tests'
-  import Artifacts from './Artifacts'
+  import statusText from '@/statusText'
+  import PipelineInfo from './PipelineInfo'
+  import PipelineMenu from './PipelineMenu'
+  import PipelineNotifications from './PipelineNotifications'
+  import PipelineTreeView from './PipelineTreeView'
+  import TestsView from './TestsView'
+  import ArtifactsView from './ArtifactsView'
+  import Error from './Error'
+  import NotFound from './NotFound'
+  const viewIds = [ 'view', 'tests', 'artifacts']
   export default {
     name: 'PipelineView',
-    components: {
-      ConsoleOutput,
-      Window,
-      Tests,
-      Artifacts
+    props: {
+      pipelineid: {
+        type: String,
+        required: true
+      },
+      viewid: {
+        type: String,
+        required: false,
+        default: 'view'
+      }
     },
+    components: {
+      PipelineInfo,
+      PipelineMenu,
+      PipelineNotifications,
+      Error,
+      NotFound,
+      PipelineTreeView,
+      ArtifactsView,
+      TestsView
+    },
+    data: () => ({
+      drawerLeft: null,
+      drawerRight: null,
+      statusColors: statusColors,
+      statusIcons: statusIcons,
+      statusText: statusText,
+      pipeline: null,
+      loading: true,
+      errored: false,
+      notfound: false
+    }),
     methods: {
-      openWindow(id) {
-        this.$store.commit('PIPELINE_WINDOW_ID', id)
+      visitPipeline(visitor, data) {
+        if (this.pipeline === null
+                || typeof this.pipeline.items === 'undefined') {
+          return
+        }
+        // depth first traversal of the pipeline items
+        var stack = []
+        for (var i=this.pipeline.items.length -1 ; i >= 0 ; i--) {
+          stack.push({
+            path: '',
+            item: this.pipeline.items[i]
+          })
+        }
+        while (stack.length > 0) {
+          var elt = stack.pop()
+          visitor(elt.item, elt.path + '/' + elt.item.name, data)
+          if (typeof elt.item.children !== 'undefined') {
+            for (var i=elt.item.children.length -1 ; i >= 0 ; i--) {
+              stack.push({
+                path: elt.path + '/' + elt.item.name,
+                item: elt.item.children[i]
+              })
+            }
+          }
+        }
+      },
+      artifactsVisitor(item, path, data) {
+        if (typeof item.artifacts !== 'undefined') {
+          let copy = {}
+          copy.count = item.artifacts.count
+          data.count += copy.count
+          copy.items = item.artifacts.items
+          copy.path = path
+          copy.type = item.type
+          data.items.push(copy)
+        }
+      },
+      testsVisitor(item, path, data) {
+        if (typeof item.tests !== 'undefined') {
+          let copy = {}
+          copy.passed = item.tests.passed
+          data.passed += copy.passed
+          copy.failed = item.tests.failed
+          data.failed += copy.failed
+          copy.skipped = item.tests.skipped
+          data.skipped += copy.skipped
+          copy.status = copy.failed === 0 ? 'SUCCESS' : 'UNSTABLE'
+          copy.items = item.tests.items
+          copy.path = path
+          copy.type = item.type
+          data.items.push(copy)
+        }
       }
     },
     computed: {
-      items() {
-        var p = utils.getParent(this, 'Pipeline')
-        if (p === false
-                || p.pipeline === null
-                || typeof p.pipeline.items === 'undefined') {
-          return []
-        }
-        return p.pipeline.items
+      viewIdNotFound() {
+        return !viewIds.includes(this.viewid)
+      },
+      artifacts() {
+        let res = {}
+        res.items = []
+        res.count = 0
+        this.visitPipeline(this.artifactsVisitor, res)
+        return res
+      },
+      tests() {
+        let res = {}
+        res.items = []
+        res.passed = 0
+        res.failed = 0
+        res.skipped = 0
+        this.visitPipeline(this.testsVisitor, res)
+        return res
       }
     },
-    data: () => ({
-      statusColors: statusColors,
-      statusIcons: statusIcons,
-    }),
+    created () {
+      this.$api.get(this.$route.params.pipelineid)
+        .then((response) => this.pipeline = response.data)
+        .catch(error => {
+          if (error.response.status === 404) {
+            this.notfound = true
+          } else {
+            this.errored = error.message
+          }
+        })
+        .finally(() => this.loading = false)
+    }
   }
 </script>
