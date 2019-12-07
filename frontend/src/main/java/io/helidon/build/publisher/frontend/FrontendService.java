@@ -123,16 +123,11 @@ final class FrontendService implements Service {
             FileSegment fileSegment = new FileSegment(position, filePath.toFile());
             FileSegment linesSegment = fileSegment.findLines(lines, linesOnly, tail);
 
-            FileChannel fc = FileChannel.open(filePath, StandardOpenOption.READ);
-            fc.position(fileSegment.begin);
-            Publisher<DataChunk> publisher = Multi
-                    .from(new ReadableByteChannelPublisher(fc, RETRY_SCHEMA))
-                    .limit(new DataChunkLimiter(linesSegment.end - linesSegment.begin));
-
             res.headers().contentType(MediaType.TEXT_PLAIN);
             res.headers().put(MAX_POSITION_HEADER, String.valueOf(fileSegment.end));
             res.headers().put(POSITION_HEADER, String.valueOf(linesSegment.end));
 
+            Publisher<DataChunk> publisher = new FileSegmentPublisher(linesSegment);
             if (!wrapHtml) {
                 res.send(publisher);
             } else {

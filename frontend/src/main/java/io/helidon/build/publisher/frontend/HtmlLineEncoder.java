@@ -11,8 +11,14 @@ import java.nio.ByteBuffer;
  */
 final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
 
-    private static final DataChunk DIV = DataChunk.create("<div class=\"line\">".getBytes());
-    private static final DataChunk SLASH_DIV = DataChunk.create("</div>".getBytes());
+    static final String DIV_TEXT = "<div class=\"line\">";
+    static final String SLASH_DIV_TEXT = "</div>";
+
+    private final ByteBuffer DIV_DATA = ByteBuffer.wrap(DIV_TEXT.getBytes());
+    private final ByteBuffer SLASH_DIV_DATA = ByteBuffer.wrap(SLASH_DIV_TEXT.getBytes());
+
+    private final DataChunk DIV = DataChunk.create(false, DIV_DATA, true);
+    private final DataChunk SLASH_DIV = DataChunk.create(false, SLASH_DIV_DATA, true);
 
     private final VirtualBuffer vbuf = new VirtualBuffer();
     private int position;
@@ -36,10 +42,12 @@ final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
 
     private void submitLine(int begin, int end) {
         if (end > begin) {
+            DIV_DATA.position(0);
             submit(DIV);
             for (ByteBuffer slice : vbuf.slice(begin, end)) {
                 submit(new VirtualChunk(parent, slice));
             }
+            SLASH_DIV_DATA.position(0);
             submit(SLASH_DIV);
         }
     }

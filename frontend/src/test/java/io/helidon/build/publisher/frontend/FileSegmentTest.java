@@ -11,34 +11,34 @@ import static org.hamcrest.MatcherAssert.assertThat;
 /**
  * {@link FileSegment} test.
  */
-public class FileSegmentTest {
+public final class FileSegmentTest {
 
-    private static final String TEXT1 = "line1\nline2\nline3\nline4\n";
-    private static final FileSegment SEG1 = new FileSegment(0, createFile(TEXT1));
-    private static final FileSegment SEG1_POS6 = SEG1.slice(6L);
+    static final String TEXT1 = "line1\nline2\nline3\nline4\n";
+    static final FileSegment SEG1 = new FileSegment(0, createFile(TEXT1));
+    static final FileSegment SEG1_POS6 = SEG1.slice(6L);
 
-    private static final String TEXT2 = "line1\nline2\nline3\nline4";
-    private static final FileSegment SEG2 = new FileSegment(0, createFile(TEXT2));
+    static final String TEXT2 = "line1\nline2\nline3\nline4";
+    static final FileSegment SEG2 = new FileSegment(0, createFile(TEXT2));
 
-    private static final String TEXT3 = "incompleteline";
-    private static final FileSegment SEG3 = new FileSegment(0, createFile(TEXT3));
+    static final String TEXT3 = "incompleteline";
+    static final FileSegment SEG3 = new FileSegment(0, createFile(TEXT3));
 
-    private static final String TEXT4 = "\nline\n";
-    private static final FileSegment SEG4 = new FileSegment(0, createFile(TEXT4));
+    static final String TEXT4 = "\nline\n";
+    static final FileSegment SEG4 = new FileSegment(0, createFile(TEXT4));
 
-    private static final String TEXT5 = "\nline";
-    private static final FileSegment SEG5 = new FileSegment(0, createFile(TEXT5));
+    static final String TEXT5 = "\nline";
+    static final FileSegment SEG5 = new FileSegment(0, createFile(TEXT5));
 
-    private static final String TEXT6 = "\n\nline\n\n\n";
-    private static final FileSegment SEG6 = new FileSegment(0, createFile(TEXT6));
+    static final String TEXT6 = "\n\nline\n\n\n";
+    static final FileSegment SEG6 = new FileSegment(0, createFile(TEXT6));
 
-    private static final String TEXT7 = "\n";
-    private static final FileSegment SEG7 = new FileSegment(0, createFile(TEXT7));
+    static final String TEXT7 = "\n";
+    static final FileSegment SEG7 = new FileSegment(0, createFile(TEXT7));
 
-    private static final String TEXT8 = "";
-    private static final FileSegment SEG8 = new FileSegment(0, createFile(TEXT8));
+    static final String TEXT8 = "";
+    static final FileSegment SEG8 = new FileSegment(0, createFile(TEXT8));
 
-    private static File createFile(String content) {
+    static File createFile(String content) {
         try {
             File file = File.createTempFile(FileSegmentTest.class.getSimpleName(), null);
             try (FileWriter writer = new FileWriter(file)) {
