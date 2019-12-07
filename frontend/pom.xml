@@ -54,9 +54,14 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.helidon.build.publisher</groupId>
-            <artifactId>helidon-build-publisher-storage</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-all</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

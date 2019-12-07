@@ -283,7 +283,7 @@ final class MockHelper {
 
     static String mockDate() {
         // up to a year before
-        long epoch = System.currentTimeMillis() - (long)RANDOM.nextDouble() * YEAR_IN_MILLIS;
+        long epoch = System.currentTimeMillis() - (long)(RANDOM.nextDouble() * YEAR_IN_MILLIS);
         ZonedDateTime date = Instant.ofEpochMilli(epoch).atZone(ZoneId.of("America/Los_Angeles"));
         return DATE_FORMATTER.format(date);
     }

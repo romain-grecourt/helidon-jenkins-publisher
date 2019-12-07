@@ -1,32 +1,34 @@
 package io.helidon.build.publisher.frontend;
 
+import io.helidon.build.publisher.reactive.DataChunkLimiter;
+import io.helidon.build.publisher.reactive.Multi;
 import io.helidon.common.http.DataChunk;
-import io.helidon.common.http.Http;
 import io.helidon.common.http.MediaType;
-import io.helidon.common.reactive.Flow;
 import io.helidon.common.reactive.Flow.Publisher;
-import io.helidon.common.reactive.Flow.Subscriber;
 import io.helidon.common.reactive.RetrySchema;
 import io.helidon.media.common.ReadableByteChannelPublisher;
+import io.helidon.webserver.BadRequestException;
 import io.helidon.webserver.ResponseHeaders;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Optional;
 
 /**
  * Service that implements the endpoint used by the UI.
  */
 final class FrontendService implements Service {
 
+    private static final RetrySchema RETRY_SCHEMA = RetrySchema.linear(0, 10, 250);
+    private static final String MAX_POSITION_HEADER = "vnd.io.helidon.publisher.max-position";
+    private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
     private final Path storagePath;
 
     /**
@@ -53,8 +55,8 @@ final class FrontendService implements Service {
     }
 
     private void listPipelines(ServerRequest req, ServerResponse res) {
-        int page = req.queryParams().first("page").map(Integer::parseInt).orElse(1);
-        int numitems = req.queryParams().first("numitems").map(Integer::parseInt).orElse(20);
+        int page = toInt(req.queryParams().first("page"), 1);
+        int numitems = toInt(req.queryParams().first("numitems"), 20);
         ResponseHeaders headers = res.headers();
         headers.contentType(MediaType.APPLICATION_JSON);
         headers.put("Access-Control-Allow-Origin", "*");
@@ -74,6 +76,8 @@ final class FrontendService implements Service {
     }
 
     private void getDescriptor(ServerRequest req, ServerResponse res) {
+        // TODO adapt between backend model and UI model
+        // OR, maybe not..
         String pipelineId = req.path().param("pipelineId");
         Path filePath = storagePath.resolve(pipelineId + "/pipeline.json");
         if (Files.exists(filePath)) {
@@ -83,8 +87,9 @@ final class FrontendService implements Service {
         try {
             long size = Files.size(filePath);
             FileChannel fc = FileChannel.open(filePath, StandardOpenOption.READ);
-            RetrySchema retrySchema = RetrySchema.linear(0, 10, 250);
-            Publisher<DataChunk> publisher = new LimitPublisher(new ReadableByteChannelPublisher(fc, retrySchema), size);
+            Multi<DataChunk> publisher = Multi
+                    .from(new ReadableByteChannelPublisher(fc, RETRY_SCHEMA))
+                    .limit(new DataChunkLimiter(size));
             res.headers().contentType(MediaType.APPLICATION_JSON);
             res.headers().contentLength(size);
             res.send(publisher);
@@ -95,116 +100,69 @@ final class FrontendService implements Service {
 
     private void getOutput(ServerRequest req, ServerResponse res) {
         String pipelineId = req.path().param("pipelineId");
-        String stepIdParam = req.path().param("stepId");
-        if (pipelineId == null || pipelineId.isEmpty() || stepIdParam == null || stepIdParam.isEmpty()) {
-            res.status(Http.Status.BAD_REQUEST_400).send();
-            return;
-        }
-        int stepId, nlines;
-        long position;
-        try {
-            stepId = Integer.valueOf(stepIdParam);
-            nlines = req.queryParams().first("nlines").map(Integer::valueOf).orElse(0);
-            position = req.queryParams().first("position").map(Long::parseLong).orElse(0L);
-        } catch( NumberFormatException ex) {
-            res.status(400).send();
-            return;
-        }
+        int stepId = toInt(Optional.ofNullable(req.path().param("stepId")));
+
+        // number of lines (default is inifite)
+        int lines = toInt(req.queryParams().first("lines"), Integer.MAX_VALUE);
+        // start position (default is 0)
+        long position = toLong(req.queryParams().first("position"), 0L);
+        // count lines from the tail? (default is false)
+        boolean tail = req.queryParams().first("tail").isPresent();
+        // return only complete lines? (default is false)
+        boolean linesOnly = req.queryParams().first("lines_only").isPresent();
+        // wrap each lines with div markups ? (default is false)
+        boolean wrapHtml = req.queryParams().first("wrap_html").isPresent();
+
         Path filePath = storagePath.resolve(pipelineId + "/step-" + stepId + ".log");
-        if (Files.exists(filePath)) {
+        if (!Files.exists(filePath)) {
             res.status(404).send();
             return;
         }
+
         try {
-            long size = Files.size(filePath);
-            position = findLinesPosition(filePath, position, size - 1, nlines);
+            FileSegment fileSegment = new FileSegment(position, filePath.toFile());
+            FileSegment linesSegment = fileSegment.findLines(lines, linesOnly, tail);
+
             FileChannel fc = FileChannel.open(filePath, StandardOpenOption.READ);
-            fc.position(position);
-            RetrySchema retrySchema = RetrySchema.linear(0, 10, 250);
-            Publisher<DataChunk> publisher = new LimitPublisher(new ReadableByteChannelPublisher(fc, retrySchema), size);
+            fc.position(fileSegment.begin);
+            Publisher<DataChunk> publisher = Multi
+                    .from(new ReadableByteChannelPublisher(fc, RETRY_SCHEMA))
+                    .limit(new DataChunkLimiter(linesSegment.end - linesSegment.begin));
+
             res.headers().contentType(MediaType.TEXT_PLAIN);
-            res.headers().contentLength(size - position);
-            res.send(publisher);
+            res.headers().put(MAX_POSITION_HEADER, String.valueOf(fileSegment.end));
+            res.headers().put(POSITION_HEADER, String.valueOf(linesSegment.end));
+
+            if (!wrapHtml) {
+                res.send(publisher);
+            } else {
+                HtmlLineEncoder htmlEncoder = new HtmlLineEncoder();
+                publisher.subscribe(htmlEncoder);
+                res.send(htmlEncoder);
+            }
         } catch (IOException ex) {
             req.next(ex);
         }
     }
 
-    private long findLinesPosition(Path filePath, long min, long pos, int nlines) throws IOException {
-        RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r");
-        while(pos >= min && nlines > 0) {
-            raf.seek(min);
-            int readByte = raf.readByte();
-            if (readByte == 0xA) {
-                nlines--;
-            }
-            pos--;
-        }
-        return pos;
+    private static int toInt(Optional<String> optional) {
+        return optional.map(Integer::valueOf)
+                .orElseThrow(() -> new BadRequestException(""));
     }
 
-    private static final class LimitPublisher implements Publisher<DataChunk> {
-
-        private final Publisher<DataChunk> delegate;
-        private final long limit;
-
-        LimitPublisher(Publisher<DataChunk> delegate, long limit) {
-            this.delegate = delegate;
-            this.limit = limit;
-        }
-
-        @Override
-        public void subscribe(Subscriber<? super DataChunk> subscriber) {
-            delegate.subscribe(new LimitSubscriber(subscriber, limit));
+    private static int toInt(Optional<String> optional, int defaultValue) {
+        try {
+            return optional.map(Integer::valueOf).orElse(defaultValue);
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("");
         }
     }
 
-    private static final class LimitSubscriber implements Subscriber<DataChunk> {
-
-        private final Subscriber<? super DataChunk> delegate;
-        private final long limit;
-        private long current;
-        private boolean completed;
-
-        LimitSubscriber(Subscriber<? super DataChunk> delegate, long limit) {
-            this.delegate = delegate;
-            this.limit = limit;
-        }
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            delegate.onSubscribe(subscription);
-        }
-
-        @Override
-        public void onNext(DataChunk item) {
-            ByteBuffer data = item.data();
-            int itemLength = data.remaining();
-            if (current < limit) {
-                long currentLimit = limit - current;
-                if (itemLength > currentLimit) {
-                    data.position((int) (itemLength - currentLimit));
-                    current = limit;
-                    delegate.onNext(item);
-                    delegate.onComplete();
-                    completed = true;
-                } else {
-                    current += itemLength;
-                    delegate.onNext(item);
-                }
-            }
-        }
-
-        @Override
-        public void onError(Throwable ex) {
-            delegate.onError(ex);
-        }
-
-        @Override
-        public void onComplete() {
-            if (!completed) {
-                delegate.onComplete();
-            }
+    private static long toLong(Optional<String> optional, long defaultValue) {
+        try {
+            return optional.map(Long::valueOf).orElse(defaultValue);
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("");
         }
     }
 }

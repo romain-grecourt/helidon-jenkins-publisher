@@ -1,10 +1,6 @@
 <template>
   <v-app dark>
-    <template
-      v-if="loading"
-    >
-      <!-- TODO -->
-    </template>
+    <loading v-if="loading" />
     <error
       v-else-if="errored"
       :message="errored"
@@ -145,10 +141,12 @@
 import statusColors from '@/statusColors'
 import statusIcons from '@/statusIcons'
 import Error from './Error'
+import Loading from './Loading'
 export default {
   name: 'PipelinesView',
   components: {
-    Error
+    Error,
+    Loading
   },
 
   data: () => ({

@@ -1,10 +1,6 @@
 <template>
   <v-app dark>
-    <template
-      v-if="loading"
-    >
-      <!-- TODO -->
-    </template>
+    <loading v-if="loading" />
     <notFound
       v-else-if="notfound"
       message="Pipeline not found!"
@@ -114,6 +110,7 @@ import TestsView from './TestsView'
 import ArtifactsView from './ArtifactsView'
 import Error from './Error'
 import NotFound from './NotFound'
+import Loading from './Loading'
 const viewIds = ['view', 'tests', 'artifacts']
 export default {
   name: 'PipelineView',
@@ -121,6 +118,7 @@ export default {
     PipelineInfo,
     PipelineMenu,
     PipelineNotifications,
+    Loading,
     Error,
     NotFound,
     PipelineTreeView,
