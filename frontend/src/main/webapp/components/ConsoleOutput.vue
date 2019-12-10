@@ -1,13 +1,19 @@
 <template>
   <div
-    class="output"
+    v-if="dohtml"
     ref="container"
+    class="output"
   >
     <slot />
   </div>
+  <pre
+    v-else
+    ref="container"
+    class="output"
+  ><slot /></pre>
 </template>
 <style>
-.output {
+div.output {
   counter-reset: log;
   padding: 0;
   text-decoration: none;
@@ -16,7 +22,7 @@
   position: relative;
   color: #E0E0E0;
 }
-.output > div.line {
+div..output > div.line {
   color: #eee;
   position: relative;
   display: block;
@@ -24,7 +30,7 @@
   line-height: 20px;
   word-break: break-all;
 }
-.output > div.line:before {
+div.output > div.line:before {
   counter-increment: log;
   content: counter(log);
   min-width: 25px;
@@ -34,9 +40,22 @@
   margin-left: -35px;
   color: #777777;
 }
+pre.output {
+  white-space: pre-wrap;       /* Since CSS 2.1 */
+  white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+  white-space: -pre-wrap;      /* Opera 4-6 */
+  white-space: -o-pre-wrap;    /* Opera 7 */
+  word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
 </style>
 <script>
 export default {
   name: 'ConsoleOutput',
+  props: {
+    dohtml: {
+      type: Boolean,
+      default: true
+    }
+  }
 }
 </script>

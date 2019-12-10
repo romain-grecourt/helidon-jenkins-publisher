@@ -172,7 +172,7 @@ export default {
     this.$api.get(this.$route.params.pipelineid)
       .then((response) => (this.pipeline = response.data))
       .catch(error => {
-        if (typeof error.response !== 'undefined' && error.response.status  === 404) {
+        if (typeof error.response !== 'undefined' && error.response.status === 404) {
           this.notfound = true
         } else {
           this.errored = error.message

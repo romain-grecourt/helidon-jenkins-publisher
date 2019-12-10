@@ -136,7 +136,7 @@ final class FrontendService implements Service {
 
             // TODO remove me
             headers.put("Access-Control-Allow-Origin", "*");
-            headers.put("Access-Control-Expose-Headers", "*");
+            headers.put("Access-Control-Expose-Headers", LINES_HEADERS, REMAINING_HEADER, POSITION_HEADER);
 
             Publisher<DataChunk> publisher = new FileSegmentPublisher(lseg);
             if (!wrapHtml) {

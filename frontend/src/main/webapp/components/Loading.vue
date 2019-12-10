@@ -15,7 +15,7 @@
             :size="150"
             color="primary"
             indeterminate
-          ></v-progress-circular>
+          />
         </v-content>
       </v-row>
     </v-container>
@@ -23,6 +23,6 @@
 </template>
 <script>
 export default {
-  name: 'Loading',
+  name: 'Loading'
 }
 </script>

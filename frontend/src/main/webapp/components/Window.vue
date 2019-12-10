@@ -52,7 +52,7 @@ export default {
     id: {
       type: String,
       required: true
-    },
+    }
   },
   data: () => ({
     opened: false

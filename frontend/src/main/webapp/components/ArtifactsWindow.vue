@@ -34,11 +34,6 @@ export default {
     Window,
     Artifacts
   },
-  computed: {
-    windowId() {
-      return this.id + "-artifacts"
-    }
-  },
   props: {
     id: {
       type: Number,
@@ -53,5 +48,10 @@ export default {
       required: true
     }
   },
+  computed: {
+    windowId () {
+      return this.id + '-artifacts'
+    }
+  }
 }
 </script>

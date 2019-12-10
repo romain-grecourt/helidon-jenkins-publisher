@@ -34,11 +34,6 @@ export default {
     Window,
     Tests
   },
-  computed: {
-    windowId() {
-      return this.id + "-tests"
-    }
-  },
   props: {
     id: {
       type: Number,
@@ -53,5 +48,10 @@ export default {
       required: true
     }
   },
+  computed: {
+    windowId () {
+      return this.id + '-tests'
+    }
+  }
 }
 </script>
