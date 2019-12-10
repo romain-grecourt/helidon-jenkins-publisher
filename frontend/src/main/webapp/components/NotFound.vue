@@ -1,15 +1,13 @@
 <template>
-  <v-content>
     <v-container
       class="fill-height"
       fluid
-    >
+      >
       <v-row>
-        <v-content
+        <v-col
           align="center"
           justify="center"
-          class="mx-0"
-        >
+          class="mx-0">
           <v-icon
             size="128"
           >
@@ -22,7 +20,7 @@
           >
             GO TO PIPELINES
           </v-btn>
-        </v-content>
+        </v-col>
       </v-row>
     </v-container>
   </v-content>

@@ -25,6 +25,11 @@ final class FileSegment {
      */
     final RandomAccessFile raf;
 
+    // TODO add lines attributes
+    // initialize it to -1
+
+    final int lines;
+
     /**
      * Create a new segment.
      *
@@ -32,8 +37,20 @@ final class FileSegment {
      * @param file the file
      */
     FileSegment(long begin, File file) {
+        this(begin, file.length(), file);
+    }
+
+    /**
+     * Create a new segment.
+     *
+     * @param begin begin position
+     * @param end end position
+     * @param file the file
+     */
+    FileSegment(long begin, long end, File file) {
         this.begin = begin;
-        this.end = file.length();
+        this.end = end;
+        this.lines = -1;
         try {
             this.raf = new RandomAccessFile(file, "r");
         } catch(FileNotFoundException ex) {
@@ -47,9 +64,10 @@ final class FileSegment {
      * @param begin begin position
      * @param end end position
      */
-    private FileSegment(long begin, long end, RandomAccessFile raf) {
+    private FileSegment(long begin, long end, int lines, RandomAccessFile raf) {
         this.begin = begin;
         this.end = end;
+        this.lines = lines;
         this.raf  = raf;
     }
 
@@ -63,7 +81,7 @@ final class FileSegment {
         if (position > end) {
             throw new IllegalArgumentException("Invalid position");
         }
-        return new FileSegment(position, end, raf);
+        return new FileSegment(position, end, -1, raf);
     }
 
     /**
@@ -80,7 +98,7 @@ final class FileSegment {
         if (position + limit > end) {
             throw new IllegalArgumentException("Invalid limit");
         }
-        return new FileSegment(position, position + limit, raf);
+        return new FileSegment(position, position + limit, -1, raf);
     }
 
     /**
@@ -144,7 +162,7 @@ final class FileSegment {
         if (linesOnly) {
             endPos = linePos;
         }
-        return new FileSegment(beginPos, endPos, raf);
+        return new FileSegment(beginPos, endPos, numlines, raf);
     }
 
     private FileSegment findLinesUp(int lines, boolean linesOnly) throws IOException {
@@ -170,6 +188,6 @@ final class FileSegment {
         } else if (lines != Integer.MAX_VALUE && readByte == 0xA && endPos - beginPos > 1) {
             beginPos++;
         }
-        return new FileSegment(beginPos, endPos, raf);
+        return new FileSegment(beginPos, endPos, numlines, raf);
     }
 }

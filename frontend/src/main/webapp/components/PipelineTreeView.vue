@@ -51,67 +51,23 @@
         <template
           v-slot:label="{ item }"
         >
-          <window
+          <consoleOutputWindow
             v-if="item.type=='STEP'"
             :id="item.id"
             :title="item.name"
-            type="console"
-          >
-            <template
-              v-slot:prepend
-            >
-              <v-icon
-                class="mr-4"
-              >
-                mdi-console
-              </v-icon>
-            </template>
-            <consoleOutput>
-              <div
-                class="line"
-              >
-                line
-              </div>
-            </consoleoutput>
-          </window>
-          <window
+          />
+          <testsWindow
             v-else-if="item.tests"
             :id="item.id"
             :title="item.name"
-            type="tests"
-          >
-            <template
-              v-slot:prepend
-            >
-              <v-icon
-                class="mr-4"
-              >
-                mdi-bug
-              </v-icon>
-            </template>
-            <tests
-              :tests="item.tests"
-            />
-          </window>
-          <window
+            :tests="item.tests"
+          />
+          <artifactsWindow
             v-if="item.artifacts"
             :id="item.id"
             :title="item.name"
-            type="artifacts"
-          >
-            <template
-              v-slot:prepend
-            >
-              <v-icon
-                class="mr-4"
-              >
-                mdi-cube
-              </v-icon>
-            </template>
-            <artifacts
-              :artifacts="item.artifacts"
-            />
-          </window>
+            :artifacts="item.artifacts"
+          />
           <div
             class="node-label-text"
           >
@@ -226,17 +182,15 @@
 <script>
 import statusColors from '@/statusColors'
 import statusIcons from '@/statusIcons'
-import ConsoleOutput from './ConsoleOutput'
-import Window from './Window'
-import Tests from './Tests'
-import Artifacts from './Artifacts'
+import ConsoleOutputWindow from './ConsoleOutputWindow'
+import TestsWindow from './TestsWindow'
+import ArtifactsWindow from './ArtifactsWindow'
 export default {
   name: 'PipelineTreeView',
   components: {
-    ConsoleOutput,
-    Window,
-    Tests,
-    Artifacts
+    ConsoleOutputWindow,
+    TestsWindow,
+    ArtifactsWindow
   },
   props: {
     items: {

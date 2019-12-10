@@ -44,6 +44,7 @@ final class LimitPublisher<T> implements Multi<T> {
 
         @Override
         public void onNext(T item) {
+            // drop it on the floor
             limiter.limit(item, completeAction);
         }
 

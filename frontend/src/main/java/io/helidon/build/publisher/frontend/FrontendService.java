@@ -27,7 +27,8 @@ import java.util.Optional;
 final class FrontendService implements Service {
 
     private static final RetrySchema RETRY_SCHEMA = RetrySchema.linear(0, 10, 250);
-    private static final String MAX_POSITION_HEADER = "vnd.io.helidon.publisher.max-position";
+    private static final String LINES_HEADERS = "vnd.io.helidon.publisher.lines";
+    private static final String REMAINING_HEADER = "vnd.io.helidon.publisher.remaining";
     private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
     private final Path storagePath;
 
@@ -102,7 +103,7 @@ final class FrontendService implements Service {
         String pipelineId = req.path().param("pipelineId");
         int stepId = toInt(Optional.ofNullable(req.path().param("stepId")));
 
-        // number of lines (default is inifite)
+        // number of lines (default is infinite)
         int lines = toInt(req.queryParams().first("lines"), Integer.MAX_VALUE);
         // start position (default is 0)
         long position = toLong(req.queryParams().first("position"), 0L);
@@ -120,18 +121,28 @@ final class FrontendService implements Service {
         }
 
         try {
-            FileSegment fileSegment = new FileSegment(position, filePath.toFile());
-            FileSegment linesSegment = fileSegment.findLines(lines, linesOnly, tail);
+            FileSegment fseg;
+            if (tail) {
+                fseg = new FileSegment(0, position == 0 ? Files.size(filePath): position, filePath.toFile());
+            } else {
+                fseg = new FileSegment(0, Files.size(filePath), filePath.toFile());
+            }
+            FileSegment lseg = fseg.findLines(lines, linesOnly, tail);
+            ResponseHeaders headers = res.headers();
+            headers.contentType(MediaType.TEXT_PLAIN);
+            headers.put(LINES_HEADERS, String.valueOf(lseg.lines));
+            headers.put(REMAINING_HEADER, String.valueOf(tail ? lseg.begin : fseg.end - lseg.end));
+            headers.put(POSITION_HEADER, String.valueOf(lseg.end));
 
-            res.headers().contentType(MediaType.TEXT_PLAIN);
-            res.headers().put(MAX_POSITION_HEADER, String.valueOf(fileSegment.end));
-            res.headers().put(POSITION_HEADER, String.valueOf(linesSegment.end));
+            // TODO remove me
+            headers.put("Access-Control-Allow-Origin", "*");
+            headers.put("Access-Control-Expose-Headers", "*");
 
-            Publisher<DataChunk> publisher = new FileSegmentPublisher(linesSegment);
+            Publisher<DataChunk> publisher = new FileSegmentPublisher(lseg);
             if (!wrapHtml) {
                 res.send(publisher);
             } else {
-                HtmlLineEncoder htmlEncoder = new HtmlLineEncoder();
+                HtmlLineEncoder htmlEncoder = new HtmlLineEncoder(req.requestId());
                 publisher.subscribe(htmlEncoder);
                 res.send(htmlEncoder);
             }

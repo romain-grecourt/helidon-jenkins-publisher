@@ -34,7 +34,7 @@ public final class HtmlEncoderTest {
 
     @Test
     public void testSimple() throws Exception {
-        HtmlLineEncoder encoder = new HtmlLineEncoder();
+        HtmlLineEncoder encoder = new HtmlLineEncoder(1L);
         new FileSegmentPublisher(FileSegmentTest.SEG1).subscribe(encoder);
         List<String> lines = lines(encoder);
         assertThat(lines, is(equalTo(Arrays.asList(

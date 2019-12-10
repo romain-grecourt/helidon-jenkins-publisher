@@ -1,33 +1,32 @@
 <template>
-  <v-content>
     <v-container
       class="fill-height"
       fluid
     >
       <v-row>
-        <v-content
+        <v-col
           align="center"
           justify="center"
-          class="mx-0"
-        >
+          class="mx-0">
           <v-icon
             size="128"
           >
             mdi-emoticon-dead
           </v-icon>
-          <h1>{{ message }}</h1>
-        </v-content>
+          <h1 class="mt-2" v-if="message">{{ message }}</h1>
+          <div style="display:block">
+            <slot />
+          </div>
+        </v-col>
       </v-row>
     </v-container>
-  </v-content>
 </template>
 <script>
 export default {
   name: 'Error',
   props: {
     message: {
-      type: String,
-      default: 'Error !'
+      type: String
     }
   }
 }

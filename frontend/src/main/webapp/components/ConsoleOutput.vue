@@ -1,5 +1,8 @@
 <template>
-  <div class="output">
+  <div
+    class="output"
+    ref="container"
+  >
     <slot />
   </div>
 </template>
@@ -34,6 +37,6 @@
 </style>
 <script>
 export default {
-  name: 'ConsoleOutput'
+  name: 'ConsoleOutput',
 }
 </script>

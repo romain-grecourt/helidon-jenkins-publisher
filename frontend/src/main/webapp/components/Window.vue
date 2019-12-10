@@ -22,7 +22,9 @@
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-card-title>
+      <slot name="append" />
       <v-card-text
+        ref="content"
         class="pa-0"
       >
         <slot />
@@ -48,36 +50,33 @@ export default {
       required: true
     },
     id: {
-      type: Number,
-      required: true
-    },
-    type: {
       type: String,
       required: true
-    }
+    },
   },
   data: () => ({
     opened: false
   }),
   watch: {
     opened () {
-      var windowId = this.id + '-' + this.type
-      var curState = this.$store.state.pipelineWindowId === windowId
+      var curState = this.$store.state.pipelineWindowId === this.id
       if (!this.opened && curState) {
+        this.$emit('closed')
         this.$store.commit('PIPELINE_WINDOW_ID', 0)
       }
     }
   },
   created () {
-    var windowId = this.id + '-' + this.type
-    this.opened = this.$store.state.pipelineWindowId === windowId
+    this.opened = this.$store.state.pipelineWindowId === this.id
     this.unsubscribe = this.$store.subscribe((mutation, state) => {
       if (mutation.type === 'PIPELINE_WINDOW_ID') {
-        var newState = mutation.payload === windowId
+        var newState = mutation.payload === this.id
         if (!this.opened && newState) {
           this.opened = true
+          this.$emit('opened')
         } else if (this.opened && !newState) {
           this.opened = false
+          this.$emit('closed')
         }
       }
     })
@@ -89,7 +88,7 @@ export default {
     close () {
       if (this.opened) {
         this.opened = false
-        this.$store.commit('PIPELINE_WINDOW_ID', 0)
+        this.$emit('closed')
       }
     }
   }
