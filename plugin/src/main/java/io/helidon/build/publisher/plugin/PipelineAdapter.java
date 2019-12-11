@@ -32,7 +32,7 @@ import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException;
 import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 
 /**
- * Pipeline event emitter.
+ * Pipeline event adapter.
  */
 final class PipelineAdapter {
 
@@ -81,20 +81,23 @@ final class PipelineAdapter {
     /**
      * Get the step for the given step id.
      * @param id step id
-     * @return {@link FlowStep} if found, or {@code null} if not found
+     * @return {@link Step} if found, or {@code null} if not found
      */
     Pipeline.Step step(String id) {
         return steps.get(id);
     }
 
     /**
-     * Get the next unprocessed step at the head.
-     * @return FlowStep or {@code null} if there is no unprocessed step at the head
+     * Get the next unprocessed and included step at the head.
+     * @return Step or {@code null} if there is no "included" and "unprocessed" step at the head
      */
     Pipeline.Step poll() {
         if (!headNodes.isEmpty()) {
             StepAtomNode node = headNodes.pollLast();
-            return steps.get(node.getId());
+            Pipeline.Step step = steps.get(node.getId());
+            if (isStepIncluded(step.declared(), step.meta())) {
+                return step;
+            }
         }
         return null;
     }
@@ -132,6 +135,16 @@ final class PipelineAdapter {
         boolean meta = node.getDescriptor().isMetaStep();
         String sig = Pipeline.Step.createPath(pstage.path(), name, args);
         boolean declared = signatures.contains(sig);
+        Pipeline.Steps psteps = getOrCreateSteps((Pipeline.Sequence) pstage);
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Creating step, runId={0}, signature={1}", new Object[]{
+                runInfo.id,
+                sig,
+            });
+        }
+        Pipeline.Step step = new Pipeline.Step(psteps, name, truncateStepArgs(args), meta, declared,
+                new StatusImpl(node), new TimingsImpl(node));
+        steps.put(node.getId(), step);
         if (!isStepIncluded(declared, meta)) {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Excluding step, runId={0}, signature={1}, stepId={2}, ", new Object[]{
@@ -140,20 +153,10 @@ final class PipelineAdapter {
                     sig
                 });
             }
-            return;
+        } else {
+            psteps.addStep(step);
+            step.fireCreated();
         }
-        if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Creating step, runId={0}, signature={1}", new Object[]{
-                runInfo.id,
-                sig,
-            });
-        }
-        Pipeline.Steps psteps = getOrCreateSteps((Pipeline.Sequence) pstage);
-        Pipeline.Step step = new Pipeline.Step(psteps, name, truncateStepArgs(args), meta, declared, new StatusImpl(node),
-                new TimingsImpl(node));
-        psteps.addStep(step);
-        steps.put(node.getId(), step);
-        step.fireCreated();
     }
 
     private boolean isStepIncluded(boolean declared, boolean meta) {

@@ -1,12 +1,12 @@
 package io.helidon.build.publisher.plugin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.helidon.build.publisher.model.PipelineEvents;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -20,6 +20,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
+
+import io.helidon.build.publisher.model.PipelineEvents;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Publisher client.
@@ -160,11 +164,15 @@ final class BackendClient implements PipelineEvents.EventListener {
                         case PIPELINE_COMPLETED:
                         case STEP_COMPLETED:
                         case STAGE_COMPLETED:
+                        case ARTIFACTS_INFO:
                         case ERROR:
                             processEvent(event);
                             break;
                         case OUTPUT_DATA:
                             processOutputEvent((PipelineEvents.OutputData) event);
+                            break;
+                        case ARTIFACT_DATA:
+                            processArtifactEvent((PipelineEvents.ArtifactData) event);
                             break;
                         default:
                             LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -197,6 +205,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                     case PIPELINE_COMPLETED:
                     case STEP_COMPLETED:
                     case STAGE_COMPLETED:
+                    case ARTIFACTS_INFO:
                         events.add(e);
                         it.remove();
                         break;
@@ -206,6 +215,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                         }
                         break;
                     case OUTPUT_DATA:
+                    case ARTIFACT_DATA:
                         break;
                     default:
                         LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -295,6 +305,54 @@ final class BackendClient implements PipelineEvents.EventListener {
                             url.toString(),
                             code,
                             outputEvent
+                        });
+            }
+        }
+
+        /**
+         * Process an artifact event.
+         * @param artifactEvent event
+         */
+        private void processArtifactEvent(PipelineEvents.ArtifactData artifactEvent) throws IOException {
+            String fname = URLEncoder.encode(artifactEvent.filename(), "UTF-8").replace("/", "%2F");
+            URL url = URI.create(serverUrl + "/files/" + artifactEvent.runId()+ "/" + artifactEvent.stageId()+ "/" + fname).toURL();
+
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "Sending artifact data event, queueId={0}, url={1}, event={2}", new Object[]{
+                    queueId,
+                    url,
+                    artifactEvent
+                });
+            }
+
+            URLConnection con = url.openConnection();
+            if (!(con instanceof HttpURLConnection)) {
+                throw new IllegalStateException("Not an HttpURLConnection");
+            }
+            HttpURLConnection hcon = (HttpURLConnection) con;
+            hcon.setDoOutput(true);
+            hcon.addRequestProperty("Content-Type", "text/plain");
+            hcon.addRequestProperty("Content-Encoding", "gzip");
+            hcon.setRequestMethod("POST");
+            try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream());
+                    FileInputStream fis = new FileInputStream(artifactEvent.file())) {
+                byte[] buf = new byte[1024];
+                int nbytes = 0;
+                while (nbytes >= 0) {
+                    nbytes = fis.read(buf);
+                    if (nbytes > 0) {
+                        out.write(buf, 0, nbytes);
+                    }
+                }
+                out.flush();
+            }
+            int code = hcon.getResponseCode();
+            if (201 != code) {
+                LOGGER.log(Level.WARNING, "Invalid response code for artifact data event, url={0}, code={1}, step: {1}",
+                        new Object[]{
+                            url.toString(),
+                            code,
+                            artifactEvent
                         });
             }
         }

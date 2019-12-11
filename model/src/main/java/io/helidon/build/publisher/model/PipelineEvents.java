@@ -5,11 +5,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.io.File;
 
 /**
  * Pipeline events.
@@ -71,6 +71,16 @@ public final class PipelineEvents {
         OUTPUT_DATA,
 
         /**
+         * Artifact file was archived.
+         */
+        ARTIFACT_DATA,
+
+        /**
+         * Artifacts info for a step.
+         */
+        ARTIFACTS_INFO,
+
+        /**
          * A pipeline has been created.
          */
         PIPELINE_CREATED,
@@ -102,6 +112,8 @@ public final class PipelineEvents {
         @JsonSubTypes.Type(value = PipelineEvents.StageCompleted.class, name = "STAGE_COMPLETED"),
         @JsonSubTypes.Type(value = PipelineEvents.Output.class, name = "OUTPUT"),
         @JsonSubTypes.Type(value = PipelineEvents.OutputData.class, name = "OUTPUT_DATA"),
+        @JsonSubTypes.Type(value = PipelineEvents.ArtifactData.class, name = "ARTIFACT_DATA"),
+        @JsonSubTypes.Type(value = PipelineEvents.ArtifactsInfo.class, name = "ARTIFACTS_INFO"),
         @JsonSubTypes.Type(value = PipelineEvents.Error.class, name = "ERROR")
     })
     public static abstract class Event {
@@ -789,6 +801,182 @@ public final class PipelineEvents {
         public String toString() {
             return Output.class.getSimpleName() + "{"
                     + " stepId=" + stepId
+                    + " }";
+        }
+    }
+
+    /**
+     * {@link EventType#ARTIFACT_DATA} event.
+     */
+    public static final class ArtifactData extends Event {
+
+        final File file;
+        final String filename;
+        final int stepsId;
+
+        /**
+         * Create a new {@link EventType#ARTIFACT_DATA} event.
+         *
+         * @param runId runId
+         * @param stepsId the corresponding stepsId
+         * @param file the artifact file
+         * @param filename the artifact relative filename
+         */
+        public ArtifactData(String runId, int stepsId, File file, String filename) {
+            super(runId);
+            this.stepsId = stepsId;
+            this.file = file;
+            this.filename = filename;
+        }
+
+        /**
+         * Get the steps id.
+         *
+         * @return String
+         */
+        public int stageId() {
+            return stepsId;
+        }
+
+        /**
+         * Get the file.
+         * @return File
+         */
+        public File file() {
+            return file;
+        }
+
+        /**
+         * Get the relative filename.
+         * @return 
+         */
+        public String filename() {
+            return filename;
+        }
+
+        @Override
+        public EventType eventType() {
+            return EventType.ARTIFACT_DATA;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 97 * hash + Objects.hashCode(this.file);
+            hash = 97 * hash + Objects.hashCode(this.filename);
+            hash = 97 * hash + this.stepsId;
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final ArtifactData other = (ArtifactData) obj;
+            if (this.stepsId != other.stepsId) {
+                return false;
+            }
+            if (!Objects.equals(this.filename, other.filename)) {
+                return false;
+            }
+            return Objects.equals(this.file, other.file);
+        }
+
+        @Override
+        public String toString() {
+            return ArtifactData.class.getSimpleName() + "{"
+                    + " runId=" + runId
+                    + ", stepsId=" + stepsId
+                    + ", file=" + file
+                    + ", filename=" + filename
+                    + " }";
+        }
+    }
+
+    /**
+     * {@link EventType#ARTIFACTS_INFO} event.
+     */
+    @JsonPropertyOrder({"runId", "eventType", "stageId"})
+    public static final class ArtifactsInfo extends Event {
+
+        final int stepsId;
+        final int count;
+
+        /**
+         * Create a new {@link EventType#ARTIFACTS_INFO} event.
+         * @param runId runId
+         * @param stageId the corresponding stage id
+         * @param count the count of archived files
+         */
+        public ArtifactsInfo(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stageId,
+                @JsonProperty("files") int count) {
+            super(runId);
+            this.stepsId = stageId;
+            this.count = count;
+        }
+
+        /**
+         * Get the steps id.
+         * @return String
+         */
+        @JsonProperty
+        public int stepsId() {
+            return stepsId;
+        }
+
+        /**
+         * Get the count of archived file names.
+         * @return int
+         */
+        @JsonProperty
+        public int count() {
+            return count;
+        }
+
+        @Override
+        public EventType eventType() {
+            return EventType.ARTIFACTS_INFO;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 7;
+            hash = 29 * hash + this.stepsId;
+            hash = 29 * hash + this.count;
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final ArtifactsInfo other = (ArtifactsInfo) obj;
+            if (this.stepsId != other.stepsId) {
+                return false;
+            }
+            return this.count == other.count;
+        }
+
+        @Override
+        public String toString() {
+            return ArtifactsInfo.class.getSimpleName() + "{"
+                    + " runId=" + runId
+                    + ", stepsId=" + stepsId
+                    + ", count=" + count
                     + " }";
         }
     }

@@ -20,18 +20,18 @@ import io.helidon.common.reactive.Flow.Subscriber;
 import io.helidon.common.reactive.Flow.Subscription;
 
 /**
- * Output appender.
+ * File appender.
  */
-final class OutputAppender {
+final class FileAppender {
 
-    private static final Logger LOGGER = Logger.getLogger(OutputAppender.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(FileAppender.class.getName());
     private static final int QUEUE_SIZE = 1024; // max number of append action in the queue
 
     private final ExecutorService appenderExecutors;
     private final BlockingQueue<AppendAction>[] appendActionQueues;
     private final Path storagePath;
 
-    OutputAppender(Path storagePath, int nthreads) {
+    FileAppender(Path storagePath, int nthreads) {
         this.storagePath = storagePath;
         this.appenderExecutors = Executors.newFixedThreadPool(nthreads);
         this.appendActionQueues = new BlockingQueue[nthreads];
@@ -69,6 +69,9 @@ final class OutputAppender {
     private OutputStream outputStream(String path) {
         Path filePath = storagePath.resolve(path);
         try {
+            if (!Files.exists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
             if (!Files.exists(filePath)) {
                 if (LOGGER.isLoggable(Level.FINE)) {
                     LOGGER.log(Level.FINE, "Creating file: {0}", path);

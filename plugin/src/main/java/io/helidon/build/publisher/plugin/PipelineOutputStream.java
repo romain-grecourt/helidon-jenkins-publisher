@@ -18,7 +18,7 @@ final class PipelineOutputStream extends LineTransformationOutputStream {
     private final String runId;
     private final Pipeline.Step step;
     private final int id;
-    private final PipelineEvents.EventListener eventListener;
+    private final BackendClient client;
 
     /**
      * Create a new instance.
@@ -26,13 +26,13 @@ final class PipelineOutputStream extends LineTransformationOutputStream {
      * @param out the stream to wrap
      * @param step the associated step
      */
-    PipelineOutputStream(OutputStream out, String runId, Pipeline.Step step, PipelineEvents.EventListener eventListener) {
+    PipelineOutputStream(OutputStream out, String runId, Pipeline.Step step, BackendClient client) {
         super();
         this.out = out;
         this.runId = runId;
         this.step = step;
         this.id = IDS.incrementAndGet();
-        this.eventListener = eventListener;
+        this.client = client;
     }
 
     @Override
@@ -54,7 +54,7 @@ final class PipelineOutputStream extends LineTransformationOutputStream {
         if (ConsoleNote.findPreamble(bytes, 0, len) == -1) {
             byte[] data = new byte[len];
             System.arraycopy(bytes, 0, data, 0, len);
-            eventListener.onEvent(new PipelineEvents.OutputData(runId, step.id(), data));
+            client.onEvent(new PipelineEvents.OutputData(runId, step.id(), data));
         }
         if (out != null) {
             out.write(bytes, 0, len);

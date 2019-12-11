@@ -128,15 +128,15 @@ final class FileSegment {
      * @param lines the number of lines to search:, a non positive value results in an empty segment, and
      * {@code Integer.MAX_VALUE} results in a segment that begins at {@code 0}
      * @param linesOnly if {@code true} the end position of the resulting segment matches the end of a line
-     * @param tail if {@code true} the lines are counted from the end of this segment, otherwise from the beginning
+     * @param backward if {@code true} the lines are counted from the end of this segment, otherwise from the beginning
      * @return BufferSegment
      * @throws IOException 
      */
-    FileSegment findLines(int lines, boolean linesOnly, boolean tail) throws IOException {
+    FileSegment findLines(int lines, boolean linesOnly, boolean backward) throws IOException {
         if (lines == Integer.MAX_VALUE && !linesOnly) {
             return this;
         }
-        if (tail) {
+        if (backward) {
             return findLinesUp(lines, linesOnly);
         } else {
             return findLinesDown(lines, linesOnly);

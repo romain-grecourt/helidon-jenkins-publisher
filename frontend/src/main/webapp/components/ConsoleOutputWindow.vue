@@ -20,10 +20,10 @@
     >
       <v-progress-linear
         height="4"
-        style="min-height: 4px"
-        :value="100"
-        :indeterminate="progressIndeterminate"
-        :query="true"
+        :style="progressBarActive"
+        :active="loading"
+        background-color="#b3aaaa"
+        indeterminate
         stream
       />
     </template>
@@ -73,14 +73,15 @@ export default {
     loading: true, // progress bar
     readonly: true, // output is not going to change
     errored: false, // error when fetching output
-    progressIndeterminate: true, // indeterminate progress bar
-    progress: 0, // progress bar value
     position: 0, // output raw position index
     remaining: 0 // output raw remaining
   }),
   computed: {
     windowId () {
       return this.id + '-console'
+    },
+    progressBarActive () {
+      return this.loading ? { minHeight: '4px' } : {}
     }
   },
   watch: {
@@ -95,58 +96,57 @@ export default {
     retry () {
       const outputContainer = this.$refs.output.$refs.container
       outputContainer.innerHTML = ''
-      this.progressIndeterminate = true
-      this.loadOutput(0, 0, true, this.readonly, 1000)
+      this.loading = true
+      this.loadOutput(0, 0, true, this.readonly, 400)
     },
     onWindowOpened () {
       this.active = true
-      this.loadOutput(0, 0, true, this.readonly, 1000)
+      this.loadOutput(0, 0, true, this.readonly, 400)
     },
-    renderOutput (position, remaining, tail, linesOnly, lines, output) {
+    renderOutput (position, remaining, backward, linesOnly, lines, output) {
       this.remaining = remaining
       this.position = position
       if (remaining === 0) {
-        this.progressIndeterminate = false
+        this.loading = false
       }
       const outputContainer = this.$refs.output.$refs.container
-      if (tail) {
+      if (backward) {
         outputContainer.innerHTML = output + outputContainer.innerHTML
+        const windowContent = this.$refs.window.$refs.content
+        windowContent.scrollTop = windowContent.scrollHeight
       } else {
         outputContainer.innerHTML = outputContainer.innerHTML + output
       }
-      const windowContent = this.$refs.window.$refs.content
-      windowContent.scrollTop = windowContent.scrollHeight
       if (this.active) {
-        if (tail) {
-          this.loadOutput(remaining, position, tail, linesOnly, lines)
+        if (backward) {
+          this.loadOutput(remaining, position, backward, linesOnly, lines)
         } else {
-          this.loadOutput(position, remaining, tail, linesOnly, lines)
+          this.loadOutput(position, remaining, backward, linesOnly, lines)
         }
       }
     },
-    loadOutput (position, remaining, tail, linesOnly, lines) {
-      if ((tail && position === 0 && remaining > 0) ||
-              (!tail && remaining === 0 && position > 0)) {
+    loadOutput (position, remaining, backward, linesOnly, lines) {
+      if ((backward && position === 0 && remaining > 0) ||
+              (!backward && remaining === 0 && position > 0)) {
         return
       }
       let uri = 'test' + '/output/' + 1 // TODO this is hard-coded
       uri += '?position=' + position
       uri += '&lines=' + lines
-      if (tail) {
-        uri += '&tail'
+      if (backward) {
+        uri += '&backward=true'
       }
       if (linesOnly) {
-        uri += '&lines_only'
+        uri += '&lines_only=true'
       }
       this.$api.get(uri)
         .then((response) => {
           position = parseInt(response.headers['vnd.io.helidon.publisher.position'])
           remaining = parseInt(response.headers['vnd.io.helidon.publisher.remaining'])
-          this.renderOutput(position, remaining, tail, linesOnly, lines, response.data)
+          this.renderOutput(position, remaining, backward, linesOnly, lines, response.data)
         })
         .catch(error => {
           this.errored = true
-          console.warn(error)
         })
     },
     onWindowClosed () {

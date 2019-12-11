@@ -22,7 +22,7 @@ div.output {
   position: relative;
   color: #E0E0E0;
 }
-div..output > div.line {
+div.output > div.line {
   color: #eee;
   position: relative;
   display: block;

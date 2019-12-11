@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import io.helidon.build.publisher.model.PipelineEvents.ArtifactsInfo;
 import io.helidon.build.publisher.model.PipelineEvents.Event;
 import io.helidon.build.publisher.model.PipelineEvents.EventListener;
 import io.helidon.build.publisher.model.PipelineEvents.EventType;
@@ -86,6 +87,15 @@ public final class Pipeline {
     @JsonProperty
     public Sequence stages() {
         return sequence;
+    }
+
+    /**
+     * Get a node by id.
+     * @param id node id
+     * @return {@link Node} or {@code null} if not found
+     */
+    public Node node(int id) {
+        return sequence.nodesByIds.get(id);
     }
 
     /**
@@ -169,6 +179,17 @@ public final class Pipeline {
                 LOGGER.log(Level.FINE, "Applying event: {0}", event);
             }
             switch (eventType) {
+                case ARTIFACTS_INFO:
+                    ArtifactsInfo ai = ((ArtifactsInfo)event);
+                    Node artifactStage = sequence.nodesByIds.get(ai.stepsId);
+                    if (artifactStage == null) {
+                        throw new IllegalStateException("Unkown node, id=" + ai.stepsId);
+                    }
+                    if (!(artifactStage instanceof Steps)) {
+                        throw new IllegalStateException("Invalid artifact steps node");
+                    }
+                    ((Steps)artifactStage).artifacts = ai.count;
+                    break;
                 case PIPELINE_COMPLETED:
                     if (sequence.status.state != State.FINISHED) {
                         sequence.status.state = State.FINISHED;
@@ -239,7 +260,6 @@ public final class Pipeline {
     /**
      * Graph node.
      */
-    @JsonPropertyOrder({"id", "name", "path", "state", "result", "startTime", "endTime"})
     public static abstract class Node {
 
         final Map<Integer, Node> nodesByIds;
@@ -587,9 +607,11 @@ public final class Pipeline {
     /**
      * A steps stage.
      */
+    @JsonPropertyOrder({"id", "type", "state", "result", "startTime", "endTime", "artifacts", "steps"})
     public static final class Steps extends Stage {
 
         final List<Step> steps = new LinkedList<>();
+        int artifacts = 0;
 
         private Steps(int id, Node parent, Status status, Timings timings) {
             super(StageType.STEPS, id, parent, null, Objects.requireNonNull(parent, "parent").path, status, timings);
@@ -616,6 +638,16 @@ public final class Pipeline {
         @Override
         public String path() {
             return path;
+        }
+
+        /**
+         * Get the artifacts count.
+         *
+         * @return int
+         */
+        @JsonProperty
+        public final int artifacts() {
+            return artifacts;
         }
 
         /**
@@ -670,6 +702,7 @@ public final class Pipeline {
     /**
      * A step node.
      */
+    @JsonPropertyOrder({"id", "name", "args", "path", "state", "result", "startTime", "endTime", "meta", "declared"})
     public static final class Step extends Node {
 
         final String args;
@@ -831,6 +864,7 @@ public final class Pipeline {
     /**
      * A stage node with nested stage nodes.
      */
+    @JsonPropertyOrder({"id", "type", "name", "path", "state", "result", "startTime", "endTime", "stages"})
     public static abstract class Stages extends Stage {
 
         final List<Stage> stages = new LinkedList<>();
@@ -1002,6 +1036,7 @@ public final class Pipeline {
                             nestedStep.get("meta").asBoolean(), nestedStep.get("declared").asBoolean(),
                             readStatus(nestedStep), readTimings(nestedStep)));
                 }
+                steps.artifacts = stageNode.get("artifacts").asInt(0);
                 ((Stages) parent).addStage(steps);
                 stack.pop();
             } else {

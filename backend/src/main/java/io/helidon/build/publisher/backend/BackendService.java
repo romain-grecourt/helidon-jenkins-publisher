@@ -1,8 +1,10 @@
 package io.helidon.build.publisher.backend;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.LinkedList;
+import java.net.URLDecoder;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,7 +31,7 @@ final class BackendService implements Service {
 
     private final Path storagePath;
     private final ObjectMapper mapper;
-    private final OutputAppender appender;
+    private final FileAppender appender;
 
     /**
      * Create a new instance.
@@ -46,14 +48,15 @@ final class BackendService implements Service {
             }
         }
         this.storagePath = dirPath;
-        this.appender = new OutputAppender(storagePath, appenderThreads);
+        this.appender = new FileAppender(storagePath, appenderThreads);
         this.mapper = new ObjectMapper();
     }
 
     @Override
     public void update(Routing.Rules rules) {
         rules.put("/events", this::processEvents)
-             .put("/output/{pipelineId}/{stepId}", this::appendOutput);
+             .put("/output/{pipelineId}/{stepId}", this::appendOutput)
+             .post("/files/{pipelineId}/{stageId}/{filepath}", this::uploadFile);
     }
 
     private void processEvents(ServerRequest req, ServerResponse res) {
@@ -106,6 +109,10 @@ final class BackendService implements Service {
             } catch (IOException ex) {
                 req.next(ex);
             }
+        }).exceptionally((ex) -> {
+            req.next(ex);
+            LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+            return null;
         });
     }
 
@@ -127,5 +134,33 @@ final class BackendService implements Service {
         boolean compressed = req.headers().value(Http.Header.CONTENT_ENCODING).map(hdr -> "gzip".equals(hdr)).orElse(false);
         appender.append(req.content(), pipelineId + "/step-" + stepId + ".log", compressed);
         res.status(Http.Status.OK_200).send();
+    }
+
+    private void uploadFile(ServerRequest req, ServerResponse res) {
+        String pipelineId = req.path().param("pipelineId");
+        String stageIdParam = req.path().param("stageId");
+        String filepath = req.path().param("filepath");
+        if (pipelineId == null || pipelineId.isEmpty() || stageIdParam == null || stageIdParam.isEmpty()
+                || filepath == null || filepath.isEmpty()) {
+            res.status(Http.Status.BAD_REQUEST_400).send();
+            return;
+        }
+        int stageId;
+        try {
+            stageId = Integer.valueOf(stageIdParam);
+        } catch( NumberFormatException ex) {
+            res.status(400).send();
+            LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+            return;
+        }
+        try {
+            filepath = URLDecoder.decode(filepath.replace("%2F", "/"), "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            req.next(ex);
+            return;
+        }
+        boolean compressed = req.headers().value(Http.Header.CONTENT_ENCODING).map(hdr -> "gzip".equals(hdr)).orElse(false);
+        appender.append(req.content(), pipelineId + "/artifacts/" + stageId + "/" + filepath, compressed);
+        res.status(Http.Status.CREATED_201).send();
     }
 }

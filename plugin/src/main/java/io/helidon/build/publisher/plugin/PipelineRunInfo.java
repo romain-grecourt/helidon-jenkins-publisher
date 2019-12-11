@@ -60,6 +60,7 @@ final class PipelineRunInfo {
                 publisherClientThreads = 5;
             }
             id = createId(jobName, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            // TODO repository URL
         } else {
             id = null;
             publisherServerUrl = null;

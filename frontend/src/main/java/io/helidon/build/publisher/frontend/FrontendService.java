@@ -107,12 +107,12 @@ final class FrontendService implements Service {
         int lines = toInt(req.queryParams().first("lines"), Integer.MAX_VALUE);
         // start position (default is 0)
         long position = toLong(req.queryParams().first("position"), 0L);
-        // count lines from the tail? (default is false)
-        boolean tail = req.queryParams().first("tail").isPresent();
+        // count lines from the end? (default is false)
+        boolean backward = req.queryParams().first("backward").map(Boolean::valueOf).orElse(false);
         // return only complete lines? (default is false)
-        boolean linesOnly = req.queryParams().first("lines_only").isPresent();
+        boolean linesOnly = req.queryParams().first("lines_only").map(Boolean::valueOf).orElse(false);
         // wrap each lines with div markups ? (default is false)
-        boolean wrapHtml = req.queryParams().first("wrap_html").isPresent();
+        boolean wrapHtml = req.queryParams().first("html").map(Boolean::valueOf).orElse(false);
 
         Path filePath = storagePath.resolve(pipelineId + "/step-" + stepId + ".log");
         if (!Files.exists(filePath)) {
@@ -122,16 +122,16 @@ final class FrontendService implements Service {
 
         try {
             FileSegment fseg;
-            if (tail) {
+            if (backward) {
                 fseg = new FileSegment(0, position == 0 ? Files.size(filePath): position, filePath.toFile());
             } else {
                 fseg = new FileSegment(0, Files.size(filePath), filePath.toFile());
             }
-            FileSegment lseg = fseg.findLines(lines, linesOnly, tail);
+            FileSegment lseg = fseg.findLines(lines, linesOnly, backward);
             ResponseHeaders headers = res.headers();
             headers.contentType(MediaType.TEXT_PLAIN);
             headers.put(LINES_HEADERS, String.valueOf(lseg.lines));
-            headers.put(REMAINING_HEADER, String.valueOf(tail ? lseg.begin : fseg.end - lseg.end));
+            headers.put(REMAINING_HEADER, String.valueOf(backward ? lseg.begin : fseg.end - lseg.end));
             headers.put(POSITION_HEADER, String.valueOf(lseg.end));
 
             // TODO remove me
