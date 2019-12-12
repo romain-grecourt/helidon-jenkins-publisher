@@ -35,6 +35,8 @@ final class BackendClient implements PipelineEvents.EventListener {
     private static final int OUTPUT_THRESHOLD = 100 * 1024; // 100KIB
     private static final int EVENT_QUEUE_SIZE = 4096; // max number of events in the queue
     private static final int AGGREGATE_SIZE = 100; // max number of aggregated events
+    private static final int CONNECT_TIMEOUT = 30 * 1000; // 30s
+    private static final int READ_TIMEOUT = 60 * 2 * 1000; // 2min
 
     private final BlockingQueue<PipelineEvents.Event>[] queues;
     private final ExecutorService executor;
@@ -165,6 +167,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                         case STEP_COMPLETED:
                         case STAGE_COMPLETED:
                         case ARTIFACTS_INFO:
+                        case TESTS:
                         case ERROR:
                             processEvent(event);
                             break;
@@ -173,6 +176,9 @@ final class BackendClient implements PipelineEvents.EventListener {
                             break;
                         case ARTIFACT_DATA:
                             processArtifactEvent((PipelineEvents.ArtifactData) event);
+                            break;
+                        case TEST_SUITE:
+                            processTestSuiteEvent((PipelineEvents.TestSuite) event);
                             break;
                         default:
                             LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -184,9 +190,9 @@ final class BackendClient implements PipelineEvents.EventListener {
         }
 
         /**
-         * Process an output event.
+         * Process an event.
          *
-         * @param outputEvent event
+         * @param event event
          */
         private void processEvent(PipelineEvents.Event event) throws IOException {
             // aggregate event for the same run in the next 100 events in the queue
@@ -206,6 +212,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                     case STEP_COMPLETED:
                     case STAGE_COMPLETED:
                     case ARTIFACTS_INFO:
+                    case TESTS:
                         events.add(e);
                         it.remove();
                         break;
@@ -216,6 +223,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                         break;
                     case OUTPUT_DATA:
                     case ARTIFACT_DATA:
+                    case TEST_SUITE:
                         break;
                     default:
                         LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -244,6 +252,8 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.addRequestProperty("Content-Type", "application/json");
             hcon.setRequestMethod("PUT");
             hcon.setDoOutput(true);
+            hcon.setConnectTimeout(CONNECT_TIMEOUT);
+            hcon.setReadTimeout(READ_TIMEOUT);
             mapper.writeValue(hcon.getOutputStream(), new PipelineEvents(events));
             int code = hcon.getResponseCode();
             if (200 != code) {
@@ -260,7 +270,12 @@ final class BackendClient implements PipelineEvents.EventListener {
          * @param outputEvent event
          */
         private void processOutputEvent(PipelineEvents.OutputData outputEvent) throws IOException {
-            URL url = URI.create(serverUrl + "/output/" + outputEvent.runId()+ "/" + outputEvent.stepId()).toURL();
+            URL url = URI.create(serverUrl
+                    + "/output/"
+                    + outputEvent.runId()
+                    + "/"
+                    + outputEvent.stepId())
+                    .toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending output data event, queueId={0}, url={1}, event={2}", new Object[]{
@@ -279,6 +294,8 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.addRequestProperty("Content-Type", "text/plain");
             hcon.addRequestProperty("Content-Encoding", "gzip");
             hcon.setRequestMethod("PUT");
+            hcon.setConnectTimeout(CONNECT_TIMEOUT);
+            hcon.setReadTimeout(READ_TIMEOUT);
             try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream())) {
                 byte[] data = outputEvent.data();
                 out.write(data, 0, data.length);
@@ -310,12 +327,62 @@ final class BackendClient implements PipelineEvents.EventListener {
         }
 
         /**
+         * Process a test suite event.
+         * @param testSuiteEvent event
+         */
+        private void processTestSuiteEvent(PipelineEvents.TestSuite testSuiteEvent) throws IOException {
+            URL url = URI.create(serverUrl
+                    + "/files/"
+                    + testSuiteEvent.runId()
+                    + "/"
+                    + testSuiteEvent.stepsId()
+                    + "/tests/"
+                    + testSuiteEvent.suite().name() + ".json")
+                    .toURL();
+
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "Sending test suite event, queueId={0}, url={1}, event={2}", new Object[]{
+                    queueId,
+                    url,
+                    testSuiteEvent
+                });
+            }
+
+            URLConnection con = url.openConnection();
+            if (!(con instanceof HttpURLConnection)) {
+                throw new IllegalStateException("Not an HttpURLConnection");
+            }
+            HttpURLConnection hcon = (HttpURLConnection) con;
+            hcon.setDoOutput(true);
+            hcon.addRequestProperty("Content-Type", "application/json");
+            hcon.setRequestMethod("POST");
+            hcon.setConnectTimeout(CONNECT_TIMEOUT);
+            hcon.setReadTimeout(READ_TIMEOUT);
+            mapper.writeValue(hcon.getOutputStream(), testSuiteEvent.suite());
+            int code = hcon.getResponseCode();
+            if (201 != code) {
+                LOGGER.log(Level.WARNING, "Invalid response code for test suite event, url={0}, code={1}, step: {1}",
+                        new Object[]{
+                            url.toString(),
+                            code,
+                            testSuiteEvent
+                        });
+            }
+        }
+
+        /**
          * Process an artifact event.
          * @param artifactEvent event
          */
         private void processArtifactEvent(PipelineEvents.ArtifactData artifactEvent) throws IOException {
-            String fname = URLEncoder.encode(artifactEvent.filename(), "UTF-8").replace("/", "%2F");
-            URL url = URI.create(serverUrl + "/files/" + artifactEvent.runId()+ "/" + artifactEvent.stageId()+ "/" + fname).toURL();
+            URL url = URI.create(serverUrl
+                    + "/files/"
+                    + artifactEvent.runId()
+                    + "/"
+                    + artifactEvent.stepsId()
+                    + "/artifacts/"
+                    + URLEncoder.encode(artifactEvent.filename(), "UTF-8"))
+                    .toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending artifact data event, queueId={0}, url={1}, event={2}", new Object[]{
@@ -334,6 +401,8 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.addRequestProperty("Content-Type", "text/plain");
             hcon.addRequestProperty("Content-Encoding", "gzip");
             hcon.setRequestMethod("POST");
+            hcon.setConnectTimeout(CONNECT_TIMEOUT);
+            hcon.setReadTimeout(READ_TIMEOUT);
             try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream());
                     FileInputStream fis = new FileInputStream(artifactEvent.file())) {
                 byte[] buf = new byte[1024];

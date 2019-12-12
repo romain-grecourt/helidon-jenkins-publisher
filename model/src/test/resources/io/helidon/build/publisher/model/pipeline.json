@@ -1,13 +1,13 @@
 {
   "id": "968102A54E274A08544123A433386F62",
   "jobName": "jenkins-pipeline-example",
+  "repositoryUrl": "https://github.com:romain-grecourt/jenkins-pipeline-example.git",
   "scmHead": "master",
   "scmHash": "7edb20887226ba3d30cad237f435ff7ed73ed289",
   "pipeline": {
     "stages": {
       "id": 0,
       "name": null,
-      "path": "/",
       "state": "RUNNING",
       "result": "SUCCESS",
       "startTime": 1574357011343,
@@ -17,7 +17,6 @@
         {
           "id": 1,
           "name": "Build",
-          "path": "/stage[Build]/",
           "state": "FINISHED",
           "result": "SUCCESS",
           "startTime": 1574357011425,
@@ -34,45 +33,8 @@
               "artifacts": 0,
               "steps": [
                 {
-                  "id": 3,
-                  "name": "checkout",
-                  "path": "/stage[Build]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357012343,
-                  "endTime": 1574357014432,
-                  "args": "",
-                  "meta": false,
-                  "declared": false
-                },
-                {
-                  "id": 4,
-                  "name": "isUnix",
-                  "path": "/stage[Build]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357014432,
-                  "endTime": 1574357014441,
-                  "args": "",
-                  "meta": false,
-                  "declared": false
-                },
-                {
-                  "id": 5,
-                  "name": "sh",
-                  "path": "/stage[Build]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357014441,
-                  "endTime": 1574357018495,
-                  "args": "docker inspect -f . maven:3-alpine",
-                  "meta": false,
-                  "declared": false
-                },
-                {
                   "id": 6,
                   "name": "sh",
-                  "path": "/stage[Build]/",
                   "state": "RUNNING",
                   "result": "UNKNOWN",
                   "startTime": 1574357018495,
@@ -88,7 +50,6 @@
         {
           "id": 7,
           "name": "Test",
-          "path": "/stage[Test]/",
           "state": "RUNNING",
           "result": "SUCCESS",
           "startTime": 1574357021129,
@@ -105,45 +66,8 @@
               "artifacts": 0,
               "steps": [
                 {
-                  "id": 9,
-                  "name": "checkout",
-                  "path": "/stage[Test]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357021207,
-                  "endTime": 1574357022607,
-                  "args": "",
-                  "meta": false,
-                  "declared": false
-                },
-                {
-                  "id": 10,
-                  "name": "isUnix",
-                  "path": "/stage[Test]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357022607,
-                  "endTime": 1574357022618,
-                  "args": "",
-                  "meta": false,
-                  "declared": false
-                },
-                {
-                  "id": 11,
-                  "name": "sh",
-                  "path": "/stage[Test]/",
-                  "state": "RUNNING",
-                  "result": "UNKNOWN",
-                  "startTime": 1574357022618,
-                  "endTime": 1574357024422,
-                  "args": "docker inspect -f . node:7-alpine",
-                  "meta": false,
-                  "declared": false
-                },
-                {
                   "id": 12,
                   "name": "sh",
-                  "path": "/stage[Test]/",
                   "state": "FINISHED",
                   "result": "SUCCESS",
                   "startTime": 1574357024422,
@@ -155,7 +79,6 @@
                 {
                   "id": 13,
                   "name": "sh",
-                  "path": "/stage[Test]/",
                   "state": "RUNNING",
                   "result": "UNKNOWN",
                   "startTime": 1574357025049,
@@ -169,7 +92,6 @@
             {
               "id": 14,
               "name": "test1",
-              "path": "/stage[Test]/",
               "state": "RUNNING",
               "result": "SUCCESS",
               "startTime": 1574357025650,

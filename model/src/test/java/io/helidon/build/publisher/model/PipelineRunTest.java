@@ -1,14 +1,16 @@
 package io.helidon.build.publisher.model;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 import io.helidon.build.publisher.model.Pipeline.Parallel;
 import io.helidon.build.publisher.model.Pipeline.Sequence;
 import io.helidon.build.publisher.model.Pipeline.Step;
 import io.helidon.build.publisher.model.Pipeline.Steps;
 import io.helidon.build.publisher.model.Status.State;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -20,10 +22,12 @@ import static org.hamcrest.core.Is.is;
  */
 public class PipelineRunTest {
 
+    static final String REPO_URL = "https://github.com/john_doe/repo.git";
+
     @Test
-    public void testJSON() throws IOException {
+    public void testJson() throws IOException {
         String runId = "abcdefgh";
-        PipelineRun run = new PipelineRun(runId, "testJob", "master", "123456789",
+        PipelineRun run = new PipelineRun(runId, "testJob", REPO_URL, "master", "123456789",
                 new Pipeline(runId, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
 
         Steps steps = new Steps(run.pipeline.sequence, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
@@ -39,6 +43,7 @@ public class PipelineRunTest {
         test1.addStage(test1Steps);
         test1Steps.addStep(new Step(test1Steps, "sh", "echo test1a", false, true, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
         test1Steps.addStep(new Step(test1Steps, "sh", "echo test1b", false, true, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
+        test1Steps.tests = new TestsInfo(1, 1, 0, 0);
 
         Sequence test2 = new Sequence(parallel, "test2", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
         parallel.addStage(test2);
@@ -46,6 +51,7 @@ public class PipelineRunTest {
         test2.addStage(test2Steps);
         test2Steps.addStep(new Step(test2Steps, "sh", "echo test2a", false, true, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
         test2Steps.addStep(new Step(test2Steps, "sh", "echo test2b", false, true, new Status(State.RUNNING), new Timings(System.currentTimeMillis())));
+        test2Steps.tests = new TestsInfo(1, 0, 1, 0);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectMapper mapper = new ObjectMapper();
@@ -62,7 +68,7 @@ public class PipelineRunTest {
     }
 
     @Test
-    public void testJSONFile() throws IOException {
+    public void testJsonFile() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         PipelineRun fromJson = mapper.readValue(PipelineRunTest.class.getResourceAsStream("pipeline.json"), PipelineRun.class);
     }

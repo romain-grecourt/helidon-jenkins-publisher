@@ -1,5 +1,6 @@
 package io.helidon.build.publisher.model;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -9,7 +10,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import java.io.File;
 
 /**
  * Pipeline events.
@@ -76,9 +76,19 @@ public final class PipelineEvents {
         ARTIFACT_DATA,
 
         /**
-         * Artifacts info for a step.
+         * Artifacts info for a steps stage.
          */
         ARTIFACTS_INFO,
+
+        /**
+         * Test suite data.
+         */
+        TEST_SUITE,
+
+        /**
+         * Tests info for a steps stage.
+         */
+        TESTS,
 
         /**
          * A pipeline has been created.
@@ -114,6 +124,8 @@ public final class PipelineEvents {
         @JsonSubTypes.Type(value = PipelineEvents.OutputData.class, name = "OUTPUT_DATA"),
         @JsonSubTypes.Type(value = PipelineEvents.ArtifactData.class, name = "ARTIFACT_DATA"),
         @JsonSubTypes.Type(value = PipelineEvents.ArtifactsInfo.class, name = "ARTIFACTS_INFO"),
+        @JsonSubTypes.Type(value = PipelineEvents.TestSuite.class, name = "TEST_SUITE"),
+        @JsonSubTypes.Type(value = PipelineEvents.Tests.class, name = "TESTS"),
         @JsonSubTypes.Type(value = PipelineEvents.Error.class, name = "ERROR")
     })
     public static abstract class Event {
@@ -160,21 +172,6 @@ public final class PipelineEvents {
     }
 
     /**
-     * No-op event listener implementation.
-     */
-    private static class NoOpEventListener implements EventListener {
-
-        @Override
-        public void onEvent(Event event) {
-        }
-    }
-
-    /**
-     * No-op event listener.
-     */
-    public static EventListener NOOP_LISTENER = new NoOpEventListener();
-
-    /**
      * Node event type.
      */
     public enum NodeEventType {
@@ -199,7 +196,6 @@ public final class PipelineEvents {
         final int parentId;
         final int index;
         final String name;
-        final String path;
         final long startTime;
 
         /**
@@ -211,13 +207,12 @@ public final class PipelineEvents {
          * @param name node name, may be {@code null}
          * @param startTime start timestamp
          */
-        NodeCreatedEvent(String runId, int id, int parentId, int index, String name, String path, long startTime) {
+        NodeCreatedEvent(String runId, int id, int parentId, int index, String name, long startTime) {
             super(runId);
             this.id = id;
             this.parentId = parentId;
             this.index = index;
             this.name = name;
-            this.path = path;
             this.startTime = startTime;
         }
 
@@ -257,15 +252,6 @@ public final class PipelineEvents {
         @JsonProperty
         public final String name() {
             return name;
-        }
-
-        /**
-         * Get the path of the created node.
-         * @return String
-         */
-        @JsonProperty
-        public String path() {
-            return path;
         }
 
         /**
@@ -311,10 +297,7 @@ public final class PipelineEvents {
             if (this.startTime != other.startTime) {
                 return false;
             }
-            if (!Objects.equals(this.name, other.name)) {
-                return false;
-            }
-            return Objects.equals(this.path, other.path);
+            return Objects.equals(this.name, other.name);
         }
     }
 
@@ -423,7 +406,7 @@ public final class PipelineEvents {
     /**
      * {@link EventType#STEP_CREATED} event.
      */
-    @JsonPropertyOrder({"runId", "eventType", "id", "parentId", "index", "name", "path", "startTime", "state", "args", "declared"})
+    @JsonPropertyOrder({"runId", "eventType", "id", "parentId", "index", "name", "startTime", "state", "args", "declared"})
     public static final class StepCreated extends NodeCreatedEvent {
 
         final String args;
@@ -437,7 +420,6 @@ public final class PipelineEvents {
          * @param parentId node parent id
          * @param index index in the parent node
          * @param name node name
-         * @param path
          * @param startTime start timestamp
          * @param args step arguments
          * @param meta step meta flag
@@ -445,10 +427,10 @@ public final class PipelineEvents {
          */
         public StepCreated(@JsonProperty("runId") String runId, @JsonProperty("id") int id,
                 @JsonProperty("parentId") int parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
-                @JsonProperty("path") String path, @JsonProperty("startTime") long startTime, @JsonProperty("args") String args,
+                @JsonProperty("startTime") long startTime, @JsonProperty("args") String args,
                 @JsonProperty("meta") boolean meta, @JsonProperty("declared") boolean declared) {
 
-            super(runId, id, parentId, index, name, path, startTime);
+            super(runId, id, parentId, index, name, startTime);
             this.args = args;
             this.meta = meta;
             this.declared = declared;
@@ -524,7 +506,6 @@ public final class PipelineEvents {
                     + ", parentId=" + parentId
                     + ", index=" + index
                     + ", name=" + name
-                    + ", path=" + path
                     + ", args=" + args
                     + ", meta=" + meta
                     + ", declared=" + declared
@@ -556,7 +537,7 @@ public final class PipelineEvents {
     /**
      * {@link EventType#STAGE_CREATED} event.
      */
-    @JsonPropertyOrder({"runId", "eventType", "id", "parentId", "index", "name", "path", "startTime", "state", "stageType"})
+    @JsonPropertyOrder({"runId", "eventType", "id", "parentId", "index", "name", "startTime", "state", "stageType"})
     public static final class StageCreated extends NodeCreatedEvent {
 
         final Pipeline.Stage.StageType stageType;
@@ -569,16 +550,15 @@ public final class PipelineEvents {
          * @param parentId node parent id
          * @param index index in the parent node
          * @param name node name
-         * @param path node path
          * @param startTime start timestamp
          * @param stageType stage type
          */
         public StageCreated(@JsonProperty("runId") String runId, @JsonProperty("id") int id,
                 @JsonProperty("parentId") int parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
-                @JsonProperty("path") String path, @JsonProperty("startTime") long startTime,
+                @JsonProperty("startTime") long startTime,
                 @JsonProperty("stageType") Pipeline.Stage.StageType stageType) {
 
-            super(runId, id, parentId, index, name, path, startTime);
+            super(runId, id, parentId, index, name, startTime);
             this.stageType = stageType;
         }
 
@@ -632,7 +612,6 @@ public final class PipelineEvents {
                     + ", parentId=" + parentId
                     + ", index=" + index
                     + ", name=" + name
-                    + ", path=" + path
                     + ", startTime=" + startTime
                     + " }";
         }
@@ -834,7 +813,7 @@ public final class PipelineEvents {
          *
          * @return String
          */
-        public int stageId() {
+        public int stepsId() {
             return stepsId;
         }
 
@@ -912,13 +891,13 @@ public final class PipelineEvents {
         /**
          * Create a new {@link EventType#ARTIFACTS_INFO} event.
          * @param runId runId
-         * @param stageId the corresponding stage id
+         * @param stepsId the corresponding steps stage id
          * @param count the count of archived files
          */
-        public ArtifactsInfo(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stageId,
+        public ArtifactsInfo(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stepsId,
                 @JsonProperty("files") int count) {
             super(runId);
-            this.stepsId = stageId;
+            this.stepsId = stepsId;
             this.count = count;
         }
 
@@ -982,12 +961,143 @@ public final class PipelineEvents {
     }
 
     /**
+     * {@link EventType#TESTS} event.
+     */
+    @JsonPropertyOrder({"runId", "eventType", "stageId"})
+    public static final class Tests extends Event {
+
+        final int stepsId;
+        final TestsInfo info;
+
+        /**
+         * Create a new {@link EventType#TESTS} event.
+         * @param runId runId
+         * @param stepsId the corresponding steps stage id
+         * @param info the tests info
+         */
+        public Tests(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stepsId,
+                @JsonProperty("info") TestsInfo info){
+
+            super(runId);
+            this.stepsId = stepsId;
+            this.info = info;
+        }
+
+        /**
+         * Get the steps id.
+         * @return String
+         */
+        @JsonProperty
+        public int stepsId() {
+            return stepsId;
+        }
+
+        @JsonProperty
+        public TestsInfo info() {
+            return info;
+        }
+
+        @Override
+        public EventType eventType() {
+            return EventType.TESTS;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 97 * hash + this.stepsId;
+            hash = 97 * hash + Objects.hashCode(this.info);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final Tests other = (Tests) obj;
+            if (this.stepsId != other.stepsId) {
+                return false;
+            }
+            return Objects.equals(this.info, other.info);
+        }
+
+        @Override
+        public String toString() {
+            return ArtifactsInfo.class.getSimpleName() + "{"
+                    + " runId=" + runId
+                    + ", stepsId=" + stepsId
+                    + ", info=" + info
+                    + " }";
+        }
+    }
+
+    /**
+     * {@link EventType#TEST_SUITE} event.
+     */
+    @JsonPropertyOrder({"runId", "eventType", "stageId"})
+    public static final class TestSuite extends Event {
+
+        final int stepsId;
+        final TestSuiteResult suite;
+
+        /**
+         * Create a new {@link EventType#TEST_SUITE} event.
+         * @param runId runId
+         * @param stepsId the corresponding steps stage id
+         * @param suite the tests suite result
+         */
+        public TestSuite(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stepsId,
+                @JsonProperty("suite") TestSuiteResult suite){
+
+            super(runId);
+            this.stepsId = stepsId;
+            this.suite = suite;
+        }
+
+        /**
+         * Get the steps id.
+         * @return String
+         */
+        @JsonProperty
+        public int stepsId() {
+            return stepsId;
+        }
+
+        @JsonProperty
+        public TestSuiteResult suite() {
+            return suite;
+        }
+
+        @Override
+        public EventType eventType() {
+            return EventType.TEST_SUITE;
+        }
+
+        @Override
+        public String toString() {
+            return ArtifactsInfo.class.getSimpleName() + "{"
+                    + " runId=" + runId
+                    + ", stepsId=" + stepsId
+                    + ", suite=" + suite.name
+                    + " }";
+        }
+    }
+
+    /**
      * {@link EventType#PIPELINE_CREATED} event.
      */
-    @JsonPropertyOrder({"runId", "eventType", "jobName", "scmHead", "scmHash", "startTime"})
+    @JsonPropertyOrder({"runId", "eventType", "jobName", "repositoryUrl", "scmHead", "scmHash", "startTime"})
     public static final class PipelineCreated extends Event {
 
         final String jobName;
+        final String repositoryUrl;
         final String scmHead;
         final String scmHash;
         final long startTime;
@@ -996,16 +1106,18 @@ public final class PipelineEvents {
          * Create a new {@link EventType#PIPELINE_CREATED} event.
          * @param runId runId
          * @param jobName job name
+         * @param repositoryUrl SCM repositoryUrl
          * @param scmHead SCM head
          * @param scmHash SCM hash
          * @param startTime start timestamp
          */
         public PipelineCreated(@JsonProperty("runId") String runId, @JsonProperty("jobName") String jobName,
-                @JsonProperty("scmHead") String scmHead, @JsonProperty("scmHash") String scmHash,
-                @JsonProperty("startTime") long startTime) {
+               @JsonProperty("repositoryUrl") String repositoryUrl, @JsonProperty("scmHead") String scmHead,
+                @JsonProperty("scmHash") String scmHash, @JsonProperty("startTime") long startTime) {
 
             super(runId);
             this.jobName = jobName;
+            this.repositoryUrl = repositoryUrl;
             this.scmHead = scmHead;
             this.scmHash = scmHash;
             this.startTime = startTime;
@@ -1023,6 +1135,15 @@ public final class PipelineEvents {
         @JsonProperty
         public String jobName() {
             return jobName;
+        }
+
+        /**
+         * Get the repository URL.
+         * @return String
+         */
+        @JsonProperty
+        public String repositoryUrl() {
+            return repositoryUrl;
         }
 
         /**
@@ -1057,6 +1178,7 @@ public final class PipelineEvents {
             int hash = 7;
             hash = 89 * hash + Objects.hashCode(this.runId);
             hash = 89 * hash + Objects.hashCode(this.jobName);
+            hash = 89 * hash + Objects.hashCode(this.repositoryUrl);
             hash = 89 * hash + Objects.hashCode(this.scmHead);
             hash = 89 * hash + Objects.hashCode(this.scmHash);
             hash = 89 * hash + Objects.hashCode(this.startTime);
@@ -1081,6 +1203,9 @@ public final class PipelineEvents {
             if (!Objects.equals(this.jobName, other.jobName)) {
                 return false;
             }
+            if (!Objects.equals(this.repositoryUrl, other.repositoryUrl)) {
+                return false;
+            }
             if (!Objects.equals(this.scmHead, other.scmHead)) {
                 return false;
             }
@@ -1095,6 +1220,7 @@ public final class PipelineEvents {
             return PipelineCreated.class.getSimpleName() + "{"
                     + " runId=" + runId
                     + ", jobName=" + jobName
+                    + ", repositoryUrl" + repositoryUrl
                     + ", scmHead=" + scmHead
                     + ", scmHash=" + scmHash
                     + ", startTime=" + startTime

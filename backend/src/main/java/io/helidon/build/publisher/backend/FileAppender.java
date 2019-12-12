@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -31,13 +33,25 @@ final class FileAppender {
     private final BlockingQueue<AppendAction>[] appendActionQueues;
     private final Path storagePath;
 
+    /**
+     * Create a new file appender.
+     * @param storagePath the storage
+     * @param nthreads the thread pool size
+     */
     FileAppender(Path storagePath, int nthreads) {
         this.storagePath = storagePath;
         this.appenderExecutors = Executors.newFixedThreadPool(nthreads);
         this.appendActionQueues = new BlockingQueue[nthreads];
     }
 
-    boolean append(Publisher<DataChunk> payload, String path, boolean compressed) {
+    /**
+     * Append the data of a publisher to a file in the storage at the given path.
+     * @param payload the data
+     * @param paththe file path
+     * @param compressed true if the payload is {@code gzip} compressed
+     * @return a future that completes normally when the data is appended or exceptionally if an error occurred
+     */
+    CompletionStage<Void> append(Publisher<DataChunk> payload, String path, boolean compressed) {
         int queueId = Math.floorMod(path.hashCode(), appendActionQueues.length);
         BlockingQueue<AppendAction> queue = appendActionQueues[queueId];
         if (queue == null) {
@@ -54,16 +68,17 @@ final class FileAppender {
                 queueId
             });
         }
-        AppendAction action = new AppendAction(payload, outputStream(path), compressed);
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        AppendAction action = new AppendAction(payload, outputStream(path), compressed, future);
         if (!queue.offer(action)) {
             LOGGER.log(Level.WARNING, "Queue #{0} is full, dropping all append actions ({1})", new Object[]{
                 queueId,
                 path
             });
             action.drain();
-            return false;
+            future.completeExceptionally(new IllegalStateException("queue is full"));
         }
-        return true;
+        return future;
     }
 
     private OutputStream outputStream(String path) {
@@ -108,8 +123,8 @@ final class FileAppender {
 
         private final Appender appender;
 
-        AppendAction(Publisher<DataChunk> payload, OutputStream os, boolean compressed) {
-            appender = new Appender(os, compressed, this::onComplete);
+        AppendAction(Publisher<DataChunk> payload, OutputStream os, boolean compressed, CompletableFuture<Void> future) {
+            appender = new Appender(os, compressed, future);
             payload.subscribe(appender);
         }
 
@@ -121,24 +136,20 @@ final class FileAppender {
         void execute() {
             appender.subscription.request(1);
         }
-
-        void onComplete() {
-            // TODO publish event
-        }
     }
 
     private static final class Appender implements Subscriber<DataChunk> {
 
         private Subscription subscription;
         private final OutputStream os;
-        private final Runnable runnable;
+        private final CompletableFuture<Void> future;
         private final boolean compressed;
         private boolean drain;
 
-        Appender(OutputStream os, boolean compressed, Runnable runnable) {
+        Appender(OutputStream os, boolean compressed, CompletableFuture<Void> future) {
             this.os = os;
             this.compressed = compressed;
-            this.runnable = runnable;
+            this.future = future;
         }
 
         @Override
@@ -168,12 +179,14 @@ final class FileAppender {
                 }
             } catch (IOException ex) {
                 subscription.cancel();
+                future.completeExceptionally(ex);
                 LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
             }
         }
 
         @Override
         public void onError(Throwable ex) {
+            future.completeExceptionally(ex);
             LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
         }
 
@@ -182,7 +195,7 @@ final class FileAppender {
             try {
                 os.flush();
                 os.close();
-                runnable.run();
+                future.complete(null);
             } catch (IOException ex) {
                 LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
             }

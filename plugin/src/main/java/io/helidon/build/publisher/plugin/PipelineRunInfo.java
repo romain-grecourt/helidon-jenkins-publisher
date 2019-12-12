@@ -1,14 +1,24 @@
 package io.helidon.build.publisher.plugin;
 
-import hudson.model.Actionable;
-import hudson.model.Run;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Iterator;
+
 import io.helidon.build.publisher.plugin.config.HelidonPublisherFolderProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherProjectProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+
+import hudson.model.Actionable;
+import hudson.model.Job;
+import hudson.model.Run;
+import hudson.plugins.git.GitSCM;
+import hudson.plugins.git.UserRemoteConfig;
+import hudson.scm.SCM;
+import jenkins.plugins.git.AbstractGitSCMSource;
 import jenkins.scm.api.SCMRevision;
 import jenkins.scm.api.SCMRevisionAction;
+import jenkins.scm.api.SCMSource;
+import jenkins.triggers.SCMTriggerItem;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject;
@@ -26,18 +36,20 @@ final class PipelineRunInfo {
     final String jobName;
     final String scmHead;
     final String scmHash;
+    final String repositoryUrl;
     final String publisherServerUrl;
     final int publisherClientThreads;
 
     PipelineRunInfo() {
-        this.id = null;
-        this.excludeSyntheticSteps = false;
-        this.excludeMetaSteps = false;
-        this.publisherClientThreads = 0;
-        this.jobName = null;
-        this.scmHead = null;
-        this.scmHash = null;
-        this.publisherServerUrl = null;
+        id = null;
+        excludeSyntheticSteps = false;
+        excludeMetaSteps = false;
+        publisherClientThreads = 0;
+        jobName = null;
+        repositoryUrl = null;
+        scmHead = null;
+        scmHash = null;
+        publisherServerUrl = null;
     }
 
     PipelineRunInfo(FlowExecution execution) {
@@ -45,7 +57,15 @@ final class PipelineRunInfo {
         WorkflowMultiBranchProject project = Helper.getProject(run.getParent());
         jobName = project.getName();
         HelidonPublisherFolderProperty prop = project.getProperties().get(HelidonPublisherFolderProperty.class);
-        SCMRevision rev = getSCMRevision(run);
+        SCMRevisionAction revAction = getSCMRevisionAction(run);
+        SCMRevision rev = revAction.getRevision();
+        SCMSource scmSource = project.getSCMSource(revAction.getSourceId());
+        if (scmSource instanceof AbstractGitSCMSource) {
+            String remote = ((AbstractGitSCMSource)scmSource).getRemote();
+            repositoryUrl = remote;
+        } else {
+            repositoryUrl = null;
+        }
         scmHead = rev.getHead().getName();
         scmHash = rev.toString();
         if (prop != null && !isBranchExcluded(scmHead, prop.getBranchExcludes())) {
@@ -59,8 +79,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(jobName, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
-            // TODO repository URL
+            id = createId(jobName, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -71,9 +90,28 @@ final class PipelineRunInfo {
     }
 
     PipelineRunInfo(Run<?, ?> run) {
-        HelidonPublisherProjectProperty prop = run.getParent().getProperty(HelidonPublisherProjectProperty.class);
+        Job<?, ?> job = run.getParent();
+        HelidonPublisherProjectProperty prop = job.getProperty(HelidonPublisherProjectProperty.class);
         jobName = run.getParent().getName();
-        SCMRevision rev = getSCMRevision(run);
+        SCMRevisionAction revAction = getSCMRevisionAction(run);
+        String remote = null;
+        if (job instanceof SCMTriggerItem) {
+            SCMTriggerItem trigger = (SCMTriggerItem) job;
+            Iterator<? extends SCM> it = trigger.getSCMs().iterator();
+            while(it.hasNext() && remote == null) {
+                SCM scm = it.next();
+                if (scm instanceof GitSCM) {
+                    for (UserRemoteConfig urc : ((GitSCM) scm).getUserRemoteConfigs()) {
+                        if (revAction.getSourceId().equals(urc.getName())) {
+                            remote = urc.getUrl();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        repositoryUrl = remote;
+        SCMRevision rev = revAction.getRevision();
         scmHead = rev.getHead().getName();
         scmHash = rev.toString();
         if (prop != null && !isBranchExcluded(scmHead, prop.getBranchExcludes())) {
@@ -87,7 +125,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(jobName, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            id = createId(jobName, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -128,8 +166,10 @@ final class PipelineRunInfo {
      * @param startTime start timestamp
      * @return String
      */
-    private static String createId(String jobName, String scmHead, String scmHash, int buildNumber, long startTime) {
-        String runDesc = jobName + "/" + scmHead + "/" + buildNumber + "/" + startTime + "/" + scmHash;
+    private static String createId(String jobName, String repotistoryUrl, String scmHead, String scmHash, int buildNumber,
+            long startTime) {
+
+        String runDesc = jobName + "/" + repotistoryUrl + "/" + scmHead + "/" + buildNumber + "/" + startTime + "/" + scmHash;
         return md5sum(runDesc.getBytes());
     }
 
@@ -173,15 +213,10 @@ final class PipelineRunInfo {
         return false;
     }
 
-    /**
-     * Get the SCM revision for this run.
-     * @param run the run
-     * @return SCMRevision
-     */
-    private static SCMRevision getSCMRevision(Actionable run) {
+    private static SCMRevisionAction getSCMRevisionAction(Actionable run) {
         SCMRevisionAction revAction = run.getAction(SCMRevisionAction.class);
         if (revAction != null) {
-            return revAction.getRevision();
+            return revAction;
         }
         throw new IllegalStateException("Unable to get scm revision");
     }

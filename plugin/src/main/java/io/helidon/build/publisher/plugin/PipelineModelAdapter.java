@@ -9,7 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.PipelineEvents.EventListener;
 import io.helidon.build.publisher.model.PipelineRun;
 import io.helidon.build.publisher.model.Status;
 import io.helidon.build.publisher.model.Timings;
@@ -34,9 +34,9 @@ import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 /**
  * Pipeline event adapter.
  */
-final class PipelineAdapter {
+final class PipelineModelAdapter {
 
-    private static final Logger LOGGER = Logger.getLogger(FlowDecorator.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
     private static final String STAGE_DESC_ID = StageStep.class.getName();
     private static final String PARALLEL_DESC_ID = ParallelStep.class.getName();
 
@@ -45,7 +45,7 @@ final class PipelineAdapter {
     private final Map<String, Pipeline.Step> steps;
     private final Map<String, Pipeline.Stage> stages;
     private final PipelineRunInfo runInfo;
-    private final PipelineEvents.EventListener listener;
+    private final List<EventListener> listeners;
     private PipelineRun run;
 
     /**
@@ -54,12 +54,11 @@ final class PipelineAdapter {
      * @param runInfo run info
      * @param listener event listener
      */
-    PipelineAdapter(PipelineSignatures signatures, PipelineRunInfo runInfo, PipelineEvents.EventListener listener) {
+    PipelineModelAdapter(PipelineSignatures signatures, PipelineRunInfo runInfo) {
         Objects.requireNonNull(signatures, "signatures is null");
         Objects.requireNonNull(runInfo, "runInfo is null");
-        Objects.requireNonNull(listener, "listener is null");
         this.signatures = signatures;
-        this.listener = listener;
+        this.listeners = new LinkedList<>();
         this.steps = new HashMap<>();
         this.stages = new HashMap<>();
         this.runInfo = runInfo;
@@ -67,7 +66,27 @@ final class PipelineAdapter {
     }
 
     /**
-     * Get the top level stage sequence.
+     * Add a pipeline event listener.
+     * @param listener listener to add
+     * @throws NullPointerException if listener is {@code null}
+     */
+    void addEventListener(EventListener listener) {
+        listeners.add(Objects.requireNonNull(listener, "listener is null"));
+    }
+
+    /**
+     * Get the underlying pipeline.
+     * @return {@code Pipeline} or {@code null} if the run is not yet started
+     */
+    Pipeline pipeline() {
+        if (run != null) {
+            return run.pipeline();
+        }
+        return null;
+    }
+
+    /**
+     * Get the pipeline run.
      * @return StageSequence
      * @throw IllegalStateException if the root is not set yet
      */
@@ -113,8 +132,11 @@ final class PipelineAdapter {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
             }
-            Pipeline pipeline = new Pipeline(runInfo.id, new StatusImpl(node), new TimingsImpl(node), listener);
-            run = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.scmHead, runInfo.scmHash, pipeline);
+            Pipeline pipeline = new Pipeline(runInfo.id, new StatusImpl(node), new TimingsImpl(node));
+            for (EventListener listener : listeners) {
+                pipeline.addEventListener(listener);
+            }
+            run = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash, pipeline);
             run.fireCreated();
         } else if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);

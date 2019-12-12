@@ -1,36 +1,43 @@
 package io.helidon.build.publisher.plugin;
 
-import hudson.Extension;
-import hudson.console.ConsoleLogFilter;
-import hudson.model.Run;
-import hudson.model.TaskListener;
-import hudson.model.listeners.RunListener;
-import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
-import io.helidon.build.publisher.model.PipelineRun;
-import io.helidon.build.publisher.model.Status;
-import io.helidon.build.publisher.model.Timings;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
+
+import io.helidon.build.publisher.model.Pipeline;
+import io.helidon.build.publisher.model.PipelineRun;
+import io.helidon.build.publisher.model.Status;
+import io.helidon.build.publisher.model.Timings;
+
+import hudson.Extension;
+import hudson.console.ConsoleLogFilter;
+import hudson.model.Run;
+import hudson.model.TaskListener;
+import hudson.model.listeners.RunListener;
+import hudson.tasks.junit.SuiteResult;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 
 /**
- * Job decorator.
+ * Job publisher.
+ * Uses {@link RunListener} and {@link ConsoleLogFilter}.
  */
-public final class JobDecorator {
+public final class JobPublisher {
 
-    private static final Logger LOGGER = Logger.getLogger(FlowDecorator.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
     private static final PipelineRunInfo EMPTY_PIPELINE_RUNINFO = new PipelineRunInfo();
-    private static final JobDecorator EMPTY_DECORATOR = new JobDecorator(null);
-    private static final Map<Run, WeakReference<JobDecorator>> DECORATORS = new WeakHashMap<>();
+    private static final JobPublisher EMPTY_PUBLISHER = new JobPublisher(null);
+    private static final Map<Run, WeakReference<JobPublisher>> PUBLISHERS = new WeakHashMap<>();
+    private static final ArtifactsProcessor.Factory ARTIFACTS_PROCESSOR_FACTORY = new ArtifactsProcessorFactory();
+    private static final TestResultSuiteMatcher TEST_RESULT_SUITE_MATCHER = new TestResultSuiteMatcher();
 
+    private final Run<?, ?> run;
     private final PipelineRunInfo runInfo;
     private final BackendClient client;
     private final Status status;
@@ -39,7 +46,7 @@ public final class JobDecorator {
     private Pipeline.Steps steps;
     private Pipeline.Step step;
 
-    private JobDecorator(Run<?,?> run) {
+    private JobPublisher(Run<?,?> run) {
         if (run == null || run instanceof WorkflowRun) {
             runInfo = EMPTY_PIPELINE_RUNINFO;
         } else {
@@ -52,6 +59,8 @@ public final class JobDecorator {
             client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
             status = new StatusImpl(run);
             timings = new TimingsImpl(run);
+            this.run = run;
+            ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
         } else {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Pipeline NOT enabled, runInfo={0}, isWorkflowRun={1}", new Object[]{
@@ -62,6 +71,7 @@ public final class JobDecorator {
             client = null;
             status = null;
             timings = null;
+            this.run = null;
         }
     }
 
@@ -73,8 +83,11 @@ public final class JobDecorator {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
             }
-            Pipeline pipeline = new Pipeline(runInfo.id, status, timings, client);
-            pipelineRun = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.scmHead, runInfo.scmHash, pipeline);
+            final Pipeline pipeline = new Pipeline(runInfo.id, status, timings);
+            pipeline.addEventListener(client);
+            pipeline.addEventListener(new TestResulProcessor(() -> pipelineRun, client, run, TEST_RESULT_SUITE_MATCHER));
+            pipelineRun = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash,
+                    pipeline);
             pipelineRun.fireCreated();
             Pipeline.Sequence root = pipeline.stages();
             steps = new Pipeline.Steps(root, status, timings);
@@ -100,24 +113,24 @@ public final class JobDecorator {
         }
     }
 
-    private static JobDecorator get(Run run) {
+    private static JobPublisher get(Run run) {
         if (run == null) {
-            return EMPTY_DECORATOR;
+            return EMPTY_PUBLISHER;
         }
-        synchronized (DECORATORS) {
-            WeakReference<JobDecorator> decoratorRef = DECORATORS.get(run);
-            if (decoratorRef != null && decoratorRef.get() != null) {
-                return decoratorRef.get();
+        synchronized (PUBLISHERS) {
+            WeakReference<JobPublisher> ref = PUBLISHERS.get(run);
+            if (ref != null && ref.get() != null) {
+                return ref.get();
             }
         }
-        JobDecorator decorator = new JobDecorator(run);
-        synchronized (DECORATORS) {
-            WeakReference<JobDecorator> decoratorRef = DECORATORS.get(run);
-            if (decoratorRef != null && decoratorRef.get() != null) {
-                return decoratorRef.get();
+        JobPublisher jobPublisher = new JobPublisher(run);
+        synchronized (PUBLISHERS) {
+            WeakReference<JobPublisher> ref = PUBLISHERS.get(run);
+            if (ref != null && ref.get() != null) {
+                return ref.get();
             }
-            DECORATORS.put(run, new WeakReference<>(decorator));
-            return decorator;
+            PUBLISHERS.put(run, new WeakReference<>(jobPublisher));
+            return jobPublisher;
         }
     }
 
@@ -138,27 +151,27 @@ public final class JobDecorator {
     @Extension
     public static final class ConsoleLogFilterImpl extends ConsoleLogFilter implements Serializable {
 
-        private final JobDecorator decorator;
+        private final JobPublisher jobPublisher;
 
         public ConsoleLogFilterImpl() {
             super();
-            decorator = EMPTY_DECORATOR;
+            jobPublisher = EMPTY_PUBLISHER;
         }
 
         public ConsoleLogFilterImpl(Run run) {
-            decorator = get(run);
+            jobPublisher = get(run);
         }
 
         @Override
         public OutputStream decorateLogger(Run build, OutputStream outputStream) throws IOException, InterruptedException {
-            if (decorator.runInfo.isEnabled()) {
+            if (jobPublisher.runInfo.isEnabled()) {
                 if (LOGGER.isLoggable(Level.FINE)) {
                     LOGGER.log(Level.FINE, "Decorating output, runId={0}, step={1}", new Object[]{
-                        decorator.runInfo.id,
-                        decorator.step
+                        jobPublisher.runInfo.id,
+                        jobPublisher.step
                     });
                 }
-                return new PipelineOutputStream(outputStream, decorator.runInfo.id, decorator.step, decorator.client);
+                return new PipelineOutputStream(outputStream, jobPublisher.runInfo.id, jobPublisher.step, jobPublisher.client);
             }
             return outputStream;
         }
@@ -203,6 +216,51 @@ public final class JobDecorator {
         @Override
         protected void refresh() {
             result = Helper.convertResult(run.getResult());
+        }
+    }
+
+    /**
+     * Artifact processor factory.
+     */
+    private static final class ArtifactsProcessorFactory implements ArtifactsProcessor.Factory {
+
+        @Override
+        public ArtifactsProcessor create(Run<?, ?> run) {
+            WeakReference<JobPublisher> ref = PUBLISHERS.get(run);
+            JobPublisher jobPublisher = ref != null ? ref.get() : null;
+            if (jobPublisher != null && jobPublisher.runInfo.isEnabled()) {
+                ArchivedArtifactsStepsProvider stepsProvider = new ArchivedArtifactsStepsProvider(jobPublisher);
+                return new ArtifactsProcessor(run, jobPublisher.client, jobPublisher.runInfo.id, stepsProvider);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Archived artifacts steps provider.
+     */
+    private static final class ArchivedArtifactsStepsProvider implements ArtifactsProcessor.StepsProvider {
+
+        private final JobPublisher jobPublisher;
+
+        ArchivedArtifactsStepsProvider(JobPublisher publisher) {
+            this.jobPublisher = Objects.requireNonNull(publisher, "publisher is null!");
+        }
+
+        @Override
+        public Pipeline.Steps getSteps() {
+            return jobPublisher.steps;
+        }
+    }
+
+    /**
+     * Test result suite matcher.
+     */
+    private static final class TestResultSuiteMatcher implements TestResulProcessor.SuiteResultMatcher {
+
+        @Override
+        public boolean match(SuiteResult suite, Pipeline.Steps steps) {
+            return true;
         }
     }
 }
