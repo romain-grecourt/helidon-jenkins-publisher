@@ -15,13 +15,13 @@ public final class ArtifactDataEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#ARTIFACT_DATA} event.
      *
-     * @param runId runId
+     * @param pipelineId pipeline id
      * @param stepsId the corresponding stepsId
      * @param file the artifact file
      * @param filename the artifact relative filename
      */
-    public ArtifactDataEvent(String runId, int stepsId, File file, String filename) {
-        super(runId);
+    public ArtifactDataEvent(String pipelineId, int stepsId, File file, String filename) {
+        super(pipelineId);
         this.stepsId = stepsId;
         this.file = file;
         this.filename = filename;
@@ -92,7 +92,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
     @Override
     public String toString() {
         return ArtifactDataEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + ", stepsId=" + stepsId
                 + ", file=" + file
                 + ", filename=" + filename

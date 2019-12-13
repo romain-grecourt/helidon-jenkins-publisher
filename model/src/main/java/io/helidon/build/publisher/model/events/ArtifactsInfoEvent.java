@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package io.helidon.build.publisher.model.events;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -11,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * {@link PipelineEventType#ARTIFACTS_INFO} event.
  */
-@JsonPropertyOrder({"runId", "eventType", "stageId"})
+@JsonPropertyOrder({"pipelineId", "eventType", "stageId"})
 public final class ArtifactsInfoEvent extends PipelineEvent {
 
     final int stepsId;
@@ -20,13 +15,13 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#ARTIFACTS_INFO} event.
      *
-     * @param runId runId
+     * @param pipelineId pipeline id
      * @param stepsId the corresponding steps stage id
      * @param count the count of archived files
      */
-    public ArtifactsInfoEvent(@JsonProperty("runId") String runId, @JsonProperty("stepsId") int stepsId,
+    public ArtifactsInfoEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepsId") int stepsId,
             @JsonProperty("files") int count) {
-        super(runId);
+        super(pipelineId);
         this.stepsId = stepsId;
         this.count = count;
     }
@@ -85,7 +80,7 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
     @Override
     public String toString() {
         return ArtifactsInfoEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + ", stepsId=" + stepsId
                 + ", count=" + count
                 + " }";

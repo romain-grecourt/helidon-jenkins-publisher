@@ -1,13 +1,14 @@
 package io.helidon.build.publisher.model.events;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.util.Objects;
 
 /**
  * {@link PipelineEventType#PIPELINE_ERROR} event.
  */
-@JsonPropertyOrder({"runId", "eventType", "code", "message"})
+@JsonPropertyOrder({"pipelineId", "eventType", "code", "message"})
 public final class PipelineErrorEvent extends PipelineEvent {
 
     final int code;
@@ -16,12 +17,12 @@ public final class PipelineErrorEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#ERROR} event.
      *
-     * @param runId runId
+     * @param pipelineId pipelineId
      * @param code the error code
      * @param message the error message
      */
-    public PipelineErrorEvent(String runId, @JsonProperty("code") int code, @JsonProperty("message") String message) {
-        super(runId);
+    public PipelineErrorEvent(String pipelineId, @JsonProperty("code") int code, @JsonProperty("message") String message) {
+        super(pipelineId);
         this.code = code;
         this.message = message;
     }
@@ -35,7 +36,7 @@ public final class PipelineErrorEvent extends PipelineEvent {
     public int hashCode() {
         int hash = 3;
         hash = 89 * hash + this.code;
-        hash = 89 * hash + Objects.hashCode(this.runId);
+        hash = 89 * hash + Objects.hashCode(this.pipelineId);
         hash = 89 * hash + Objects.hashCode(this.message);
         return hash;
     }
@@ -55,7 +56,7 @@ public final class PipelineErrorEvent extends PipelineEvent {
         if (this.code != other.code) {
             return false;
         }
-        if (!Objects.equals(this.runId, other.runId)) {
+        if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
         return Objects.equals(this.message, other.message);

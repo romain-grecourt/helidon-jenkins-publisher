@@ -4,6 +4,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 
+import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherFolderProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherProjectProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
@@ -33,29 +34,32 @@ final class PipelineRunInfo {
     final String id;
     final boolean excludeSyntheticSteps;
     final boolean excludeMetaSteps;
-    final String jobName;
+    final String title;
     final String scmHead;
     final String scmHash;
     final String repositoryUrl;
     final String publisherServerUrl;
     final int publisherClientThreads;
+    final long startTime;
 
     PipelineRunInfo() {
         id = null;
         excludeSyntheticSteps = false;
         excludeMetaSteps = false;
         publisherClientThreads = 0;
-        jobName = null;
+        title = null;
         repositoryUrl = null;
         scmHead = null;
         scmHash = null;
         publisherServerUrl = null;
+        startTime = 0;
     }
 
     PipelineRunInfo(FlowExecution execution) {
         WorkflowRun run = Helper.getRun(execution.getOwner());
+        startTime = run.getStartTimeInMillis();
         WorkflowMultiBranchProject project = Helper.getProject(run.getParent());
-        jobName = project.getName();
+        title = project.getName();
         HelidonPublisherFolderProperty prop = project.getProperties().get(HelidonPublisherFolderProperty.class);
         SCMRevisionAction revAction = getSCMRevisionAction(run);
         SCMRevision rev = revAction.getRevision();
@@ -79,7 +83,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(jobName, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -92,7 +96,7 @@ final class PipelineRunInfo {
     PipelineRunInfo(Run<?, ?> run) {
         Job<?, ?> job = run.getParent();
         HelidonPublisherProjectProperty prop = job.getProperty(HelidonPublisherProjectProperty.class);
-        jobName = run.getParent().getName();
+        title = run.getParent().getName();
         SCMRevisionAction revAction = getSCMRevisionAction(run);
         String remote = null;
         if (job instanceof SCMTriggerItem) {
@@ -110,6 +114,7 @@ final class PipelineRunInfo {
                 }
             }
         }
+        startTime = run.getStartTimeInMillis();
         repositoryUrl = remote;
         SCMRevision rev = revAction.getRevision();
         scmHead = rev.getHead().getName();
@@ -125,7 +130,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(jobName, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -135,19 +140,15 @@ final class PipelineRunInfo {
         }
     }
 
-    /**
-     * Test if this run should be processed.
-     * @return {@code true} if enabled, {@code false} otherwise
-     */
-    boolean isEnabled() {
-        return id != null;
+    PipelineInfo toPipelineInfo() {
+        return new PipelineInfo(id, title, repositoryUrl, scmHead, scmHash);
     }
 
     @Override
     public String toString() {
         return PipelineRunInfo.class.getSimpleName() + "{"
                 + " id=" + id == null ? "null" : id
-                + ", jobName=" + jobName
+                + ", title=" + title
                 + ", scmHead=" + scmHead
                 + ", scmHash=" + scmHash
                 + ", publisherServerUrl=" + publisherServerUrl == null ? "null" : publisherServerUrl
@@ -159,17 +160,17 @@ final class PipelineRunInfo {
 
     /**
      * Create a unique ID.
-     * @param jobName job name
+     * @param title job name
      * @param scmHead SCM head
      * @param scmHash SCM hash
      * @param buildNumber build number
      * @param startTime start timestamp
      * @return String
      */
-    private static String createId(String jobName, String repotistoryUrl, String scmHead, String scmHash, int buildNumber,
+    private static String createId(String title, String repotistoryUrl, String scmHead, String scmHash, int buildNumber,
             long startTime) {
 
-        String runDesc = jobName + "/" + repotistoryUrl + "/" + scmHead + "/" + buildNumber + "/" + startTime + "/" + scmHash;
+        String runDesc = title + "/" + repotistoryUrl + "/" + scmHead + "/" + buildNumber + "/" + startTime + "/" + scmHash;
         return md5sum(runDesc.getBytes());
     }
 

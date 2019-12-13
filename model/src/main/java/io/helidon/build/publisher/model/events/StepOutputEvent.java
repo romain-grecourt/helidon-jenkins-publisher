@@ -1,13 +1,14 @@
 package io.helidon.build.publisher.model.events;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.util.Objects;
 
 /**
  * {@link PipelineEventType#STEP_OUTPUT} event.
  */
-@JsonPropertyOrder({"runId", "eventType", "stepId"})
+@JsonPropertyOrder({"pipelineId", "eventType", "stepId"})
 public final class StepOutputEvent extends PipelineEvent {
 
     final int stepId;
@@ -15,11 +16,11 @@ public final class StepOutputEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#OUTPUT} event.
      *
-     * @param runId runId
+     * @param pipelineId pipelineId
      * @param stepId the corresponding step id
      */
-    public StepOutputEvent(@JsonProperty("runId") String runId, @JsonProperty("stepId") int stepId) {
-        super(runId);
+    public StepOutputEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepId") int stepId) {
+        super(pipelineId);
         this.stepId = stepId;
     }
 
@@ -41,7 +42,7 @@ public final class StepOutputEvent extends PipelineEvent {
     @Override
     public int hashCode() {
         int hash = 3;
-        hash = 47 * hash + Objects.hashCode(this.runId);
+        hash = 47 * hash + Objects.hashCode(this.pipelineId);
         hash = 47 * hash + Objects.hashCode(this.stepId);
         return hash;
     }
@@ -58,7 +59,7 @@ public final class StepOutputEvent extends PipelineEvent {
             return false;
         }
         final StepOutputEvent other = (StepOutputEvent) obj;
-        if (!Objects.equals(this.runId, other.runId)) {
+        if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
         return Objects.equals(this.stepId, other.stepId);

@@ -14,12 +14,12 @@ public final class StepOutputDataEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#OUTPUT_DATA} event.
      *
-     * @param runId runId
+     * @param pipelineId pipelineId
      * @param stepId the corresponding stepId
      * @param data the output data
      */
-    public StepOutputDataEvent(String runId, int stepId, byte[] data) {
-        super(runId);
+    public StepOutputDataEvent(String pipelineId, int stepId, byte[] data) {
+        super(pipelineId);
         this.stepId = stepId;
         this.data = data;
     }
@@ -50,7 +50,7 @@ public final class StepOutputDataEvent extends PipelineEvent {
     @Override
     public int hashCode() {
         int hash = 7;
-        hash = 53 * hash + Objects.hashCode(this.runId);
+        hash = 53 * hash + Objects.hashCode(this.pipelineId);
         hash = 53 * hash + Objects.hashCode(this.stepId);
         hash = 53 * hash + Arrays.hashCode(this.data);
         return hash;
@@ -68,7 +68,7 @@ public final class StepOutputDataEvent extends PipelineEvent {
             return false;
         }
         final StepOutputDataEvent other = (StepOutputDataEvent) obj;
-        if (!Objects.equals(this.runId, other.runId)) {
+        if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
         if (!Objects.equals(this.stepId, other.stepId)) {
@@ -80,7 +80,7 @@ public final class StepOutputDataEvent extends PipelineEvent {
     @Override
     public String toString() {
         return StepOutputDataEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + ", stepId=" + stepId
                 + " }";
     }

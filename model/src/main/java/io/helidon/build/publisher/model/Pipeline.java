@@ -1,6 +1,5 @@
 package io.helidon.build.publisher.model;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.util.List;
 import java.util.LinkedList;
 
@@ -8,10 +7,15 @@ import io.helidon.build.publisher.model.events.PipelineEventListener;
 import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import io.helidon.build.publisher.model.Status.State;
+
 /**
  * Pipeline model.
  */
 @JsonDeserialize(using = PipelineDeserializer.class)
+@JsonSerialize(using = PipelineSerializer.class)
 public final class Pipeline extends Stages {
 
     /**
@@ -23,7 +27,16 @@ public final class Pipeline extends Stages {
      * @throws NullPointerException if info, status or timings is {@code null}
      */
     public Pipeline(PipelineInfo info, Status status, Timings timings) {
-        super(info, StageType.SEQUENCE, status, timings);
+        super(info, status, timings);
+    }
+
+    /**
+     * Create a new running pipeline.
+     * @param info pipeline info
+     * @param startTime start timestamp
+     */
+    public Pipeline(PipelineInfo info, long startTime) {
+        this(info, new Status(State.RUNNING), new Timings(startTime));
     }
 
     /**
@@ -41,6 +54,11 @@ public final class Pipeline extends Stages {
      */
     public Node node(int id) {
         return nodesByIds.get(id);
+    }
+
+    @Override
+    public StageType type() {
+        return StageType.SEQUENCE;
     }
 
     @Override
@@ -70,18 +88,15 @@ public final class Pipeline extends Stages {
         int parentId = 0;
         int depth = 1;
         visitor.visitStart();
-        depth++;
         while (!stack.isEmpty()) {
             Stage stage = stack.peek();
             if (stage instanceof Steps) {
                 // leaf
-                visitor.visitStepsStart((Steps) stage, depth);
-                depth++;
+                visitor.visitStepsStart((Steps) stage, depth + 1);
                 for (Step step : ((Steps) stage).children) {
-                    visitor.visitStep(step, depth);
+                    visitor.visitStep(step, depth + 2);
                 }
-                depth--;
-                visitor.visitStepsEnd((Steps) stage, depth);
+                visitor.visitStepsEnd((Steps) stage, depth + 1);
                 parentId = stage.parent.id;
                 stack.pop();
             } else if (stage instanceof Stages) {
@@ -111,7 +126,6 @@ public final class Pipeline extends Stages {
                 }
             }
         }
-        depth--;
         visitor.visitEnd();
     }
 
@@ -125,5 +139,12 @@ public final class Pipeline extends Stages {
         PipelinePrettyPrinter printer = new PipelinePrettyPrinter(excludeSyntheticSteps, excludeMetaSteps);
         visit(printer);
         return printer.getString();
+    }
+
+    @Override
+    public String toString() {
+        return Pipeline.class.getSimpleName() + "{"
+                + " id=" + info.id
+                + " }";
     }
 }

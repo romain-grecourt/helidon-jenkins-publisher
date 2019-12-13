@@ -1,6 +1,7 @@
 package io.helidon.build.publisher.model;
 
 import io.helidon.build.publisher.model.events.StageCompletedEvent;
+import java.util.Objects;
 
 /**
  * A set of stages running in parallel.
@@ -18,11 +19,16 @@ public final class Parallel extends Stages {
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
     public Parallel(Node parent, String name, Status status, Timings timings) {
-        super(StageType.PARALLEL, parent, name, status, timings);
+        super(parent, name, Objects.requireNonNull(parent, "parent is null!").path, status, timings);
     }
 
     Parallel(int id, Node parent, String name, Status status, Timings timings) {
-        super(StageType.PARALLEL, id, parent, name, status, timings);
+        super(id, parent, name, Objects.requireNonNull(parent, "parent is null!").path, status, timings);
+    }
+
+    @Override
+    public StageType type() {
+        return StageType.PARALLEL;
     }
 
     @Override

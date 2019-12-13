@@ -16,7 +16,7 @@ import static org.hamcrest.core.Is.is;
 /**
  * Test JSON with {@link PipelineInfo}.
  */
-public class PipelineRunTest {
+public class PipelineTest {
 
     static final String REPO_URL = "https://github.com/john_doe/repo.git";
     static final long TIMESTAMP = System.currentTimeMillis();
@@ -25,7 +25,7 @@ public class PipelineRunTest {
     public void testJson() throws IOException {
         String runId = "abcdefgh";
         PipelineInfo info = new PipelineInfo(runId, "testJob", REPO_URL, "master", "123456789");
-        Pipeline pipeline  = new Pipeline(info, new Status(State.RUNNING), new Timings(TIMESTAMP));
+        Pipeline pipeline  = new Pipeline(info, TIMESTAMP);
 
         Steps steps = new Steps(pipeline, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
         pipeline.addStage(steps);
@@ -52,7 +52,7 @@ public class PipelineRunTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(baos, info);
+        mapper.writeValue(baos, pipeline);
 
         // pretty print
         Object json = mapper.readValue(new ByteArrayInputStream(baos.toByteArray()), Object.class);
@@ -60,13 +60,13 @@ public class PipelineRunTest {
         System.out.println(indented);
 
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-        PipelineInfo fromJson = mapper.readValue(bais, PipelineInfo.class);
-        assertThat(fromJson, is(equalTo(info)));
+        Pipeline fromJson = mapper.readValue(bais, Pipeline.class);
+        assertThat(fromJson, is(equalTo(pipeline)));
     }
 
     //@Test
     public void testJsonFile() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        PipelineInfo fromJson = mapper.readValue(PipelineRunTest.class.getResourceAsStream("pipeline.json"), PipelineInfo.class);
+        PipelineInfo fromJson = mapper.readValue(PipelineTest.class.getResourceAsStream("pipeline.json"), PipelineInfo.class);
     }
 }

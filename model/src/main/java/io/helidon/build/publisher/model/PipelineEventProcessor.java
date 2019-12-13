@@ -1,5 +1,6 @@
 package io.helidon.build.publisher.model;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -8,6 +9,7 @@ import io.helidon.build.publisher.model.Status.State;
 import io.helidon.build.publisher.model.events.ArtifactsInfoEvent;
 import io.helidon.build.publisher.model.events.NodeCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineEvent;
+import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
 import io.helidon.build.publisher.model.events.PipelineEventType;
 import io.helidon.build.publisher.model.events.StageCreatedEvent;
 import io.helidon.build.publisher.model.events.StepCreatedEvent;
@@ -31,21 +33,55 @@ public final class PipelineEventProcessor {
 
     private static final Logger LOGGER = Logger.getLogger(PipelineEventProcessor.class.getName());
 
-    private final Pipeline pipeline;
+    private final PipelineDescriptorManager manager;
 
     /**
      * Create a new processor.
-     * @param pipeline the pipeline
+     * @param manager
      */
-    public PipelineEventProcessor(Pipeline pipeline) {
-        this.pipeline = pipeline;
+    public PipelineEventProcessor(PipelineDescriptorManager manager) {
+        this.manager = manager;
+    }
+
+    /**
+     * Process the given mixed events that may belong to different pipelines.
+     * @param allEvents events to process
+     * @throws IllegalStateException if unable to get a pipeline descriptor
+     */
+    public void process(List<PipelineEvent> allEvents) {
+        Pipeline pipeline = null;
+        List<PipelineEvent> events = new LinkedList<>();
+        for (PipelineEvent event : allEvents) {
+            String epid = event.pipelineId();
+            if (pipeline == null || !pipeline.info.id.equals(epid)) {
+                if (pipeline != null) {
+                    process(pipeline, events);
+                    manager.save(pipeline);
+                    events = new LinkedList<>();
+                }
+                pipeline = manager.load(epid);
+                if (pipeline == null) {
+                    if (event.eventType() == PipelineEventType.PIPELINE_CREATED) {
+                        PipelineCreatedEvent createdEvent = (PipelineCreatedEvent) event;
+                        pipeline = new Pipeline(createdEvent.info(), createdEvent.startTime());
+                    } else {
+                        throw new IllegalStateException("Unable to get pipeline descriptor, pipelineId=" + epid);
+                    }
+                }
+            }
+            events.add(event);
+        }
+        if (pipeline != null) {
+            process(pipeline, events);
+            manager.save(pipeline);
+        }
     }
 
     /**
      * Process the given events.
      * @param events the events to apply
      */
-    public void process(List<PipelineEvent> events) {
+    private static void process(Pipeline pipeline, List<PipelineEvent> events) {
         for (PipelineEvent event : events) {
             PipelineEventType eventType = event.eventType();
             if (pipeline.status.state == State.FINISHED && eventType != PipelineEventType.PIPELINE_COMPLETED) {
@@ -59,23 +95,23 @@ public final class PipelineEventProcessor {
             }
             switch (eventType) {
                 case ARTIFACTS_INFO:
-                    processArtifactsInfoEvent((ArtifactsInfoEvent) event);
+                    processArtifactsInfoEvent(pipeline, (ArtifactsInfoEvent) event);
                     break;
                 case TESTS_INFO:
-                    processTestsEvent((TestsInfoEvent) event);
+                    processTestsEvent(pipeline, (TestsInfoEvent) event);
                     break;
                 case PIPELINE_COMPLETED:
-                    processPipelineCompletedEvent();
+                    processPipelineCompletedEvent(pipeline);
                     break;
                 case STEP_COMPLETED:
                 case STAGE_COMPLETED:
-                    processNodeCompletedEvent((NodeCompletedEvent) event);
+                    processNodeCompletedEvent(pipeline, (NodeCompletedEvent) event);
                     break;
                 case STEP_CREATED:
-                    processStepCreatedEvent((StepCreatedEvent) event);
+                    processStepCreatedEvent(pipeline, (StepCreatedEvent) event);
                     break;
                 case STAGE_CREATED:
-                    processStageCreatedEvent((StageCreatedEvent) event);
+                    processStageCreatedEvent(pipeline, (StageCreatedEvent) event);
                     break;
                 default:
                 // do nothing
@@ -83,7 +119,7 @@ public final class PipelineEventProcessor {
         }
     }
 
-    private Node getNode(int id) {
+    private static Node getNode(Pipeline pipeline, int id) {
         Node node = pipeline.nodesByIds.get(id);
         if (node == null) {
             throw new IllegalStateException("Unkown node, id=" + id);
@@ -91,55 +127,55 @@ public final class PipelineEventProcessor {
         return node;
     }
 
-    private Steps getSteps(int id) {
-        Node node = getNode(id);
+    private static Steps getSteps(Pipeline pipeline, int id) {
+        Node node = getNode(pipeline, id);
         if (!(node instanceof Steps)) {
             throw new IllegalStateException("Invalid steps node, id=" + id);
         }
         return (Steps) node;
     }
 
-    private Stages getStages(int id) {
-        Node node = getNode(id);
+    private static Stages getStages(Pipeline pipeline, int id) {
+        Node node = getNode(pipeline, id);
         if (!(node instanceof Stages)) {
             throw new IllegalStateException("Invalid stages node, id=" + id);
         }
         return (Stages) node;
     }
 
-    private void processArtifactsInfoEvent(ArtifactsInfoEvent event) {
-        getSteps(event.stepsId()).artifacts = event.count();
+    private static void processArtifactsInfoEvent(Pipeline pipeline, ArtifactsInfoEvent event) {
+        getSteps(pipeline, event.stepsId()).artifacts = event.count();
     }
 
-    private void processTestsEvent(TestsInfoEvent event) {
-        getSteps(event.stepsId()).tests = event.info();
+    private static void processTestsEvent(Pipeline pipeline, TestsInfoEvent event) {
+        getSteps(pipeline, event.stepsId()).tests = event.info();
     }
 
-    private void processPipelineCompletedEvent() {
+    private static void processPipelineCompletedEvent(Pipeline pipeline) {
         if (pipeline.status.state != State.FINISHED) {
             pipeline.status.state = State.FINISHED;
             pipeline.status.result = Status.Result.UNKNOWN;
         }
     }
 
-    private void processNodeCompletedEvent(NodeCompletedEvent event) {
-        Node node = getNode(event.id());
+    private static void processNodeCompletedEvent(Pipeline pipeline, NodeCompletedEvent event) {
+        Node node = getNode(pipeline, event.id());
         node.status.state = State.FINISHED;
         node.status.result = event.result();
         node.timings.endTime = event.endTime();
     }
 
-    private void processStepCreatedEvent(StepCreatedEvent event) {
-        Steps steps = getSteps(event.id());
+    private static void processStepCreatedEvent(Pipeline pipeline, StepCreatedEvent event) {
+        Steps steps = getSteps(pipeline, event.parentId());
         if (event.index() != steps.children.size()) {
             throw new IllegalStateException("Invalid index");
         }
-        steps.addStep(new Step(event.id(), steps, event.name(), event.args(), event.meta(), event.declared(), new Status(),
-                new Timings(event.startTime())));
+        steps.addStep(new Step(event.id(), steps, event.name(), event.args(), false, true, new Status(),
+            new Timings(event.startTime())));
     }
 
-    private void processStageCreatedEvent(StageCreatedEvent event) {
-        Stages stages = getStages(event.id());
+    private static void processStageCreatedEvent(Pipeline pipeline, StageCreatedEvent event) {
+        Stages stages = getStages(pipeline, event.parentId());
         if (event.index() != stages.children.size()) {
             throw new IllegalStateException("Invalid index");
         }

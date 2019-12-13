@@ -10,8 +10,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.events.PipelineEvents;
 import io.helidon.build.publisher.model.Status;
+import io.helidon.build.publisher.model.Step;
+import io.helidon.build.publisher.model.Steps;
+import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 
 import hudson.Extension;
 import hudson.model.Run;
@@ -39,46 +41,59 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
 
     private final PipelineModelAdapter modelAdapter;
     private final BackendClient client;
-    private final PipelineRunInfo runInfo;
+    private final Pipeline pipeline;
+    private final String pipelineId;
+    private final boolean excludeSyntheticSteps;
+    private final boolean excludeMetaSteps;
+    private final boolean enabled;
 
     PipelinePublisher(FlowExecution execution) {
-        runInfo = new PipelineRunInfo(execution);
-        if (runInfo.isEnabled()) {
+        PipelineRunInfo runInfo = new PipelineRunInfo(execution);
+        if (runInfo.id != null) {
+            enabled = true;
+            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            excludeSyntheticSteps = runInfo.excludeSyntheticSteps;
+            excludeMetaSteps = runInfo.excludeMetaSteps;
+            pipelineId = runInfo.id;
+            pipeline = new Pipeline(runInfo.toPipelineInfo(), runInfo.startTime);
+            pipeline.addEventListener(client);
             PipelineSignatures signatures = PipelineSignatures.getOrCreate(execution);
+            modelAdapter = new PipelineModelAdapter(signatures, pipeline, excludeSyntheticSteps, excludeMetaSteps);
+            pipeline.addEventListener(new TestResulProcessor(pipeline, client, Helper.getRun(execution.getOwner()),
+                    new TestResultSuiteMatcher(modelAdapter)));
+            ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Pipeline enabled, runInfo={0}, signatures: {1}", new Object[]{
-                    runInfo,
-                    signatures.signatures
+                LOGGER.log(Level.FINE, "Pipeline enabled, execution={0}, pipelineId={1}", new Object[]{
+                    execution,
+                    pipelineId
                 });
             }
-            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
-            modelAdapter = new PipelineModelAdapter(signatures, runInfo);
-            modelAdapter.addEventListener(client);
-            TestResulProcessor testResultProcessor = new TestResulProcessor(modelAdapter::run, client,
-                    Helper.getRun(execution.getOwner()), new TestResultSuiteMatcher(modelAdapter));
-            modelAdapter.addEventListener(testResultProcessor);
-            ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
         } else {
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Pipeline NOT enabled, runInfo={0}", runInfo);
-            }
+            enabled = false;
+            excludeMetaSteps = false;
+            excludeSyntheticSteps = false;
+            pipelineId = null;
+            pipeline = null;
             modelAdapter = null;
             client = null;
+            if (LOGGER.isLoggable(Level.FINE)) {
+                LOGGER.log(Level.FINE, "Pipeline NOT enabled, execution={0}", execution);
+            }
         }
     }
 
     @Override
     public OutputStream decorate(OutputStream out) throws IOException, InterruptedException {
-        if (runInfo.isEnabled()) {
-            Pipeline.Step step = modelAdapter.poll();
+        if (enabled) {
+            Step step = modelAdapter.poll();
             if (step != null) {
                 if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "Decorating output, runId={0}, step={1}", new Object[]{
-                        runInfo.id,
+                    LOGGER.log(Level.FINE, "Decorating output, pipelineId={0}, step={1}", new Object[]{
+                        pipelineId,
                         step
                     });
                 }
-                return new PipelineOutputStream(out, runInfo.id, step, client);
+                return new PipelineOutputStream(out, pipelineId, step, client);
             }
         }
         return out;
@@ -86,10 +101,10 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
 
     @Override
     public void onNewHead(FlowNode node) {
-        if (runInfo.isEnabled()) {
+        if (enabled) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "New head, runId{0}, node={1}", new Object[]{
-                    runInfo.id,
+                LOGGER.log(Level.FINE, "New head, pipelineId{0}, node={1}", new Object[]{
+                    pipelineId,
                     node
                 });
             }
@@ -116,16 +131,16 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                     return decoratorRef.get();
                 }
             }
-            PipelinePublisher decorator = new PipelinePublisher(execution);
+            PipelinePublisher pipelinePublisher = new PipelinePublisher(execution);
             synchronized (PUBLISHERS) {
                 WeakReference<TaskListenerDecorator> decoratorRef = PUBLISHERS.get(execution);
                 if (decoratorRef != null && decoratorRef.get() != null) {
                     return decoratorRef.get();
                 }
                 TaskListenerDecorator dec;
-                if (decorator.runInfo.isEnabled()) {
-                    dec = decorator;
-                    execution.addListener(decorator);
+                if (pipelinePublisher.pipeline != null) {
+                    dec = pipelinePublisher;
+                    execution.addListener(pipelinePublisher);
                 } else {
                     dec = EMPTY_PUBLISHER;
                 }
@@ -162,14 +177,14 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                     if (decorator != null) {
                         PipelinePublisher pipelinePublisher = (PipelinePublisher) decorator;
                         if (LOGGER.isLoggable(Level.FINE)) {
-                            LOGGER.log(Level.FINE, "Pipeline completed, runId={0}, pipeline={1}", new Object[]{
-                                pipelinePublisher.runInfo.id,
-                                pipelinePublisher.modelAdapter.run().prettyPrint(pipelinePublisher.runInfo.excludeSyntheticSteps,
-                                        pipelinePublisher.runInfo.excludeSyntheticSteps)
+                            LOGGER.log(Level.FINE, "Pipeline completed, pipelineId={0}, pipeline={1}", new Object[]{
+                                pipelinePublisher.pipelineId,
+                                pipelinePublisher.pipeline.toPrettyString(pipelinePublisher.excludeSyntheticSteps,
+                                        pipelinePublisher.excludeSyntheticSteps)
                             });
                         }
                         // TODO pass the result to fireComplete
-                        pipelinePublisher.modelAdapter.run().fireCompleted();
+                        pipelinePublisher.pipeline.fireCompleted();
                         return;
                     }
                 }
@@ -179,14 +194,13 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
             Status.Result result = Helper.convertResult(run.getResult());
             PipelineRunInfo runInfo = new PipelineRunInfo(execution);
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Forcing pipeline result: runId={0}, result={1}", new Object[]{
+                LOGGER.log(Level.FINE, "Forcing pipeline result: pipelineId={0}, result={1}", new Object[]{
                     runInfo.id,
                     result
                 });
             }
             BackendClient client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
-            client.onEvent(new PipelineEvents.StageCompleted(runInfo.id, 0, result, run.getDuration()));
-            client.onEvent(new PipelineEvents.PipelineCompleted(runInfo.id));
+            client.onEvent(new PipelineCompletedEvent(runInfo.id, result, run.getDuration()));
         }
 
         @Override
@@ -209,10 +223,10 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                 FlowExecution exec = ((WorkflowRun) run).getExecution();
                 WeakReference<TaskListenerDecorator> ref = PipelinePublisher.PUBLISHERS.get(exec);
                 TaskListenerDecorator decorator = ref != null ? ref.get() : null;
-                if (decorator instanceof PipelinePublisher && ((PipelinePublisher) decorator).runInfo.isEnabled()) {
+                if (decorator instanceof PipelinePublisher && ((PipelinePublisher) decorator).enabled) {
                     PipelinePublisher publisher = (PipelinePublisher) decorator;
                     ArchivedArtifactsStepsProvider stepsProvider = new ArchivedArtifactsStepsProvider(publisher, exec);
-                    return new ArtifactsProcessor(run, publisher.client, publisher.runInfo.id, stepsProvider);
+                    return new ArtifactsProcessor(run, publisher.client, publisher.pipelineId, stepsProvider);
                 }
             }
             return null;
@@ -233,12 +247,12 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
         }
 
         @Override
-        public Pipeline.Steps getSteps() {
+        public Steps getSteps() {
             for (FlowNode node : exec.getCurrentHeads()) {
                 if (("archiveArtifacts").equals(node.getDisplayFunctionName())) {
-                    Pipeline.Step step = pipelinePublisher.modelAdapter.step(node.getId());
+                    Step step = pipelinePublisher.modelAdapter.step(node.getId());
                     if (step != null) {
-                        return (Pipeline.Steps) step.parent();
+                        return (Steps) step.parent();
                     }
                 }
             }
@@ -258,10 +272,10 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
         }
 
         @Override
-        public boolean match(SuiteResult suite, Pipeline.Steps steps) {
+        public boolean match(SuiteResult suite, Steps steps) {
             String nodeId = suite.getNodeId();
             if (nodeId != null) {
-                Pipeline.Step step = modelAdapter.step(nodeId);
+                Step step = modelAdapter.step(nodeId);
                 if (step != null && step.parent().equals(steps)) {
                     return true;
                 }

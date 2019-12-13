@@ -17,15 +17,15 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
     /**
      * Create a new node created event.
      *
-     * @param runId run id
+     * @param pipelineId pipeline id
      * @param id node id
      * @param parentId node parent id
      * @param index index in the parent node
      * @param name node name, may be {@code null}
      * @param startTime start timestamp
      */
-    NodeCreatedEvent(String runId, int id, int parentId, int index, String name, long startTime) {
-        super(runId);
+    NodeCreatedEvent(String pipelineId, int id, int parentId, int index, String name, long startTime) {
+        super(pipelineId);
         this.id = id;
         this.parentId = parentId;
         this.index = index;
@@ -102,7 +102,7 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
             return false;
         }
         final NodeCreatedEvent other = (NodeCreatedEvent) obj;
-        if (!Objects.equals(this.runId, other.runId)) {
+        if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
         if (this.id != other.id) {

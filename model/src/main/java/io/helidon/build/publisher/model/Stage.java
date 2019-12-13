@@ -2,7 +2,6 @@ package io.helidon.build.publisher.model;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 
 import io.helidon.build.publisher.model.events.StageCreatedEvent;
 
@@ -13,41 +12,35 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public abstract class Stage extends Node {
 
-    final StageType type;
-
     /**
      * Create a new non parented stage.
      *
      * @param info pipeline info
-     * @param type the stage type, must not be {@code null}
      * @param status the status object
      * @param timings the timings object
      * @throws NullPointerException if info, status or timings is {@code null}
      */
-    protected Stage(PipelineInfo info, StageType type, Status status, Timings timings) {
+    protected Stage(PipelineInfo info, Status status, Timings timings) {
         super(info, status, timings);
-        this.type = Objects.requireNonNull(type, "type is null");
     }
 
     /**
      * Create a new stage.
      *
-     * @param type the stage type, must not be {@code null}
      * @param parent the parent stage that this step is part of
      * @param name the step name, must be non {@code null} and non empty
+     * @param path node path
      * @param status the status object
      * @param timings the timings object
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stage(StageType type, Node parent, String name, Status status, Timings timings) {
-        super(parent, name, createPath(parent, type, name), status, timings);
-        this.type = Objects.requireNonNull(type, "type is null");
+    protected Stage(Node parent, String name, String path, Status status, Timings timings) {
+        super(parent, name, path, status, timings);
     }
 
     /**
      * Create a new stage.
      *
-     * @param type the stage type, must not be {@code null}
      * @param id node id, must not be used in the parent graph
      * @param parent parent node, must not be {@code null}
      * @param name node name, may be {@code null}
@@ -56,24 +49,8 @@ public abstract class Stage extends Node {
      * @param timings the timings object
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stage(StageType type, int id, Node parent, String name, String path, Status status, Timings timings) {
+    protected Stage(int id, Node parent, String name, String path, Status status, Timings timings) {
         super(id, parent, name, path, status, timings);
-        this.type = Objects.requireNonNull(type, "type is null");
-    }
-
-    /**
-     * Create a new stage.
-     *
-     * @param type stage type, must not be {@code null}
-     * @param id node id, must not be used in the parent graph
-     * @param parent parent node, must not be {@code null}
-     * @param name node name, may be {@code null}
-     * @param status the status object
-     * @param timings the timings object
-     * @throws NullPointerException if parent, status or timings is {@code null}
-     */
-    protected Stage(StageType type, int id, Node parent, String name, Status status, Timings timings) {
-        this(type, id, parent, name, createPath(parent, type, name), status, timings);
     }
 
     /**
@@ -91,14 +68,6 @@ public abstract class Stage extends Node {
         return prefix + "stage[" + name + "]/";
     }
 
-    private static String createPath(Node parent, Stage.StageType stageType, String name) {
-        Objects.requireNonNull(parent, "parent is null");
-        if (stageType == StageType.SEQUENCE) {
-            return createPath(parent.path, parent instanceof Parallel, name == null ? "" : name);
-        }
-        return parent.path;
-    }
-
     /**
      * The type of stages.
      */
@@ -114,9 +83,7 @@ public abstract class Stage extends Node {
      * @return Type
      */
     @JsonProperty
-    public final StageType type() {
-        return type;
-    }
+    public abstract StageType type();
 
     @Override
     public Stage previous() {
@@ -176,6 +143,6 @@ public abstract class Stage extends Node {
             previous.fireCompleted();
         }
         int parentId = parent == null ? -1 : parent.id;
-        fireEvent(new StageCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, type));
+        fireEvent(new StageCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, type()));
     }
 }

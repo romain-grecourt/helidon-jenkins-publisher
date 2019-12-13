@@ -19,14 +19,14 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
     /**
      * Create a new completed node event.
      *
-     * @param runId run id
+     * @param pipelineId pipeline id
      * @param id node id
      * @param state node state
      * @param result node result
      * @param endTime node end timestamp
      */
-    NodeCompletedEvent(String runId, PipelineEventType type, int id, Status.Result result, long endTime) {
-        super(runId);
+    NodeCompletedEvent(String pipelineId, PipelineEventType type, int id, Status.Result result, long endTime) {
+        super(pipelineId);
         this.type = type;
         this.id = id;
         this.result = result;
@@ -72,7 +72,7 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
     @Override
     public String toString() {
         return this.getClass().getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + ", id=" + id
                 + ", result=" + result
                 + ", endTime=" + endTime

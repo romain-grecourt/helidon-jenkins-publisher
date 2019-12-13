@@ -5,11 +5,12 @@ import io.helidon.build.publisher.model.PipelineInfo;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.Objects;
 
 /**
  * {@link PipelineEventType#PIPELINE_CREATED} event.
  */
-@JsonPropertyOrder({"runId", "info"})
+@JsonPropertyOrder({"pipelineId", "info"})
 public final class PipelineCreatedEvent extends PipelineEvent {
 
     final PipelineInfo info;
@@ -19,6 +20,7 @@ public final class PipelineCreatedEvent extends PipelineEvent {
      * Create a new {@link PipelineEventType#PIPELINE_CREATED} event.
      *
      * @param info pipeline info
+     * @param startTime pipeline start time
      */
     @JsonCreator
     public PipelineCreatedEvent(@JsonProperty("info") PipelineInfo info, @JsonProperty("startTime") long startTime) {
@@ -53,10 +55,36 @@ public final class PipelineCreatedEvent extends PipelineEvent {
     }
 
     @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 83 * hash + Objects.hashCode(this.info);
+        hash = 83 * hash + (int) (this.startTime ^ (this.startTime >>> 32));
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final PipelineCreatedEvent other = (PipelineCreatedEvent) obj;
+        if (this.startTime != other.startTime) {
+            return false;
+        }
+        return Objects.equals(this.info, other.info);
+    }
+
+    @Override
     public String toString() {
         return PipelineCreatedEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
-                + ", info=" + info
+                + " pipelineId=" + pipelineId
+                + ", startTime=" + startTime
                 + " }";
     }
 }

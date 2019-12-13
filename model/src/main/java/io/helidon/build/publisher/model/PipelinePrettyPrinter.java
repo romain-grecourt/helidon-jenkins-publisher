@@ -39,13 +39,13 @@ public class PipelinePrettyPrinter implements PipelineVisitor {
     public void visitStagesStart(Stages stages, int depth) {
         sb.append(indent(depth));
         if (stages instanceof Parallel) {
-            sb.append("parallel {");
+            sb.append("parallel {\n");
         } else {
             sb.append("stage");
             if (stages.name != null && !stages.name.isEmpty()) {
                 sb.append("('").append(stages.name).append("')");
             }
-            sb.append(" {");
+            sb.append(" {\n");
         }
     }
 
@@ -80,7 +80,7 @@ public class PipelinePrettyPrinter implements PipelineVisitor {
 
     private static String indent(int depth) {
         String indent = "";
-        for (int i=0 ; i < 1 ; i++) {
+        for (int i=0 ; i < depth ; i++) {
             indent += INDENT;
         }
         return indent;

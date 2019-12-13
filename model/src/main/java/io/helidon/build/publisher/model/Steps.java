@@ -13,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A steps stage.
  */
-@JsonPropertyOrder({"id", "type", "state", "result", "startTime", "endTime", "artifacts", "tests", "steps"})
+@JsonPropertyOrder({"id", "type", "state", "result", "startTime", "endTime", "artifacts", "tests", "children"})
 public final class Steps extends Stage {
 
     final List<Step> children = new LinkedList<>();
@@ -29,11 +29,11 @@ public final class Steps extends Stage {
      * @throws NullPointerException if type, status or timings is {@code null}
      */
     public Steps(Node parent, Status status, Timings timings) {
-        super(Stage.StageType.STEPS, parent, null, status, timings);
+        super(parent, null, null, status, timings);
     }
 
     Steps(int id, Node parent, Status status, Timings timings) {
-        super(Stage.StageType.STEPS, id, parent, null, null, status, timings);
+        super(id, parent, null, null, status, timings);
     }
 
     @JsonIgnore // steps is synthetic, it doesn't have a name
@@ -60,6 +60,11 @@ public final class Steps extends Stage {
     @JsonProperty
     public TestsInfo tests() {
         return tests;
+    }
+
+    @Override
+    public StageType type() {
+        return StageType.STEPS;
     }
 
     /**

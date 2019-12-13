@@ -26,7 +26,7 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
      * Create a new deserializer instance.
      */
     public PipelineDeserializer() {
-        this(null);
+        this(Pipeline.class);
     }
 
     /**
@@ -39,8 +39,8 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
 
     @Override
     public Pipeline deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-        PipelineInfo info = ctxt.readValue(jp, PipelineInfo.class);
         JsonNode node = jp.getCodec().readTree(jp);
+        PipelineInfo info = readPipelineInfo(node);
         Pipeline pipeline = new Pipeline(info, readStatus(node), readTimings(node));
 
         // depth first traversal
@@ -55,13 +55,9 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
             StageType stageType = StageType.valueOf(stageNode.get("type").asText());
             if (stageType == StageType.STEPS) {
                 // tree leaf
-                Steps steps = readSteps(node, stageId, (Stages) parent, ctxt);
+                Steps steps = readSteps(stageNode, stageId, (Stages) parent);
                 for (JsonNode stepNode : stageNode.get("children")) {
                     steps.addStep(readStep(stepNode, steps));
-                }
-                steps.artifacts = stageNode.get("artifacts").asInt(0);
-                if (stageNode.hasNonNull("tests")) {
-                    steps.tests = ctxt.readValue(jp, TestsInfo.class);
                 }
                 stack.pop();
             } else {
@@ -77,10 +73,10 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
                     Stages stage;
                     switch (stageType) {
                         case SEQUENCE:
-                            stage = readSequence(node, stageId, (Stages) parent);
+                            stage = readSequence(stageNode, stageId, (Stages) parent);
                             break;
                         case PARALLEL:
-                            stage = readParallel(node, stageId, (Stages) parent);
+                            stage = readParallel(stageNode, stageId, (Stages) parent);
                             break;
                         default:
                             throw new IllegalStateException("Unknown type: " + stageType);
@@ -104,15 +100,29 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
         return pipeline;
     }
 
-    private static Step readStep(JsonNode node, Steps parent) {
-        return new Step(node.get("id").asInt(), parent, node.get("name").asText(), node.get("args").asText(),
-                node.get("meta").asBoolean(), node.get("declared").asBoolean(), readStatus(node), readTimings(node));
+    private static PipelineInfo readPipelineInfo(JsonNode node) {
+        return new PipelineInfo(node.get("id").asText(null), node.get("repositoryUrl").asText(null),
+                node.get("title").asText(null), node.get("scmHead").asText(null), node.get("scmHash").asText(null));
     }
 
-    private static Steps readSteps(JsonNode node, int id, Stages parent, DeserializationContext ctxt) {
+    private static Step readStep(JsonNode node, Steps parent) {
+        return new Step(node.get("id").asInt(), parent, node.get("name").asText(), node.get("args").asText(), /* meta */ false,
+                /* declared */ true, readStatus(node), readTimings(node));
+    }
+
+    private static Steps readSteps(JsonNode node, int id, Stages parent) {
         Steps steps = new Steps(id, parent, readStatus(node), readTimings(node));
+        steps.artifacts = node.get("artifacts").asInt(0);
+        if (node.hasNonNull("tests")) {
+            steps.tests = readTestsInfo(node.get("tests"));
+        }
         parent.addStage(steps);
         return steps;
+    }
+
+    private static TestsInfo readTestsInfo(JsonNode node) {
+        return new TestsInfo(node.get("total").asInt(0), node.get("passed").asInt(0), node.get("failed").asInt(0),
+                node.get("skipped").asInt(0));
     }
 
     private static Sequence readSequence(JsonNode node, int id, Stages parent) {

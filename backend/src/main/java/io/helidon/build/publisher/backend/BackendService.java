@@ -1,24 +1,22 @@
 package io.helidon.build.publisher.backend;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.LinkedList;
 import java.nio.file.FileSystems;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.helidon.build.publisher.model.events.PipelineEvents;
-import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.common.http.Http;
+import io.helidon.webserver.BadRequestException;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.helidon.build.publisher.model.events.PipelineEvent;
+import io.helidon.build.publisher.model.PipelineDescriptorFileManager;
+import io.helidon.build.publisher.model.PipelineEventProcessor;
+import io.helidon.build.publisher.model.events.PipelineEvents;
 
 /**
  * This service implements the endpoints used by the Jenkins plugin.
@@ -26,10 +24,9 @@ import io.helidon.build.publisher.model.events.PipelineEvent;
 final class BackendService implements Service {
 
     private static final Logger LOGGER = Logger.getLogger(BackendService.class.getName());
-    private static final String PIPELINE_DESC = "/pipeline.json";
 
     private final Path storagePath;
-    private final ObjectMapper mapper;
+    private final PipelineEventProcessor eventProcessor;
     private final FileAppender appender;
 
     /**
@@ -38,17 +35,9 @@ final class BackendService implements Service {
      * @param appenderThreads number of threads used for appending data
      */
     BackendService(String path, int appenderThreads) {
-        Path dirPath = FileSystems.getDefault().getPath(path);
-        if (!Files.exists(dirPath)) {
-            try {
-                Files.createDirectory(dirPath);
-            } catch (IOException ex) {
-                throw new IllegalStateException("Error initializing storage directory", ex);
-            }
-        }
-        this.storagePath = dirPath;
+        this.storagePath = FileSystems.getDefault().getPath(path);
         this.appender = new FileAppender(storagePath, appenderThreads);
-        this.mapper = new ObjectMapper();
+        this.eventProcessor = new PipelineEventProcessor(new PipelineDescriptorFileManager(storagePath));
     }
 
     @Override
@@ -59,99 +48,63 @@ final class BackendService implements Service {
     }
 
     private void processEvents(ServerRequest req, ServerResponse res) {
-        req.content().as(PipelineEvents.class).thenAccept(pevents -> {
-            try {
-                PipelineInfo pipelineRun = null;
-                List<PipelineEvent> events = new LinkedList<>();
-                for (PipelineEvent event : pevents.events()) {
-                    if (pipelineRun == null || !pipelineRun.id().equals(event.runId())) {
-                        if (pipelineRun != null) {
-                            Path filePath = storagePath.resolve(pipelineRun.id() + PIPELINE_DESC);
-                            pipelineRun.pipeline().applyEvents(events);
-                            mapper.writeValue(Files.newOutputStream(filePath), pipelineRun);
-                            events = new LinkedList<>();
-                        }
-                        String path = event.runId() + PIPELINE_DESC;
-                        Path filePath = storagePath.resolve(path);
-                        if (!Files.exists(filePath)) {
-                            if (event.eventType() == PipelineEvents.EventType.PIPELINE_CREATED) {
-                                pipelineRun = new PipelineInfo((PipelineEvents.PipelineCreated) event);
-                                Files.createDirectories(filePath.getParent());
-                                continue;
-                            } else {
-                                res.status(400).send();
-                                LOGGER.log(Level.WARNING, "Pipeline descriptor not found: {0}", path);
-                                return;
-                            }
-                        } else {
-                            if (LOGGER.isLoggable(Level.FINEST)) {
-                                LOGGER.log(Level.FINEST, "Reading pipeline descriptor: {0}", path);
-                            }
-                            pipelineRun = mapper.readValue(Files.newInputStream(filePath), PipelineInfo.class);
-                        }
-                    }
-                    events.add(event);
-                }
-                if (pipelineRun != null) {
-                    pipelineRun.pipeline().applyEvents(events);
-                    String path = pipelineRun.id() + PIPELINE_DESC;
-                    if (LOGGER.isLoggable(Level.FINEST)) {
-                        LOGGER.log(Level.FINEST, "Writing pipeline descriptor: {0}", path);
-                    }
-                    Path filePath = storagePath.resolve(pipelineRun.id() + PIPELINE_DESC);
-                    mapper.writeValue(Files.newOutputStream(filePath), pipelineRun);
-                }
-                res.status(200).send();
-            } catch (IllegalStateException ex) {
-                res.status(400).send();
-                LOGGER.log(Level.WARNING, ex.getMessage(), ex);
-            } catch (IOException ex) {
-                req.next(ex);
-            }
-        }).exceptionally((ex) -> {
-            req.next(ex);
-            LOGGER.log(Level.WARNING, ex.getMessage(), ex);
-            return null;
-        });
+        req.content().as(PipelineEvents.class).thenAccept(pipelineEvents -> {
+            eventProcessor.process(pipelineEvents.events());
+        }).exceptionally(new ErrorHandler(req));
     }
 
     private void appendOutput(ServerRequest req, ServerResponse res) {
         String pipelineId = req.path().param("pipelineId");
-        String stepIdParam = req.path().param("stepId");
-        if (pipelineId == null || pipelineId.isEmpty() || stepIdParam == null || stepIdParam.isEmpty()) {
-            res.status(Http.Status.BAD_REQUEST_400).send();
-            return;
-        }
-        int stepId;
-        try {
-            stepId = Integer.valueOf(stepIdParam);
-        } catch( NumberFormatException ex) {
-            res.status(400).send();
-            LOGGER.log(Level.WARNING, ex.getMessage(), ex);
-            return;
-        }
-        boolean compressed = req.headers().value(Http.Header.CONTENT_ENCODING).map(hdr -> "gzip".equals(hdr)).orElse(false);
-        appender.append(req.content(), pipelineId + "/step-" + stepId + ".log", compressed).thenAccept((v) -> {
-            res.status(Http.Status.OK_200).send();
-        }).exceptionally((ex) -> {
-            req.next(ex);
-            return null;
-        });
+        int stepId = Integer.valueOf(req.path().param("stepId"));
+        appender.append(req.content(), pipelineId + "/step-" + stepId + ".log", isCompressed(req))
+                .thenAccept(new AsyncResponseHandler(res))
+                .exceptionally(new ErrorHandler(req));
     }
 
     private void uploadFile(ServerRequest req, ServerResponse res) {
         String pipelineId = req.path().param("pipelineId");
         String filepath = req.path().param("filepath");
-        if (pipelineId == null || pipelineId.isEmpty() || filepath == null || filepath.isEmpty()) {
-            res.status(Http.Status.BAD_REQUEST_400).send();
-            return;
+        appender.append(req.content(), pipelineId + "/" + filepath, isCompressed(req))
+                .thenAccept(new AsyncResponseHandler(res))
+                .exceptionally(new ErrorHandler(req));
+    }
+
+    private static boolean isCompressed(ServerRequest request) {
+        return request.headers().value(Http.Header.CONTENT_ENCODING).map(hdr -> "gzip".equals(hdr)).orElse(false);
+    }
+
+    private static final class AsyncResponseHandler implements Consumer<Void> {
+
+        private final ServerResponse response;
+
+        AsyncResponseHandler(ServerResponse response) {
+            this.response = response;
         }
-        boolean compressed = req.headers().value(Http.Header.CONTENT_ENCODING).map(hdr -> "gzip".equals(hdr)).orElse(false);
-        appender.append(req.content(), pipelineId + "/" + filepath, compressed).thenAccept((v) -> {
-            res.status(Http.Status.CREATED_201).send();
-        }).exceptionally((ex) -> {
-            req.next(ex);
+
+        @Override
+        public void accept(Void v) {
+            response.status(Http.Status.OK_200).send();
+        }
+    }
+
+    private static final class ErrorHandler implements Function<Throwable, Void> {
+
+        private final ServerRequest request;
+
+        ErrorHandler(ServerRequest request) {
+            this.request = request;
+        }
+
+        @Override
+        public Void apply(Throwable ex) {
+            if (ex instanceof IllegalStateException
+                    || ex instanceof IllegalArgumentException) {
+                request.next(new BadRequestException(ex.getMessage(), ex));
+                LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+            } else {
+                request.next(ex);
+            }
             return null;
-        });
+        }
     }
 }

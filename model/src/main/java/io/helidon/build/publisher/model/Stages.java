@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A stage node with nested stage nodes.
  */
-@JsonPropertyOrder({"id", "type", "name", "state", "result", "startTime", "endTime", "stages"})
+@JsonPropertyOrder({"id", "type", "name", "state", "result", "startTime", "endTime", "children"})
 public abstract class Stages extends Stage {
 
     final LinkedList<Stage> children = new LinkedList<>();
@@ -19,42 +19,41 @@ public abstract class Stages extends Stage {
      * Create a new non parented stages.
      *
      * @param info pipeline info
-     * @param type the stage type, must not be {@code null}
      * @param status the status object
      * @param timings the timings object
-     * @throws NullPointerException if info, type, status or timings is {@code null}
+     * @throws NullPointerException if info, status or timings is {@code null}
      */
-    protected Stages(PipelineInfo info, StageType type, Status status, Timings timings) {
-        super(info, type, status, timings);
+    protected Stages(PipelineInfo info, Status status, Timings timings) {
+        super(info, status, timings);
     }
 
     /**
      * Create a new stages.
      *
-     * @param type stage type, must not be {@code null}
      * @param parent parent node, must not be {@code null}
      * @param name node name, may be {@code null}
+     * @param path node path
      * @param status the status object
      * @param timings the timings object
-     * @throws NullPointerException if type, parent, status or timings is {@code null}
+     * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stages(StageType type, Node parent, String name, Status status, Timings timings) {
-        super(type, parent, name, status, timings);
+    protected Stages(Node parent, String name, String path, Status status, Timings timings) {
+        super(parent, name, path, status, timings);
     }
 
     /**
      * Create a new stages.
      *
-     * @param type stage type, must not be {@code null}
      * @param id node id, must not be used in the parent graph
      * @param parent parent node, must not be {@code null}
      * @param name node name, may be {@code null}
+     * @param path stage node path
      * @param status the status object
      * @param timings the timings object
-     * @throws NullPointerException if type, parent, status or timings is {@code null}
+     * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stages(StageType type, int id, Node parent, String name, Status status, Timings timings) {
-        super(type, id, parent, name, status, timings);
+    protected Stages(int id, Node parent, String name, String path, Status status, Timings timings) {
+        super(id, parent, name, path, status, timings);
     }
 
     /**
@@ -72,7 +71,7 @@ public abstract class Stages extends Stage {
      * @return immutable list of {@link Stage}
      */
     @JsonProperty
-    public final List<Stage> chidren() {
+    public final List<Stage> children() {
         return Collections.unmodifiableList(children);
     }
 }

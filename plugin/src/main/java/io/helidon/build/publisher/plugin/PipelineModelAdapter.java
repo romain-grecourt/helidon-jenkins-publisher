@@ -8,10 +8,14 @@ import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import io.helidon.build.publisher.model.Parallel;
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.events.PipelineEvents.EventListener;
-import io.helidon.build.publisher.model.PipelineInfo;
+import io.helidon.build.publisher.model.Sequence;
+import io.helidon.build.publisher.model.Stage;
+import io.helidon.build.publisher.model.Stages;
 import io.helidon.build.publisher.model.Status;
+import io.helidon.build.publisher.model.Step;
+import io.helidon.build.publisher.model.Steps;
 import io.helidon.build.publisher.model.Timings;
 
 import org.jenkinsci.plugins.workflow.actions.ArgumentsAction;
@@ -42,59 +46,39 @@ final class PipelineModelAdapter {
 
     private final PipelineSignatures signatures;
     private final LinkedList<StepAtomNode> headNodes = new LinkedList<>();
-    private final Map<String, Pipeline.Step> steps;
-    private final Map<String, Pipeline.Stage> stages;
-    private final PipelineRunInfo runInfo;
-    private final List<EventListener> listeners;
-    private PipelineInfo run;
+    private final Map<String, Step> steps;
+    private final Map<String, Stage> stages;
+    private final Pipeline pipeline;
+    private final String pipelineId;
+    private final boolean excludeSyntheticSteps;
+    private final boolean excludeMetaSteps;
 
     /**
      * Create a new flow graph.
      * @param signatures the signatures used to identify the step node that are declared
-     * @param runInfo run info
-     * @param listener event listener
+     * @param pipeline the pipeline
+     * @param excludeSyntheticSteps {@code true} to exclude synthetic steps
+     * @param excludeMetaSteps {@code true} to exclude meta steps
+     * @throws NullPointerException if signatures or pipeline is {@code null}
      */
-    PipelineModelAdapter(PipelineSignatures signatures, PipelineRunInfo runInfo) {
+    PipelineModelAdapter(PipelineSignatures signatures, Pipeline pipeline, boolean excludeSyntheticSteps, boolean excludeMetaSteps) {
         Objects.requireNonNull(signatures, "signatures is null");
-        Objects.requireNonNull(runInfo, "runInfo is null");
+        Objects.requireNonNull(pipeline, "pipeline is null");
         this.signatures = signatures;
-        this.listeners = new LinkedList<>();
+        this.pipeline = pipeline;
+        this.pipelineId = pipeline.pipelineId();
+        this.excludeSyntheticSteps = excludeSyntheticSteps;
+        this.excludeMetaSteps = excludeMetaSteps;
         this.steps = new HashMap<>();
         this.stages = new HashMap<>();
-        this.runInfo = runInfo;
-        this.run = null;
-    }
-
-    /**
-     * Add a pipeline event listener.
-     * @param listener listener to add
-     * @throws NullPointerException if listener is {@code null}
-     */
-    void addEventListener(EventListener listener) {
-        listeners.add(Objects.requireNonNull(listener, "listener is null"));
     }
 
     /**
      * Get the underlying pipeline.
-     * @return {@code Pipeline} or {@code null} if the run is not yet started
+     * @return Pipeline
      */
     Pipeline pipeline() {
-        if (run != null) {
-            return run.pipeline();
-        }
-        return null;
-    }
-
-    /**
-     * Get the pipeline run.
-     * @return StageSequence
-     * @throw IllegalStateException if the root is not set yet
-     */
-    PipelineInfo run() {
-        if (run == null) {
-            throw new IllegalStateException("Run is not started");
-        }
-        return run;
+        return pipeline;
     }
 
     /**
@@ -102,7 +86,7 @@ final class PipelineModelAdapter {
      * @param id step id
      * @return {@link Step} if found, or {@code null} if not found
      */
-    Pipeline.Step step(String id) {
+    Step step(String id) {
         return steps.get(id);
     }
 
@@ -110,10 +94,10 @@ final class PipelineModelAdapter {
      * Get the next unprocessed and included step at the head.
      * @return Step or {@code null} if there is no "included" and "unprocessed" step at the head
      */
-    Pipeline.Step poll() {
+    Step poll() {
         if (!headNodes.isEmpty()) {
             StepAtomNode node = headNodes.pollLast();
-            Pipeline.Step step = steps.get(node.getId());
+            Step step = steps.get(node.getId());
             if (isStepIncluded(step.declared(), step.meta())) {
                 return step;
             }
@@ -128,50 +112,40 @@ final class PipelineModelAdapter {
      */
     void offer(FlowNode node) {
         Objects.requireNonNull(node, "node is null");
-        if (run == null) {
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
-            }
-            Pipeline pipeline = new Pipeline(runInfo.id, new StatusImpl(node), new TimingsImpl(node));
-            for (EventListener listener : listeners) {
-                pipeline.addEventListener(listener);
-            }
-            run = new PipelineInfo(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash, pipeline);
-            run.fireCreated();
-        } else if ((node instanceof StepAtomNode)) {
+        if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);
             createStep((StepAtomNode)node);
         } else if (node instanceof StepStartNode) {
-            createFlowStage((StepStartNode) node);
+            createStage((StepStartNode) node);
         }
     }
 
     private void createStep(StepAtomNode node) {
-        Pipeline.Stage pstage = findParentStage(node);
-        if (!(pstage instanceof Pipeline.Sequence)) {
+        Stage pstage = findParentStage(node);
+        if (!(pstage instanceof Sequence)) {
             throw new IllegalStateException("Not a sequence stage");
         }
         String name = node.getDisplayFunctionName();
         String stepArgs = ArgumentsAction.getStepArgumentsAsString(node);
         String args = stepArgs != null ? stepArgs : "";
         boolean meta = node.getDescriptor().isMetaStep();
-        String sig = Pipeline.Step.createPath(pstage.path(), name, args);
+        String sig = Step.createPath(pstage.path(), name, args);
         boolean declared = signatures.contains(sig);
-        Pipeline.Steps psteps = getOrCreateSteps((Pipeline.Sequence) pstage);
+        Steps psteps = getOrCreateSteps((Sequence) pstage);
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Creating step, runId={0}, signature={1}", new Object[]{
-                runInfo.id,
+            LOGGER.log(Level.FINE, "Creating step, pipelineId={0}, signature={1}, declared={2}", new Object[]{
+                pipelineId,
                 sig,
+                declared
             });
         }
-        Pipeline.Step step = new Pipeline.Step(psteps, name, truncateStepArgs(args), meta, declared,
-                new StatusImpl(node), new TimingsImpl(node));
+        Step step = new Step(psteps, name, truncateStepArgs(args), meta, declared, new StatusImpl(node), new TimingsImpl(node));
         steps.put(node.getId(), step);
         if (!isStepIncluded(declared, meta)) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Excluding step, runId={0}, signature={1}, stepId={2}, ", new Object[]{
+                LOGGER.log(Level.FINE, "Excluding step, pipelineId={0}, signature={1}, stepId={2}, ", new Object[]{
                     node.getId(),
-                    runInfo.id,
+                    pipelineId,
                     sig
                 });
             }
@@ -182,8 +156,8 @@ final class PipelineModelAdapter {
     }
 
     private boolean isStepIncluded(boolean declared, boolean meta) {
-        return ((runInfo.excludeSyntheticSteps && declared) || (!runInfo.excludeSyntheticSteps && declared))
-                && ((runInfo.excludeMetaSteps && !meta) || (!runInfo.excludeMetaSteps && meta));
+        return ((excludeSyntheticSteps && declared) || (!excludeSyntheticSteps && declared))
+                && ((excludeMetaSteps && !meta) || (!excludeMetaSteps && meta));
     }
 
     private String truncateStepArgs(String args) {
@@ -201,27 +175,27 @@ final class PipelineModelAdapter {
         return "";
     }
 
-    private Pipeline.Steps getOrCreateSteps(Pipeline.Sequence parent) {
+    private Steps getOrCreateSteps(Sequence parent) {
         String parentId = parent.id() + ".";
         for (int i = 1 ;; i++) {
             String stepsStageId = parentId + i;
             if (stages.containsKey(stepsStageId)) {
-                Pipeline.Stage stage = stages.get(stepsStageId);
-                if (!(stage instanceof Pipeline.Steps)) {
+                Stage stage = stages.get(stepsStageId);
+                if (!(stage instanceof Steps)) {
                     throw new IllegalStateException("Not a steps stage");
                 }
-                Pipeline.Steps psteps = (Pipeline.Steps) stage;
+                Steps psteps = (Steps) stage;
                 if (psteps.head()) {
                     return psteps;
                 }
             } else {
                 if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "Creating steps stage, runId={0}, parentId={1}", new Object[]{
-                        runInfo.id,
-                        parent.id()
+                    LOGGER.log(Level.FINE, "Creating steps stage, pipelineId={0}, parentId={1}", new Object[]{
+                        pipelineId,
+                        parentId
                     });
                 }
-                Pipeline.Steps psteps = new Pipeline.Steps(parent, new StatusImpl(), new TimingsImpl());
+                Steps psteps = new Steps(parent, new StatusImpl(), new TimingsImpl());
                 parent.addStage(psteps);
                 stages.put(stepsStageId, psteps);
                 psteps.fireCreated();
@@ -230,93 +204,94 @@ final class PipelineModelAdapter {
         }
     }
 
-    private void createFlowStage(StepStartNode node) {
-        if (node.getAction(LabelAction.class) != null) {
-            Pipeline.Stage pstage = findParentStage(node);
-            if (!(pstage instanceof Pipeline.Stages)) {
-                throw new IllegalStateException("Not a multi stage");
+    private void createStage(StepStartNode node) {
+        if (node.getAction(LabelAction.class) == null) {
+            return;
+        }
+        Stage pstage = findParentStage(node);
+        if (!(pstage instanceof Stages)) {
+            throw new IllegalStateException("Not a multi stage");
+        }
+        Stages pstages = (Stages) pstage;
+        String descId = node.getDescriptor().getId();
+        String name = null;
+        LabelAction action = node.getAction(LabelAction.class);
+        if (action != null) {
+            if (action instanceof ThreadNameAction) {
+                name = ((ThreadNameAction)action).getThreadName();
+            } else {
+                name = action.getDisplayName();
             }
-            Pipeline.Stages pstages = (Pipeline.Stages) pstage;
-            String descId = node.getDescriptor().getId();
-            String name = null;
-            LabelAction action = node.getAction(LabelAction.class);
-            if (action != null) {
-                if (action instanceof ThreadNameAction) {
-                    name = ((ThreadNameAction)action).getThreadName();
-                } else {
-                    name = action.getDisplayName();
-                }
+        }
+        if (STAGE_DESC_ID.equals(descId)) {
+            if (LOGGER.isLoggable(Level.FINE)) {
+                LOGGER.log(Level.FINE, "Creating sequence stage, pipelineId={0}, parentId={1}", new Object[]{
+                    pipelineId,
+                    pstages.id()
+                });
             }
-            if (STAGE_DESC_ID.equals(descId)) {
-                if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "Creating sequence stage, runId={0}, parentId={1}", new Object[]{
-                        runInfo.id,
-                        pstages.id()
-                    });
-                }
-                Pipeline.Stages sequence = new Pipeline.Sequence(pstages, name, new StatusImpl(node), new TimingsImpl(node));
-                pstages.addStage(sequence);
-                stages.put(node.getId(), sequence);
-                sequence.fireCreated();
-            } else if (PARALLEL_DESC_ID.equals(descId) && node.isBody()) {
-                StepStartNode pnode;
-                List<FlowNode> parents = node.getParents();
-                if (!parents.isEmpty()) {
-                    FlowNode parent = parents.get(0);
-                    if (parent instanceof StepStartNode) {
-                        pnode = (StepStartNode) parent;
-                    } else {
-                        throw new IllegalStateException("Invalid parent node");
-                    }
+            Stages sequence = new Sequence(pstages, name, new StatusImpl(node), new TimingsImpl(node));
+            pstages.addStage(sequence);
+            stages.put(node.getId(), sequence);
+            sequence.fireCreated();
+        } else if (PARALLEL_DESC_ID.equals(descId) && node.isBody()) {
+            StepStartNode pnode;
+            List<FlowNode> parents = node.getParents();
+            if (!parents.isEmpty()) {
+                FlowNode parent = parents.get(0);
+                if (parent instanceof StepStartNode) {
+                    pnode = (StepStartNode) parent;
                 } else {
-                    throw new IllegalStateException("Node has no parent");
+                    throw new IllegalStateException("Invalid parent node");
                 }
-                if (PARALLEL_DESC_ID.equals(pnode.getDescriptor().getId()) && !pnode.isBody()) {
-                    Pipeline.Parallel parallel;
-                    String parentId = pnode.getId();
-                    if (stages.containsKey(parentId)) {
-                        Pipeline.Stage ppstage = stages.get(parentId);
-                        if (!(ppstage instanceof Pipeline.Parallel)) {
-                            throw new IllegalStateException("Not a parallel stage");
-                        }
-                        parallel = (Pipeline.Parallel) ppstage;
-                    } else {
-                        if (LOGGER.isLoggable(Level.FINE)) {
-                            LOGGER.log(Level.FINE, "Creating parallel stage, runId={0}, parentId={1}, name={2}", new Object[]{
-                                runInfo.id,
-                                pstages.id(),
-                                name
-                            });
-                        }
-                        parallel = new Pipeline.Parallel(pstages, name, new StatusImpl(pnode), new TimingsImpl(pnode));
-                        pstages.addStage(parallel);
-                        stages.put(parentId, parallel);
-                        parallel.fireCreated();
+            } else {
+                throw new IllegalStateException("Node has no parent");
+            }
+            if (PARALLEL_DESC_ID.equals(pnode.getDescriptor().getId()) && !pnode.isBody()) {
+                Parallel parallel;
+                String parentId = pnode.getId();
+                if (stages.containsKey(parentId)) {
+                    Stage ppstage = stages.get(parentId);
+                    if (!(ppstage instanceof Parallel)) {
+                        throw new IllegalStateException("Not a parallel stage");
                     }
+                    parallel = (Parallel) ppstage;
+                } else {
                     if (LOGGER.isLoggable(Level.FINE)) {
-                        LOGGER.log(Level.FINE, "Creating sequence stage, runId={0}, parentId={1}, name={2}", new Object[]{
-                            runInfo.id,
-                            parallel.id(),
+                        LOGGER.log(Level.FINE, "Creating parallel stage, pipelineId={0}, parentId={1}, name={2}", new Object[]{
+                            pipelineId,
+                            pstages.id(),
                             name
                         });
                     }
-                    Pipeline.Sequence sequence = new Pipeline.Sequence(parallel, name, new StatusImpl(node), new TimingsImpl(node));
-                    parallel.addStage(sequence);
-                    stages.put(node.getId(), sequence);
-                    sequence.fireCreated();
+                    parallel = new Parallel(pstages, name, new StatusImpl(pnode), new TimingsImpl(pnode));
+                    pstages.addStage(parallel);
+                    stages.put(parentId, parallel);
+                    parallel.fireCreated();
                 }
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Creating sequence stage, pipelineId={0}, parentId={1}, name={2}", new Object[]{
+                        pipelineId,
+                        parallel.id(),
+                        name
+                    });
+                }
+                Sequence sequence = new Sequence(parallel, name, new StatusImpl(node), new TimingsImpl(node));
+                parallel.addStage(sequence);
+                stages.put(node.getId(), sequence);
+                sequence.fireCreated();
             }
         }
     }
 
-    private Pipeline.Stage findParentStage(FlowNode node) {
+    private Stage findParentStage(FlowNode node) {
         for (BlockStartNode parent : node.getEnclosingBlocks()) {
-            Pipeline.Stage stage = stages.get(parent.getId());
+            Stage stage = stages.get(parent.getId());
             if (stage != null) {
                 return stage;
             }
         }
-        return run.pipeline().stages();
+        return pipeline;
     }
 
     /**

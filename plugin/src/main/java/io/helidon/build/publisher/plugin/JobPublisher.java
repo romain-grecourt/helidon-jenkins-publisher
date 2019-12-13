@@ -12,8 +12,9 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.Status;
+import io.helidon.build.publisher.model.Step;
+import io.helidon.build.publisher.model.Steps;
 import io.helidon.build.publisher.model.Timings;
 
 import hudson.Extension;
@@ -22,6 +23,7 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
 import hudson.tasks.junit.SuiteResult;
+import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 
 /**
@@ -31,47 +33,52 @@ import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 public final class JobPublisher {
 
     private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
-    private static final PipelineRunInfo EMPTY_PIPELINE_RUNINFO = new PipelineRunInfo();
     private static final JobPublisher EMPTY_PUBLISHER = new JobPublisher(null);
     private static final Map<Run, WeakReference<JobPublisher>> PUBLISHERS = new WeakHashMap<>();
     private static final ArtifactsProcessor.Factory ARTIFACTS_PROCESSOR_FACTORY = new ArtifactsProcessorFactory();
     private static final TestResultSuiteMatcher TEST_RESULT_SUITE_MATCHER = new TestResultSuiteMatcher();
 
-    private final Run<?, ?> run;
-    private final PipelineRunInfo runInfo;
+    private final boolean enabled;
     private final BackendClient client;
-    private final Status status;
-    private final Timings timings;
-    private PipelineInfo pipelineRun;
-    private Pipeline.Steps steps;
-    private Pipeline.Step step;
+    private final Pipeline pipeline;
+    private final String pipelineId;
+    private final Steps steps;
+    private final Step step;
 
     private JobPublisher(Run<?,?> run) {
+        PipelineRunInfo runInfo;
         if (run == null || run instanceof WorkflowRun) {
-            runInfo = EMPTY_PIPELINE_RUNINFO;
+            runInfo = null;
         } else {
             runInfo = new PipelineRunInfo(run);
         }
-        if (runInfo.isEnabled()) {
+        if (runInfo != null && runInfo.id != null) {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Pipeline enabled, runInfo={0}", runInfo);
             }
+            enabled = true;
+            pipelineId = runInfo.id;
             client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
-            status = new StatusImpl(run);
-            timings = new TimingsImpl(run);
-            this.run = run;
+            StatusImpl status = new StatusImpl(run);
+            TimingsImpl timings = new TimingsImpl(run);
+            pipeline = new Pipeline(runInfo.toPipelineInfo(), status, timings);
+            pipeline.addEventListener(client);
+            pipeline.addEventListener(new TestResulProcessor(pipeline, client, run, TEST_RESULT_SUITE_MATCHER));
+            steps = new Steps(pipeline, status, timings);
+            step = new Step(steps, "exec", "", false, true, status, timings);
+            steps.addStep(step);
+            pipeline.addStage(steps);
             ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
         } else {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Pipeline NOT enabled, runInfo={0}, isWorkflowRun={1}", new Object[]{
-                    runInfo,
-                    run instanceof WorkflowRun
-                });
+                LOGGER.log(Level.FINE, "Pipeline NOT enabled, run={0}", run);
             }
+            enabled = false;
+            pipelineId = null;
             client = null;
-            status = null;
-            timings = null;
-            this.run = null;
+            pipeline = null;
+            steps = null;
+            step = null;
         }
     }
 
@@ -79,22 +86,9 @@ public final class JobPublisher {
      * Start the job.
      */
     void start() {
-        if (runInfo.isEnabled()) {
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Creating pipeline, runId={0}", runInfo.id);
-            }
-            final Pipeline pipeline = new Pipeline(runInfo.id, status, timings);
-            pipeline.addEventListener(client);
-            pipeline.addEventListener(new TestResulProcessor(() -> pipelineRun, client, run, TEST_RESULT_SUITE_MATCHER));
-            pipelineRun = new PipelineInfo(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash,
-                    pipeline);
-            pipelineRun.fireCreated();
-            Pipeline.Sequence root = pipeline.stages();
-            steps = new Pipeline.Steps(root, status, timings);
-            root.addStage(steps);
+        if (enabled) {
+            pipeline.fireCreated();
             steps.fireCreated();
-            step = new Pipeline.Step(steps, "exec", "", false, true, status, timings);
-            steps.addStep(step);
             step.fireCreated();
         }
     }
@@ -103,13 +97,13 @@ public final class JobPublisher {
      * Complete the job.
      */
     void complete() {
-        if (runInfo.isEnabled()) {
+        if (enabled) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Completing pipeline, runId={0}", runInfo.id);
+                LOGGER.log(Level.FINE, "Completing pipeline, pipelineId={0}", pipelineId);
             }
             step.fireCompleted();
             steps.fireCompleted();
-            pipelineRun.fireCompleted();
+            pipeline.fireCompleted();
         }
     }
 
@@ -164,14 +158,14 @@ public final class JobPublisher {
 
         @Override
         public OutputStream decorateLogger(Run build, OutputStream outputStream) throws IOException, InterruptedException {
-            if (jobPublisher.runInfo.isEnabled()) {
+            if (jobPublisher.enabled) {
                 if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "Decorating output, runId={0}, step={1}", new Object[]{
-                        jobPublisher.runInfo.id,
+                    LOGGER.log(Level.FINE, "Decorating output, pipelineId={0}, step={1}", new Object[]{
+                        jobPublisher.pipelineId,
                         jobPublisher.step
                     });
                 }
-                return new PipelineOutputStream(outputStream, jobPublisher.runInfo.id, jobPublisher.step, jobPublisher.client);
+                return new PipelineOutputStream(outputStream, jobPublisher.pipelineId, jobPublisher.step, jobPublisher.client);
             }
             return outputStream;
         }
@@ -228,9 +222,9 @@ public final class JobPublisher {
         public ArtifactsProcessor create(Run<?, ?> run) {
             WeakReference<JobPublisher> ref = PUBLISHERS.get(run);
             JobPublisher jobPublisher = ref != null ? ref.get() : null;
-            if (jobPublisher != null && jobPublisher.runInfo.isEnabled()) {
+            if (jobPublisher != null && jobPublisher.enabled) {
                 ArchivedArtifactsStepsProvider stepsProvider = new ArchivedArtifactsStepsProvider(jobPublisher);
-                return new ArtifactsProcessor(run, jobPublisher.client, jobPublisher.runInfo.id, stepsProvider);
+                return new ArtifactsProcessor(run, jobPublisher.client, jobPublisher.pipelineId, stepsProvider);
             }
             return null;
         }
@@ -248,7 +242,7 @@ public final class JobPublisher {
         }
 
         @Override
-        public Pipeline.Steps getSteps() {
+        public Steps getSteps() {
             return jobPublisher.steps;
         }
     }
@@ -259,7 +253,7 @@ public final class JobPublisher {
     private static final class TestResultSuiteMatcher implements TestResulProcessor.SuiteResultMatcher {
 
         @Override
-        public boolean match(SuiteResult suite, Pipeline.Steps steps) {
+        public boolean match(SuiteResult suite, Steps steps) {
             return true;
         }
     }

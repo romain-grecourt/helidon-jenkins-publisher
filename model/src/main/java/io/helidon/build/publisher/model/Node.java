@@ -94,6 +94,14 @@ public abstract class Node {
     }
 
     /**
+     * Get the pipeline id.
+     * @return String
+     */
+    public final String pipelineId() {
+        return info.id;
+    }
+
+    /**
      * Get the unique id.
      *
      * @return String
@@ -232,7 +240,7 @@ public abstract class Node {
     }
 
     @Override
-    public final String toString() {
+    public String toString() {
         return this.getClass().getSimpleName() + " {"
                 + " id=" + id
                 + ", parentId=" + (parent == null ? -1 : parent.id)

@@ -21,14 +21,21 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 
+import io.helidon.build.publisher.model.events.ArtifactDataEvent;
+import io.helidon.build.publisher.model.events.PipelineErrorEvent;
+import io.helidon.build.publisher.model.events.PipelineEvent;
 import io.helidon.build.publisher.model.events.PipelineEvents;
+import io.helidon.build.publisher.model.events.PipelineEventListener;
+import io.helidon.build.publisher.model.events.PipelineEventType;
+import io.helidon.build.publisher.model.events.StepOutputDataEvent;
+import io.helidon.build.publisher.model.events.TestSuiteResultEvent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Publisher client.
  */
-final class BackendClient implements PipelineEvents.EventListener {
+final class BackendClient implements PipelineEventListener {
 
     private static final Logger LOGGER = Logger.getLogger(BackendClient.class.getName());
     private static final Map<String, BackendClient> CLIENTS = new HashMap<>();
@@ -38,7 +45,7 @@ final class BackendClient implements PipelineEvents.EventListener {
     private static final int CONNECT_TIMEOUT = 30 * 1000; // 30s
     private static final int READ_TIMEOUT = 60 * 2 * 1000; // 2min
 
-    private final BlockingQueue<PipelineEvents.Event>[] queues;
+    private final BlockingQueue<PipelineEvent>[] queues;
     private final ExecutorService executor;
     private final String serverUrl;
     private final int nThreads;
@@ -61,6 +68,12 @@ final class BackendClient implements PipelineEvents.EventListener {
             if (client != null) {
                 return client;
             }
+        }
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Creating client, serverUrl={0}, nThreads={1}", new Object[]{
+                serverUrl,
+                nThreads
+            });
         }
         BackendClient client = new BackendClient(serverUrl, nThreads);
         synchronized(CLIENTS) {
@@ -90,10 +103,10 @@ final class BackendClient implements PipelineEvents.EventListener {
     }
 
     @Override
-    public void onEvent(PipelineEvents.Event event) {
-        String runId = event.runId();
-        int queueId = Math.floorMod(runId.hashCode(), nThreads);
-        BlockingQueue<PipelineEvents.Event> queue = queues[queueId];
+    public void onEvent(PipelineEvent event) {
+        String pipelineId = event.pipelineId();
+        int queueId = Math.floorMod(pipelineId.hashCode(), nThreads);
+        BlockingQueue<PipelineEvent> queue = queues[queueId];
         if (queue == null) {
             queue = new LinkedBlockingQueue<>(EVENT_QUEUE_SIZE);
             queues[queueId] = queue;
@@ -112,20 +125,20 @@ final class BackendClient implements PipelineEvents.EventListener {
             });
         }
         if (!queue.offer(event)) {
-            LOGGER.log(Level.WARNING, "Queue is full, dropping pipeline events, serverUrl={0}, queueId={1}, runId={2}",
+            LOGGER.log(Level.WARNING, "Queue is full, dropping pipeline events, serverUrl={0}, queueId={1}, pipelineId={2}",
                     new Object[]{
                         serverUrl,
                         queueId,
-                        runId
+                        pipelineId
                     });
-            Iterator<PipelineEvents.Event> it = queue.iterator();
+            Iterator<PipelineEvent> it = queue.iterator();
             while(it.hasNext()) {
-                PipelineEvents.Event e = it.next();
-                if (e.runId().equals(event.runId())) {
+                PipelineEvent e = it.next();
+                if (e.pipelineId().equals(event.pipelineId())) {
                     it.remove();
                 }
             }
-            queue.add(new PipelineEvents.Error(event.runId(), /* error code */ 1, "event queue is full"));
+            queue.add(new PipelineErrorEvent(event.pipelineId(), /* error code */ 1, "event queue is full"));
         }
     }
 
@@ -136,7 +149,7 @@ final class BackendClient implements PipelineEvents.EventListener {
     private static final class ClientThread implements Runnable {
 
         private static final Logger LOGGER = Logger.getLogger(ClientThread.class.getName());
-        private final BlockingQueue<PipelineEvents.Event> queue;
+        private final BlockingQueue<PipelineEvent> queue;
         private final String serverUrl;
         private final int queueId;
         private final ObjectMapper mapper;
@@ -146,7 +159,7 @@ final class BackendClient implements PipelineEvents.EventListener {
          * @param serverUrl the serverUrl
          * @param queue the queue that this thread processes
          */
-        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvents.Event> queue, ObjectMapper mapper) {
+        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvent> queue, ObjectMapper mapper) {
             Objects.requireNonNull(queue, "queue is null");
             this.queue = queue;
             this.queueId = queueId;
@@ -158,7 +171,7 @@ final class BackendClient implements PipelineEvents.EventListener {
         public void run() {
             while (true) {
                 try {
-                    PipelineEvents.Event event = queue.take();
+                    PipelineEvent event = queue.take();
                     switch (event.eventType()) {
                         case PIPELINE_CREATED:
                         case STEP_CREATED:
@@ -167,18 +180,18 @@ final class BackendClient implements PipelineEvents.EventListener {
                         case STEP_COMPLETED:
                         case STAGE_COMPLETED:
                         case ARTIFACTS_INFO:
-                        case TESTS:
-                        case ERROR:
+                        case TESTS_INFO:
+                        case PIPELINE_ERROR:
                             processEvent(event);
                             break;
-                        case OUTPUT_DATA:
-                            processOutputEvent((PipelineEvents.OutputData) event);
+                        case STEP_OUTPUT_DATA:
+                            processOutputEvent((StepOutputDataEvent) event);
                             break;
                         case ARTIFACT_DATA:
-                            processArtifactEvent((PipelineEvents.ArtifactData) event);
+                            processArtifactEvent((ArtifactDataEvent) event);
                             break;
-                        case TEST_SUITE:
-                            processTestSuiteEvent((PipelineEvents.TestSuite) event);
+                        case TESTSUITE_RESULT:
+                            processTestSuiteEvent((TestSuiteResultEvent) event);
                             break;
                         default:
                             LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -194,16 +207,16 @@ final class BackendClient implements PipelineEvents.EventListener {
          *
          * @param event event
          */
-        private void processEvent(PipelineEvents.Event event) throws IOException {
+        private void processEvent(PipelineEvent event) throws IOException {
             // aggregate event for the same run in the next 100 events in the queue
             // or until an output for that run is found
-            List<PipelineEvents.Event> events = new LinkedList<>();
+            List<PipelineEvent> events = new LinkedList<>();
             events.add(event);
-            Iterator<PipelineEvents.Event> it = queue.iterator();
-            PipelineEvents.Error error = null;
+            Iterator<PipelineEvent> it = queue.iterator();
+            PipelineErrorEvent error = null;
             boolean outputFound = false;
             for (int i = 0; !outputFound && error == null && it.hasNext() && i < AGGREGATE_SIZE; i++) {
-                PipelineEvents.Event e = it.next();
+                PipelineEvent e = it.next();
                 switch (e.eventType()) {
                     case PIPELINE_CREATED:
                     case STEP_CREATED:
@@ -212,18 +225,18 @@ final class BackendClient implements PipelineEvents.EventListener {
                     case STEP_COMPLETED:
                     case STAGE_COMPLETED:
                     case ARTIFACTS_INFO:
-                    case TESTS:
+                    case TESTS_INFO:
                         events.add(e);
                         it.remove();
                         break;
-                    case ERROR:
-                        if (e.runId().equals(event.runId())) {
-                            error = (PipelineEvents.Error) e;
+                    case PIPELINE_ERROR:
+                        if (e.pipelineId().equals(event.pipelineId())) {
+                            error = (PipelineErrorEvent) e;
                         }
                         break;
-                    case OUTPUT_DATA:
+                    case STEP_OUTPUT_DATA:
                     case ARTIFACT_DATA:
-                    case TEST_SUITE:
+                    case TESTSUITE_RESULT:
                         break;
                     default:
                         LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
@@ -266,22 +279,22 @@ final class BackendClient implements PipelineEvents.EventListener {
         }
 
         /**
-         * Process an output event.
-         * @param outputEvent event
+         * Process a step output event.
+         * @param event event to process
          */
-        private void processOutputEvent(PipelineEvents.OutputData outputEvent) throws IOException {
+        private void processOutputEvent(StepOutputDataEvent event) throws IOException {
             URL url = URI.create(serverUrl
                     + "/output/"
-                    + outputEvent.runId()
+                    + event.pipelineId()
                     + "/"
-                    + outputEvent.stepId())
+                    + event.stepId())
                     .toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending output data event, queueId={0}, url={1}, event={2}", new Object[]{
                     queueId,
                     url,
-                    outputEvent
+                    event
                 });
             }
 
@@ -297,17 +310,17 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
             try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream())) {
-                byte[] data = outputEvent.data();
+                byte[] data = event.data();
                 out.write(data, 0, data.length);
                 int len = data.length;
-                Iterator<PipelineEvents.Event> it = queue.iterator();
+                Iterator<PipelineEvent> it = queue.iterator();
                 // aggregate output for the same step in the next 100 events in the queue
                 // or until
                 for (int i = 0; it.hasNext() && i < AGGREGATE_SIZE && len < OUTPUT_THRESHOLD; i++) {
-                    PipelineEvents.Event e = it.next();
-                    if (e.eventType() == PipelineEvents.EventType.OUTPUT
-                            && ((PipelineEvents.OutputData)e).stepId() == outputEvent.stepId()) {
-                        data = ((PipelineEvents.OutputData)e).data();
+                    PipelineEvent e = it.next();
+                    if (e.eventType() == PipelineEventType.STEP_OUTPUT_DATA
+                            && ((StepOutputDataEvent)e).stepId() == event.stepId()) {
+                        data = ((StepOutputDataEvent)e).data();
                         out.write(data, 0, data.length);
                         len += data.length;
                         it.remove();
@@ -321,30 +334,30 @@ final class BackendClient implements PipelineEvents.EventListener {
                         new Object[]{
                             url.toString(),
                             code,
-                            outputEvent
+                            event
                         });
             }
         }
 
         /**
          * Process a test suite event.
-         * @param testSuiteEvent event
+         * @param event event
          */
-        private void processTestSuiteEvent(PipelineEvents.TestSuite testSuiteEvent) throws IOException {
+        private void processTestSuiteEvent(TestSuiteResultEvent event) throws IOException {
             URL url = URI.create(serverUrl
                     + "/files/"
-                    + testSuiteEvent.runId()
+                    + event.pipelineId()
                     + "/"
-                    + testSuiteEvent.stepsId()
+                    + event.stepsId()
                     + "/tests/"
-                    + testSuiteEvent.suite().name() + ".json")
+                    + event.suite().name() + ".json")
                     .toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending test suite event, queueId={0}, url={1}, event={2}", new Object[]{
                     queueId,
                     url,
-                    testSuiteEvent
+                    event
                 });
             }
 
@@ -358,37 +371,37 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.setRequestMethod("POST");
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
-            mapper.writeValue(hcon.getOutputStream(), testSuiteEvent.suite());
+            mapper.writeValue(hcon.getOutputStream(), event.suite());
             int code = hcon.getResponseCode();
             if (201 != code) {
                 LOGGER.log(Level.WARNING, "Invalid response code for test suite event, url={0}, code={1}, step: {1}",
                         new Object[]{
                             url.toString(),
                             code,
-                            testSuiteEvent
+                            event
                         });
             }
         }
 
         /**
          * Process an artifact event.
-         * @param artifactEvent event
+         * @param event event to process
          */
-        private void processArtifactEvent(PipelineEvents.ArtifactData artifactEvent) throws IOException {
+        private void processArtifactEvent(ArtifactDataEvent event) throws IOException {
             URL url = URI.create(serverUrl
                     + "/files/"
-                    + artifactEvent.runId()
+                    + event.pipelineId()
                     + "/"
-                    + artifactEvent.stepsId()
+                    + event.stepsId()
                     + "/artifacts/"
-                    + URLEncoder.encode(artifactEvent.filename(), "UTF-8"))
+                    + URLEncoder.encode(event.filename(), "UTF-8"))
                     .toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending artifact data event, queueId={0}, url={1}, event={2}", new Object[]{
                     queueId,
                     url,
-                    artifactEvent
+                    event
                 });
             }
 
@@ -404,7 +417,7 @@ final class BackendClient implements PipelineEvents.EventListener {
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
             try (GZIPOutputStream out = new  GZIPOutputStream(hcon.getOutputStream());
-                    FileInputStream fis = new FileInputStream(artifactEvent.file())) {
+                    FileInputStream fis = new FileInputStream(event.file())) {
                 byte[] buf = new byte[1024];
                 int nbytes = 0;
                 while (nbytes >= 0) {
@@ -421,7 +434,7 @@ final class BackendClient implements PipelineEvents.EventListener {
                         new Object[]{
                             url.toString(),
                             code,
-                            artifactEvent
+                            event
                         });
             }
         }

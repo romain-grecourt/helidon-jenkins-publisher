@@ -17,11 +17,11 @@ public final class Sequence extends Stages {
      * @throws NullPointerException if status or timings is {@code null}
      */
     public Sequence(Node parent, String name, Status status, Timings timings) {
-        super(StageType.SEQUENCE, parent, name, status, timings);
+        super(parent, name, createPath(parent, name), status, timings);
     }
 
     Sequence(int id, Node parent, String name, Status status, Timings timings) {
-        super(StageType.SEQUENCE, id, parent, name, status, timings);
+        super(id, parent, name, createPath(parent, name), status, timings);
     }
 
     @Override
@@ -35,5 +35,14 @@ public final class Sequence extends Stages {
         status.result = last != null ? last.result() : Status.Result.SUCCESS;
         timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
         fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.endTime));
+    }
+
+    @Override
+    public StageType type() {
+        return StageType.SEQUENCE;
+    }
+
+    private static String createPath(Node parent, String name) {
+        return createPath(parent.path, parent instanceof Parallel, name == null ? "" : name);
     }
 }

@@ -8,35 +8,28 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * {@link PipelineEventType#STEP_CREATED} event.
  */
-@JsonPropertyOrder({"runId", "eventType", "id", "parentId", "index", "name", "startTime", "state", "args", "declared"})
+@JsonPropertyOrder({"pipelineId", "eventType", "id", "parentId", "index", "name", "startTime", "state", "args"})
 public final class StepCreatedEvent extends NodeCreatedEvent {
 
     final String args;
-    final boolean meta;
-    final boolean declared;
 
     /**
      * Create a new {@link PipelineEventType#STEP_CREATED} event.
      *
-     * @param runId run id
+     * @param pipelineId pipeline id
      * @param id node id
      * @param parentId node parent id
      * @param index index in the parent node
      * @param name node name
      * @param startTime start timestamp
      * @param args step arguments
-     * @param meta step meta flag
-     * @param declared step declared flag
      */
-    public StepCreatedEvent(@JsonProperty("runId") String runId, @JsonProperty("id") int id,
+    public StepCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") int id,
             @JsonProperty("parentId") int parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
-            @JsonProperty("startTime") long startTime, @JsonProperty("args") String args,
-            @JsonProperty("meta") boolean meta, @JsonProperty("declared") boolean declared) {
+            @JsonProperty("startTime") long startTime, @JsonProperty("args") String args) {
 
-        super(runId, id, parentId, index, name, startTime);
+        super(pipelineId, id, parentId, index, name, startTime);
         this.args = args;
-        this.meta = meta;
-        this.declared = declared;
     }
 
     @Override
@@ -54,26 +47,6 @@ public final class StepCreatedEvent extends NodeCreatedEvent {
         return args;
     }
 
-    /**
-     * Is the step declared.
-     *
-     * @return {@code boolean}
-     */
-    @JsonProperty
-    public boolean declared() {
-        return declared;
-    }
-
-    /**
-     * Is the step meta.
-     *
-     * @return {@code boolean}
-     */
-    @JsonProperty
-    public boolean meta() {
-        return meta;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -86,12 +59,6 @@ public final class StepCreatedEvent extends NodeCreatedEvent {
             return false;
         }
         final StepCreatedEvent other = (StepCreatedEvent) obj;
-        if (this.meta != other.meta) {
-            return false;
-        }
-        if (this.declared != other.declared) {
-            return false;
-        }
         if (!Objects.equals(this.args, other.args)) {
             return false;
         }
@@ -107,14 +74,12 @@ public final class StepCreatedEvent extends NodeCreatedEvent {
     @Override
     public String toString() {
         return StepCreatedEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + ", id=" + id
                 + ", parentId=" + parentId
                 + ", index=" + index
                 + ", name=" + name
                 + ", args=" + args
-                + ", meta=" + meta
-                + ", declared=" + declared
                 + ", startTime=" + startTime
                 + " }";
     }

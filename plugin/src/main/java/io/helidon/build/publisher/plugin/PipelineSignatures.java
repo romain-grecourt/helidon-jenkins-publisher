@@ -1,17 +1,5 @@
 package io.helidon.build.publisher.plugin;
 
-import com.cloudbees.groovy.cps.Block;
-import com.cloudbees.groovy.cps.Continuation;
-import com.cloudbees.groovy.cps.Envs;
-import com.cloudbees.groovy.cps.impl.CpsCallableInvocation;
-import com.cloudbees.groovy.cps.impl.CpsClosure;
-import com.cloudbees.groovy.cps.impl.SourceLocation;
-import com.cloudbees.groovy.cps.sandbox.DefaultInvoker;
-import groovy.lang.GroovyShell;
-import groovy.lang.Script;
-import hudson.model.Actionable;
-import hudson.model.Queue.Executable;
-import io.helidon.build.publisher.model.Pipeline;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.ref.WeakReference;
@@ -25,6 +13,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
+
+import io.helidon.build.publisher.model.Stage;
+import io.helidon.build.publisher.model.Step;
+
+import com.cloudbees.groovy.cps.Block;
+import com.cloudbees.groovy.cps.Continuation;
+import com.cloudbees.groovy.cps.Envs;
+import com.cloudbees.groovy.cps.impl.CpsCallableInvocation;
+import com.cloudbees.groovy.cps.impl.CpsClosure;
+import com.cloudbees.groovy.cps.impl.SourceLocation;
+import com.cloudbees.groovy.cps.sandbox.DefaultInvoker;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import hudson.model.Actionable;
+import hudson.model.Queue.Executable;
 import org.jenkinsci.plugins.pipeline.modeldefinition.actions.ExecutionModelAction;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTBranch;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTStage;
@@ -127,7 +130,7 @@ final class PipelineSignatures {
         } else if (step.args != null) {
             args = step.args.toString();
         }
-        return Pipeline.Step.createPath(sig, step.method, args);
+        return Step.createPath(sig, step.method, args);
     }
 
     /**
@@ -152,7 +155,7 @@ final class PipelineSignatures {
                         if (arg instanceof ScriptedStepsSequence) {
                             try {
                                 sigs.addAll(createSignatures(((ScriptedStepsSequence) arg).steps,
-                                        Pipeline.Stage.createPath(sig, true, URLEncoder.encode(branchName, "UTF-8"))));
+                                        Stage.createPath(sig, true, URLEncoder.encode(branchName, "UTF-8"))));
                             } catch (UnsupportedEncodingException ex) {
                                 throw new IllegalStateException(ex);
                             }
@@ -163,7 +166,7 @@ final class PipelineSignatures {
                 // leaf
                 sigs.add(createSignature(step, sig));
             } else {
-                String ssig = Pipeline.Stage.createPath(sig, false, step.args.toString());
+                String ssig = Stage.createPath(sig, false, step.args.toString());
                 List<Entry<String, ScriptedStep>> nsteps = new LinkedList<>();
                 for(ScriptedStep nstep : step.nested) {
                     nsteps.add(new AbstractMap.SimpleEntry<>(ssig, nstep));
@@ -177,7 +180,7 @@ final class PipelineSignatures {
                             // leaf
                             sigs.add(createSignature(nstep, nsig));
                         } else {
-                            String nextSig = Pipeline.Stage.createPath(nsig, false, nstep.args.toString());
+                            String nextSig = Stage.createPath(nsig, false, nstep.args.toString());
                             for(ScriptedStep s : nstep.nested) {
                                 next.add(new AbstractMap.SimpleEntry<>(nextSig, s));
                             }
@@ -211,7 +214,7 @@ final class PipelineSignatures {
                 for (Object arg : args.values()) {
                     stepArgs += arg.toString();
                 }
-                sigs.add(Pipeline.Step.createPath(sig, sid, stepArgs));
+                sigs.add(Step.createPath(sig, sid, stepArgs));
             }
         }
         return sigs;
@@ -228,7 +231,7 @@ final class PipelineSignatures {
         List<Entry<String, ModelASTStage>> sstages = new LinkedList<>();
         String sig = "/";
         for(ModelASTStage mstage : mstages) {
-            sstages.add(new AbstractMap.SimpleEntry<>(Pipeline.Stage.createPath(sig, false, mstage.getName()), mstage));
+            sstages.add(new AbstractMap.SimpleEntry<>(Stage.createPath(sig, false, mstage.getName()), mstage));
         }
         while(!sstages.isEmpty()) {
             List<Entry<String, ModelASTStage>> next = new LinkedList<>();
@@ -245,7 +248,7 @@ final class PipelineSignatures {
                 }
                 if (sstage.getStages() != null) {
                     for(ModelASTStage nsstage : sstage.getStages().getStages()) {
-                        String nssig = Pipeline.Stage.createPath(ssig, false, nsstage.getName());
+                        String nssig = Stage.createPath(ssig, false, nsstage.getName());
                         next.add(new AbstractMap.SimpleEntry<>(nssig, nsstage));
                     }
                 }

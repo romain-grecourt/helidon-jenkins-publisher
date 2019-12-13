@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * {@link PipelineEventType#PIPELINE_COMPLETED} event.
  */
-@JsonPropertyOrder({"runId", "eventType", "state", "result", "endTime"})
+@JsonPropertyOrder({"pipelineId", "eventType", "state", "result", "endTime"})
 public final class PipelineCompletedEvent extends PipelineEvent {
 
     final Result result;
@@ -19,14 +19,14 @@ public final class PipelineCompletedEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#PIPELINE_COMPLETED} event.
      *
-     * @param runId runId
+     * @param pipelineId pipelineId
      * @param result pipeline result
      * @param endTime pipeline end timestamp
      */
-    public PipelineCompletedEvent(@JsonProperty("runId") String runId, @JsonProperty("result") Result result,
+    public PipelineCompletedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("result") Result result,
             @JsonProperty("endTime") long endTime) {
 
-        super(runId);
+        super(pipelineId);
         this.result = result;
         this.endTime = endTime;
     }
@@ -59,7 +59,7 @@ public final class PipelineCompletedEvent extends PipelineEvent {
     @Override
     public int hashCode() {
         int hash = 8;
-        hash = 89 * hash + Objects.hashCode(this.runId);
+        hash = 89 * hash + Objects.hashCode(this.pipelineId);
         return hash;
     }
 
@@ -75,13 +75,13 @@ public final class PipelineCompletedEvent extends PipelineEvent {
             return false;
         }
         final PipelineCompletedEvent other = (PipelineCompletedEvent) obj;
-        return Objects.equals(this.runId, other.runId);
+        return Objects.equals(this.pipelineId, other.pipelineId);
     }
 
     @Override
     public String toString() {
         return PipelineCompletedEvent.class.getSimpleName() + "{"
-                + " runId=" + runId
+                + " pipelineId=" + pipelineId
                 + " }";
     }
 }

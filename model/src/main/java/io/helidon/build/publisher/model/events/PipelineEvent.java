@@ -28,25 +28,25 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 })
 public abstract class PipelineEvent {
 
-    final String runId;
+    final String pipelineId;
 
     /**
      * Create a new event.
      *
-     * @param runId run id
+     * @param pipelineId pipeline id
      */
-    PipelineEvent(String runId) {
-        this.runId = runId;
+    PipelineEvent(String pipelineId) {
+        this.pipelineId = pipelineId;
     }
 
     /**
-     * Get the run id.
+     * Get the pipeline id.
      *
      * @return String
      */
     @JsonProperty
-    public final String runId() {
-        return runId;
+    public final String pipelineId() {
+        return pipelineId;
     }
 
     /**

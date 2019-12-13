@@ -1,6 +1,5 @@
 package io.helidon.build.publisher.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Base64;
@@ -17,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A step node.
  */
-@JsonPropertyOrder({"id", "name", "args", "state", "result", "startTime", "endTime", "meta", "declared"})
+@JsonPropertyOrder({"id", "name", "args", "state", "result", "startTime", "endTime"})
 public final class Step extends Node {
 
     final String args;
@@ -43,7 +42,6 @@ public final class Step extends Node {
         this.declared = declared;
     }
 
-    @JsonCreator
     public Step(int id, Steps parent, String name, String args, boolean meta, boolean declared,
             Status status, Timings timings) {
 
@@ -68,7 +66,6 @@ public final class Step extends Node {
      *
      * @return {@code boolean}
      */
-    @JsonProperty
     public boolean meta() {
         return meta;
     }
@@ -78,7 +75,6 @@ public final class Step extends Node {
      *
      * @return {@code boolean}
      */
-    @JsonProperty
     public boolean declared() {
         return declared;
     }
@@ -136,7 +132,7 @@ public final class Step extends Node {
             previous.fireCompleted();
         }
         int parentId = parent == null ? -1 : parent.id;
-        fireEvent(new StepCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, args, meta, declared));
+        fireEvent(new StepCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, args));
     }
 
     @Override
