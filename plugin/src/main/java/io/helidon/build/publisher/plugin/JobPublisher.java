@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineRun;
+import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.Status;
 import io.helidon.build.publisher.model.Timings;
 
@@ -42,7 +42,7 @@ public final class JobPublisher {
     private final BackendClient client;
     private final Status status;
     private final Timings timings;
-    private PipelineRun pipelineRun;
+    private PipelineInfo pipelineRun;
     private Pipeline.Steps steps;
     private Pipeline.Step step;
 
@@ -86,7 +86,7 @@ public final class JobPublisher {
             final Pipeline pipeline = new Pipeline(runInfo.id, status, timings);
             pipeline.addEventListener(client);
             pipeline.addEventListener(new TestResulProcessor(() -> pipelineRun, client, run, TEST_RESULT_SUITE_MATCHER));
-            pipelineRun = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash,
+            pipelineRun = new PipelineInfo(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash,
                     pipeline);
             pipelineRun.fireCreated();
             Pipeline.Sequence root = pipeline.stages();

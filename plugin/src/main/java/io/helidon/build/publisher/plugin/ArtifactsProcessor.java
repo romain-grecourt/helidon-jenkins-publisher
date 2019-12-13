@@ -6,7 +6,7 @@ import hudson.model.BuildListener;
 import hudson.model.Run;
 import hudson.util.FileVisitor;
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.events.PipelineEvents;
 import io.helidon.build.publisher.plugin.config.DelegateArtifactManagerFactory;
 import java.io.File;
 import java.io.IOException;

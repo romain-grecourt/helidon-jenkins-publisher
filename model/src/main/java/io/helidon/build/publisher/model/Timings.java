@@ -1,5 +1,8 @@
 package io.helidon.build.publisher.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Timings.
  */
@@ -30,7 +33,8 @@ public class Timings {
      * @param endTime end timestamp
      * @throws IllegalArgumentException if startTime is not a positive value
      */
-    public Timings(long startTime, long endTime) {
+    @JsonCreator
+    public Timings(@JsonProperty("startTime") long startTime, @JsonProperty("endTime") long endTime) {
         this(startTime);
         this.endTime = endTime;
     }
@@ -39,8 +43,14 @@ public class Timings {
      * Get the start timestamp.
      * @return long
      */
+    @JsonProperty
     public final long startTime() {
         return startTime;
+    }
+
+    @JsonProperty
+    public final long endTime() {
+        return endTime;
     }
 
     /**

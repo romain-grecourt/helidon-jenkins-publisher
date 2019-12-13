@@ -7,8 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
-import io.helidon.build.publisher.model.PipelineRun;
+import io.helidon.build.publisher.model.events.PipelineEvents;
+import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.TestSuiteResult;
 import io.helidon.build.publisher.model.TestsInfo;
 
@@ -22,16 +22,16 @@ import hudson.tasks.junit.TestResultAction;
  */
 final class TestResulProcessor implements PipelineEvents.EventListener {
 
-    private final Supplier<PipelineRun> pipelineRunSupplier;
+    private final Supplier<PipelineInfo> pipelineRunSupplier;
     private final BackendClient client;
     private final Actionable actionnable;
     private final Set<SuiteResult> processedSuites;
     private final SuiteResultMatcher matcher;
-    private PipelineRun pipelineRun;
+    private PipelineInfo pipelineRun;
     private Pipeline pipeline;
     private TestResultAction tra;
 
-    TestResulProcessor(Supplier<PipelineRun> pipelineSupplier, BackendClient client, Actionable actionnable,
+    TestResulProcessor(Supplier<PipelineInfo> pipelineSupplier, BackendClient client, Actionable actionnable,
             SuiteResultMatcher matcher) {
 
         this.pipelineRunSupplier = Objects.requireNonNull(pipelineSupplier, "pipelineSupplier is null");

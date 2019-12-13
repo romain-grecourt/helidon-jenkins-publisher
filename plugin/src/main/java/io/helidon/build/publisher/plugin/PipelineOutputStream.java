@@ -3,7 +3,7 @@ package io.helidon.build.publisher.plugin;
 import hudson.console.ConsoleNote;
 import hudson.console.LineTransformationOutputStream;
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.events.PipelineEvents;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;

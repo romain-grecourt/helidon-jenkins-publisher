@@ -9,8 +9,8 @@ import java.nio.file.Path;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.helidon.build.publisher.model.PipelineEvents;
-import io.helidon.build.publisher.model.PipelineRun;
+import io.helidon.build.publisher.model.events.PipelineEvents;
+import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.common.http.Http;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
@@ -18,6 +18,7 @@ import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.helidon.build.publisher.model.events.PipelineEvent;
 
 /**
  * This service implements the endpoints used by the Jenkins plugin.
@@ -60,9 +61,9 @@ final class BackendService implements Service {
     private void processEvents(ServerRequest req, ServerResponse res) {
         req.content().as(PipelineEvents.class).thenAccept(pevents -> {
             try {
-                PipelineRun pipelineRun = null;
-                List<PipelineEvents.Event> events = new LinkedList<>();
-                for (PipelineEvents.Event event : pevents.events()) {
+                PipelineInfo pipelineRun = null;
+                List<PipelineEvent> events = new LinkedList<>();
+                for (PipelineEvent event : pevents.events()) {
                     if (pipelineRun == null || !pipelineRun.id().equals(event.runId())) {
                         if (pipelineRun != null) {
                             Path filePath = storagePath.resolve(pipelineRun.id() + PIPELINE_DESC);
@@ -74,7 +75,7 @@ final class BackendService implements Service {
                         Path filePath = storagePath.resolve(path);
                         if (!Files.exists(filePath)) {
                             if (event.eventType() == PipelineEvents.EventType.PIPELINE_CREATED) {
-                                pipelineRun = new PipelineRun((PipelineEvents.PipelineCreated) event);
+                                pipelineRun = new PipelineInfo((PipelineEvents.PipelineCreated) event);
                                 Files.createDirectories(filePath.getParent());
                                 continue;
                             } else {
@@ -86,7 +87,7 @@ final class BackendService implements Service {
                             if (LOGGER.isLoggable(Level.FINEST)) {
                                 LOGGER.log(Level.FINEST, "Reading pipeline descriptor: {0}", path);
                             }
-                            pipelineRun = mapper.readValue(Files.newInputStream(filePath), PipelineRun.class);
+                            pipelineRun = mapper.readValue(Files.newInputStream(filePath), PipelineInfo.class);
                         }
                     }
                     events.add(event);

@@ -9,8 +9,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents.EventListener;
-import io.helidon.build.publisher.model.PipelineRun;
+import io.helidon.build.publisher.model.events.PipelineEvents.EventListener;
+import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.Status;
 import io.helidon.build.publisher.model.Timings;
 
@@ -46,7 +46,7 @@ final class PipelineModelAdapter {
     private final Map<String, Pipeline.Stage> stages;
     private final PipelineRunInfo runInfo;
     private final List<EventListener> listeners;
-    private PipelineRun run;
+    private PipelineInfo run;
 
     /**
      * Create a new flow graph.
@@ -90,7 +90,7 @@ final class PipelineModelAdapter {
      * @return StageSequence
      * @throw IllegalStateException if the root is not set yet
      */
-    PipelineRun run() {
+    PipelineInfo run() {
         if (run == null) {
             throw new IllegalStateException("Run is not started");
         }
@@ -136,7 +136,7 @@ final class PipelineModelAdapter {
             for (EventListener listener : listeners) {
                 pipeline.addEventListener(listener);
             }
-            run = new PipelineRun(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash, pipeline);
+            run = new PipelineInfo(runInfo.id, runInfo.jobName, runInfo.repositoryUrl, runInfo.scmHead, runInfo.scmHash, pipeline);
             run.fireCreated();
         } else if ((node instanceof StepAtomNode)) {
             headNodes.addFirst((StepAtomNode) node);

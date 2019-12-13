@@ -10,7 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.events.PipelineEvents;
 import io.helidon.build.publisher.model.Status;
 
 import hudson.Extension;

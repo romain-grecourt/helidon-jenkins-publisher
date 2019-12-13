@@ -21,7 +21,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 
-import io.helidon.build.publisher.model.PipelineEvents;
+import io.helidon.build.publisher.model.events.PipelineEvents;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
