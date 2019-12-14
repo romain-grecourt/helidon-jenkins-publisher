@@ -13,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({"pipelineId", "eventType", "stageId"})
 public final class TestsInfoEvent extends PipelineEvent {
 
-    final int stepsId;
+    final String stepsId;
     final TestsInfo info;
 
     /**
@@ -23,7 +23,7 @@ public final class TestsInfoEvent extends PipelineEvent {
      * @param stepsId the corresponding steps stage id
      * @param info the tests info
      */
-    public TestsInfoEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepsId") int stepsId,
+    public TestsInfoEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepsId") String stepsId,
             @JsonProperty("info") TestsInfo info) {
 
         super(pipelineId);
@@ -37,7 +37,7 @@ public final class TestsInfoEvent extends PipelineEvent {
      * @return String
      */
     @JsonProperty
-    public int stepsId() {
+    public String stepsId() {
         return stepsId;
     }
 
@@ -53,9 +53,9 @@ public final class TestsInfoEvent extends PipelineEvent {
 
     @Override
     public int hashCode() {
-        int hash = 3;
-        hash = 97 * hash + this.stepsId;
-        hash = 97 * hash + Objects.hashCode(this.info);
+        int hash = 7;
+        hash = 79 * hash + Objects.hashCode(this.stepsId);
+        hash = 79 * hash + Objects.hashCode(this.info);
         return hash;
     }
 
@@ -71,7 +71,7 @@ public final class TestsInfoEvent extends PipelineEvent {
             return false;
         }
         final TestsInfoEvent other = (TestsInfoEvent) obj;
-        if (this.stepsId != other.stepsId) {
+        if (!Objects.equals(this.stepsId, other.stepsId)) {
             return false;
         }
         return Objects.equals(this.info, other.info);

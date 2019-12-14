@@ -9,9 +9,12 @@ import java.nio.file.StandardOpenOption;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
@@ -29,8 +32,8 @@ final class FileAppender {
     private static final Logger LOGGER = Logger.getLogger(FileAppender.class.getName());
     private static final int QUEUE_SIZE = 1024; // max number of append action in the queue
 
-    private final ExecutorService appenderExecutors;
-    private final BlockingQueue<AppendAction>[] appendActionQueues;
+    private final ExecutorService executors;
+    private final BlockingQueue<WorkItem>[] workQueues;
     private final Path storagePath;
 
     /**
@@ -40,42 +43,68 @@ final class FileAppender {
      */
     FileAppender(Path storagePath, int nthreads) {
         this.storagePath = storagePath;
-        this.appenderExecutors = Executors.newFixedThreadPool(nthreads);
-        this.appendActionQueues = new BlockingQueue[nthreads];
+        this.executors = Executors.newFixedThreadPool(nthreads);
+        this.workQueues = new BlockingQueue[nthreads];
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Creating file appender, storagePath={0}, nThreads={1}", new Object[]{
+                storagePath,
+                nthreads
+            });
+        }
     }
 
     /**
      * Append the data of a publisher to a file in the storage at the given path.
-     * @param payload the data
+     * @param chunks the data
      * @param paththe file path
      * @param compressed true if the payload is {@code gzip} compressed
      * @return a future that completes normally when the data is appended or exceptionally if an error occurred
      */
-    CompletionStage<Void> append(Publisher<DataChunk> payload, String path, boolean compressed) {
-        int queueId = Math.floorMod(path.hashCode(), appendActionQueues.length);
-        BlockingQueue<AppendAction> queue = appendActionQueues[queueId];
+    CompletionStage<Void> append(Publisher<DataChunk> chunks, String path, boolean compressed) {
+        int queueId = Math.floorMod(path.hashCode(), workQueues.length);
+        BlockingQueue<WorkItem> queue = workQueues[queueId];
         if (queue == null) {
             queue = new LinkedBlockingQueue<>(QUEUE_SIZE);
-            appendActionQueues[queueId] = queue;
+            workQueues[queueId] = queue;
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "creating appender thread for queueId: #{0}", queueId);
             }
-            appenderExecutors.submit(new AppenderThread(queue));
-        }
-        if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Adding append action ({0}) to queue: #{1}", new Object[] {
-                path,
-                queueId
-            });
+            executors.submit(new AppenderThread(queue, queueId));
         }
         CompletableFuture<Void> future = new CompletableFuture<>();
-        AppendAction action = new AppendAction(payload, outputStream(path), compressed, future);
-        if (!queue.offer(action)) {
-            LOGGER.log(Level.WARNING, "Queue #{0} is full, dropping all append actions ({1})", new Object[]{
+        WorkItem workItem = new WorkItem(chunks, path, compressed, future);
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Adding work item to queue, queueId={0}, queueSize={1}, workItem={2}",
+                    new Object[]{
+                        queueId,
+                        queue.size(),
+                        workItem
+                    });
+        }
+        if (!queue.offer(workItem)) {
+            LOGGER.log(Level.WARNING, "Queue full, draining work item, queueId={0}, workItem={1}", new Object[]{
                 queueId,
-                path
+                workItem
             });
-            action.drain();
+            chunks.subscribe(new Subscriber<DataChunk>() {
+                @Override
+                public void onSubscribe(Subscription subscription) {
+                    subscription.request(Long.MAX_VALUE);
+                }
+
+                @Override
+                public void onNext(DataChunk item) {
+                    item.release();
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                }
+
+                @Override
+                public void onComplete() {
+                }
+            });
             future.completeExceptionally(new IllegalStateException("queue is full"));
         }
         return future;
@@ -85,6 +114,9 @@ final class FileAppender {
         Path filePath = storagePath.resolve(path);
         try {
             if (!Files.exists(filePath.getParent())) {
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Creating directory: {0}", filePath.getParent());
+                }
                 Files.createDirectories(filePath.getParent());
             }
             if (!Files.exists(filePath)) {
@@ -101,41 +133,69 @@ final class FileAppender {
 
     private final class AppenderThread implements Runnable {
 
-        private final BlockingQueue<AppendAction> queue;
+        private final BlockingQueue<WorkItem> queue;
+        private final int queueId;
 
-        AppenderThread(BlockingQueue<AppendAction> queue) {
+        AppenderThread(BlockingQueue<WorkItem> queue, int queueId) {
             this.queue = queue;
+            this.queueId = queueId;
         }
 
         @Override
         public void run() {
             while (true) {
                 try {
-                    queue.take().execute();
+                    WorkItem workItem = queue.take();
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.log(Level.FINE, "New work item processing, queueId={0}, workItem={1}", new Object[]{
+                            queueId,
+                            workItem
+                        });
+                    }
+                    Appender appender = new Appender(outputStream(workItem.path), workItem.compressed, workItem.future);
+                    workItem.chunks.subscribe(appender);
+                    workItem.future.get(2, TimeUnit.MINUTES);
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.log(Level.FINE, "End of work item processing, queueId={0}, workItem={1}", new Object[]{
+                            queueId,
+                            workItem
+                        });
+                    }
                 } catch (InterruptedException ex) {
-                    LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-                }
+                    LOGGER.log(Level.WARNING, "Appender thread interupted, queueId={0}", queueId);
+                } catch (TimeoutException ex) {
+                    LOGGER.log(Level.WARNING, "Append timeout, queueId={0}", queueId);
+                } catch (ExecutionException ex) {
+                    LOGGER.log(Level.WARNING, "Append execution error, queueId=" + queueId, ex);
+                } catch (Throwable ex) {
+                    LOGGER.log(Level.WARNING, "Append unexpected error, queueId=" + queueId, ex);
+                } 
             }
         }
     }
 
-    private final class AppendAction {
+    private final class WorkItem {
 
-        private final Appender appender;
+        private final String path;
+        private final Publisher<DataChunk> chunks;
+        private final boolean compressed;
+        private final CompletableFuture<Void> future;
 
-        AppendAction(Publisher<DataChunk> payload, OutputStream os, boolean compressed, CompletableFuture<Void> future) {
-            appender = new Appender(os, compressed, future);
-            payload.subscribe(appender);
+        WorkItem(Publisher<DataChunk> chunks, String path, boolean compressed, CompletableFuture<Void> future) {
+            this.chunks = chunks;
+            this.path = path;
+            this.compressed = compressed;
+            this.future = future;
         }
 
-        void drain() {
-            appender.drain = true;
-            appender.subscription.request(Long.MAX_VALUE);
+        @Override
+        public String toString() {
+            return WorkItem.class.getSimpleName() + " {"
+                    + " path=" + path
+                    + ", compressed=" + compressed
+                    + " }";
         }
 
-        void execute() {
-            appender.subscription.request(1);
-        }
     }
 
     private static final class Appender implements Subscriber<DataChunk> {
@@ -144,7 +204,6 @@ final class FileAppender {
         private final OutputStream os;
         private final CompletableFuture<Void> future;
         private final boolean compressed;
-        private boolean drain;
 
         Appender(OutputStream os, boolean compressed, CompletableFuture<Void> future) {
             this.os = os;
@@ -155,28 +214,25 @@ final class FileAppender {
         @Override
         public void onSubscribe(Subscription subscription) {
             this.subscription = subscription;
+            subscription.request(Long.MAX_VALUE);
         }
 
         @Override
         public void onNext(DataChunk item) {
             try {
-                if (drain) {
-                    item.release();
+                byte[] data = item.bytes();
+                if (!compressed) {
+                    os.write(data);
                 } else {
-                    byte[] data = item.bytes();
-                    if (!compressed) {
-                        os.write(data);
-                    } else {
-                        GZIPInputStream is = new GZIPInputStream(new ByteArrayInputStream(data));
+                    try (GZIPInputStream is = new GZIPInputStream(new ByteArrayInputStream(data))) {
                         byte[] buf = new byte[1024];
                         int len;
                         while ((len = is.read(buf)) != -1) {
                             os.write(buf, 0, len);
                         }
                     }
-                    item.release();
-                    subscription.request(1);
                 }
+                item.release();
             } catch (IOException ex) {
                 subscription.cancel();
                 future.completeExceptionally(ex);

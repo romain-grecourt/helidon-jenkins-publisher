@@ -49,11 +49,14 @@ public final class PipelineEventProcessor {
      * @throws IllegalStateException if unable to get a pipeline descriptor
      */
     public void process(List<PipelineEvent> allEvents) {
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Processing events: {0}", allEvents);
+        }
         Pipeline pipeline = null;
         List<PipelineEvent> events = new LinkedList<>();
         for (PipelineEvent event : allEvents) {
             String epid = event.pipelineId();
-            if (pipeline == null || !pipeline.info.id.equals(epid)) {
+            if (pipeline == null || !pipeline.pipelineId().equals(epid)) {
                 if (pipeline != null) {
                     process(pipeline, events);
                     manager.save(pipeline);
@@ -62,8 +65,7 @@ public final class PipelineEventProcessor {
                 pipeline = manager.load(epid);
                 if (pipeline == null) {
                     if (event.eventType() == PipelineEventType.PIPELINE_CREATED) {
-                        PipelineCreatedEvent createdEvent = (PipelineCreatedEvent) event;
-                        pipeline = new Pipeline(createdEvent.info(), createdEvent.startTime());
+                        pipeline = new Pipeline((PipelineCreatedEvent) event);
                     } else {
                         throw new IllegalStateException("Unable to get pipeline descriptor, pipelineId=" + epid);
                     }
@@ -119,7 +121,7 @@ public final class PipelineEventProcessor {
         }
     }
 
-    private static Node getNode(Pipeline pipeline, int id) {
+    private static Node getNode(Pipeline pipeline, String id) {
         Node node = pipeline.nodesByIds.get(id);
         if (node == null) {
             throw new IllegalStateException("Unkown node, id=" + id);
@@ -127,7 +129,7 @@ public final class PipelineEventProcessor {
         return node;
     }
 
-    private static Steps getSteps(Pipeline pipeline, int id) {
+    private static Steps getSteps(Pipeline pipeline, String id) {
         Node node = getNode(pipeline, id);
         if (!(node instanceof Steps)) {
             throw new IllegalStateException("Invalid steps node, id=" + id);
@@ -135,7 +137,7 @@ public final class PipelineEventProcessor {
         return (Steps) node;
     }
 
-    private static Stages getStages(Pipeline pipeline, int id) {
+    private static Stages getStages(Pipeline pipeline, String id) {
         Node node = getNode(pipeline, id);
         if (!(node instanceof Stages)) {
             throw new IllegalStateException("Invalid stages node, id=" + id);
@@ -181,13 +183,13 @@ public final class PipelineEventProcessor {
         }
         switch (event.stageType()) {
             case PARALLEL:
-                stages.addStage(new Parallel(event.id(), stages, event.name(), new Status(), new Timings(event.startTime())));
+                stages.addStage(new Parallel(stages, event.id(), event.name(), new Status(), new Timings(event.startTime())));
                 break;
             case SEQUENCE:
-                stages.addStage(new Sequence(event.id(), stages, event.name(), new Status(), new Timings(event.startTime())));
+                stages.addStage(new Sequence(stages, event.id(), event.name(), new Status(), new Timings(event.startTime())));
                 break;
             case STEPS:
-                stages.addStage(new Steps(event.id(), stages, new Status(), new Timings(event.startTime())));
+                stages.addStage(new Steps(stages, event.id(), new Status(), new Timings(event.startTime())));
                 break;
             default:
                 // do nothing

@@ -52,8 +52,8 @@ public abstract class Stages extends Stage {
      * @param timings the timings object
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stages(int id, Node parent, String name, String path, Status status, Timings timings) {
-        super(id, parent, name, path, status, timings);
+    protected Stages(Node parent, String id, String name, String path, Status status, Timings timings) {
+        super(parent, id, name, path, status, timings);
     }
 
     /**

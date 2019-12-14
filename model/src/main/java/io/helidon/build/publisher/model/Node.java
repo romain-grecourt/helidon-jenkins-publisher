@@ -17,10 +17,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public abstract class Node {
 
     final PipelineInfo info;
-    final Map<Integer, Node> nodesByIds;
+    final Map<String, Node> nodesByIds;
     final AtomicInteger nextId;
     final Node parent;
-    final int id;
+    final String id;
     final String name;
     final String path;
     final Status status;
@@ -40,34 +40,37 @@ public abstract class Node {
         this.timings = Objects.requireNonNull(timings, "timings is null");
         this.listeners = new LinkedList<>();
         this.parent = null;
-        this.name = null;
+        this.name = "pipeline";
         this.path = "/";
-        this.id = 0;
+        this.id = "0";
         this.nextId = new AtomicInteger(1);
         this.nodesByIds = new HashMap<>();
+        if (nodesByIds.containsKey(id)) {
+            throw new IllegalArgumentException("Id already used, id=" + id);
+        }
         this.nodesByIds.put(id, this);
     }
 
     /**
      * Create a new parented node.
-     * @param id node id, must not be used in the parent graph
      * @param parent parent node, must not be {@code null}
+     * @param id node id, must not be used in the parent graph
      * @param name node name, may be {@code null}
      * @param path path, if {@code null}, defaults to the path of the parent
      * @param status the status object
      * @param timings the timings object
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Node(int id, Node parent, String name, String path, Status status, Timings timings) {
+    protected Node(Node parent, String id, String name, String path, Status status, Timings timings) {
+        this.parent = Objects.requireNonNull(parent, "parent is null");
         this.status = Objects.requireNonNull(status, "status is null");
         this.timings = Objects.requireNonNull(timings, "timings is null");
-        this.parent = Objects.requireNonNull(parent, "parent is null");
         this.info = parent.info;
         this.listeners = parent.listeners;
         this.nodesByIds = parent.nodesByIds;
         this.nextId = parent.nextId;
-        if (id <= 0) {
-            throw new IllegalArgumentException("Invalid id: " + id);
+        if (id == null || id.isEmpty()) {
+            throw new IllegalArgumentException("Invalid id");
         }
         if (nodesByIds.containsKey(id)) {
             throw new IllegalArgumentException("Id already used, id=" + id);
@@ -90,7 +93,12 @@ public abstract class Node {
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
     protected Node(Node parent, String name, String path, Status status, Timings timings) {
-        this(Objects.requireNonNull(parent, "parent is null").nextId.getAndIncrement(), parent, name, path, status, timings);
+        this(parent, createId(parent), name, path, status, timings);
+    }
+
+    private static String createId(Node parent) {
+        Objects.requireNonNull(parent, "parent is null");
+        return String.valueOf(parent.nextId.getAndIncrement());
     }
 
     /**
@@ -102,13 +110,11 @@ public abstract class Node {
     }
 
     /**
-     * Get the unique id.
-     *
-     * @return String
+     * Get the pipeline info.
+     * @return PipelineInfo
      */
-    @JsonProperty
-    public final int id() {
-        return id;
+    public final PipelineInfo pipelineInfo() {
+        return info;
     }
 
     /**
@@ -118,6 +124,16 @@ public abstract class Node {
      */
     public Node parent() {
         return parent;
+    }
+
+    /**
+     * Get the unique id.
+     *
+     * @return String
+     */
+    @JsonProperty
+    public final String id() {
+        return id;
     }
 
     /**
@@ -240,10 +256,11 @@ public abstract class Node {
     }
 
     @Override
-    public String toString() {
+    public final String toString() {
         return this.getClass().getSimpleName() + " {"
-                + " id=" + id
-                + ", parentId=" + (parent == null ? -1 : parent.id)
+                + " pipelineId=" + info.id
+                + ", id=" + id
+                + parent == null ? "" : (", parentId=" +  parent.id)
                 + " }";
     }
 

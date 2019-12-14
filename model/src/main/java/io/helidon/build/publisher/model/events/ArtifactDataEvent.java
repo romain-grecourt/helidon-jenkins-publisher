@@ -10,7 +10,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
 
     final File file;
     final String filename;
-    final int stepsId;
+    final String stepsId;
 
     /**
      * Create a new {@link PipelineEventType#ARTIFACT_DATA} event.
@@ -20,7 +20,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
      * @param file the artifact file
      * @param filename the artifact relative filename
      */
-    public ArtifactDataEvent(String pipelineId, int stepsId, File file, String filename) {
+    public ArtifactDataEvent(String pipelineId, String stepsId, File file, String filename) {
         super(pipelineId);
         this.stepsId = stepsId;
         this.file = file;
@@ -32,7 +32,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
      *
      * @return String
      */
-    public int stepsId() {
+    public String stepsId() {
         return stepsId;
     }
 
@@ -64,7 +64,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
         int hash = 3;
         hash = 97 * hash + Objects.hashCode(this.file);
         hash = 97 * hash + Objects.hashCode(this.filename);
-        hash = 97 * hash + this.stepsId;
+        hash = 97 * hash + Objects.hashCode(this.stepsId);
         return hash;
     }
 
@@ -80,7 +80,7 @@ public final class ArtifactDataEvent extends PipelineEvent {
             return false;
         }
         final ArtifactDataEvent other = (ArtifactDataEvent) obj;
-        if (this.stepsId != other.stepsId) {
+        if (!Objects.equals(this.stepsId, other.stepsId)) {
             return false;
         }
         if (!Objects.equals(this.filename, other.filename)) {

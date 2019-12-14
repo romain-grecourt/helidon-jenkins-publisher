@@ -8,8 +8,8 @@ import java.util.Objects;
  */
 public abstract class NodeCreatedEvent extends PipelineEvent {
 
-    final int id;
-    final int parentId;
+    final String id;
+    final String parentId;
     final int index;
     final String name;
     final long startTime;
@@ -24,7 +24,7 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
      * @param name node name, may be {@code null}
      * @param startTime start timestamp
      */
-    NodeCreatedEvent(String pipelineId, int id, int parentId, int index, String name, long startTime) {
+    NodeCreatedEvent(String pipelineId, String id, String parentId, int index, String name, long startTime) {
         super(pipelineId);
         this.id = id;
         this.parentId = parentId;
@@ -39,7 +39,7 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
      * @return int
      */
     @JsonProperty
-    public final int id() {
+    public final String id() {
         return id;
     }
 
@@ -49,7 +49,7 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
      * @return int
      */
     @JsonProperty
-    public final int parentId() {
+    public final String parentId() {
         return parentId;
     }
 
@@ -86,7 +86,9 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
     @Override
     public int hashCode() {
         int hash = 3;
-        hash = 59 * hash + this.id;
+        hash = 83 * hash + Objects.hashCode(this.pipelineId);
+        hash = 83 * hash + Objects.hashCode(this.id);
+        hash = 83 * hash + Objects.hashCode(eventType());
         return hash;
     }
 
@@ -105,18 +107,7 @@ public abstract class NodeCreatedEvent extends PipelineEvent {
         if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
-        if (this.id != other.id) {
-            return false;
-        }
-        if (this.parentId != other.parentId) {
-            return false;
-        }
-        if (this.index != other.index) {
-            return false;
-        }
-        if (this.startTime != other.startTime) {
-            return false;
-        }
-        return Objects.equals(this.name, other.name);
+        return Objects.equals(this.id, other.id);
     }
+
 }

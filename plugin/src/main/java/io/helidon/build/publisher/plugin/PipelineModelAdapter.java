@@ -40,7 +40,7 @@ import org.jenkinsci.plugins.workflow.support.steps.StageStep;
  */
 final class PipelineModelAdapter {
 
-    private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(PipelineModelAdapter.class.getName());
     private static final String STAGE_DESC_ID = StageStep.class.getName();
     private static final String PARALLEL_DESC_ID = ParallelStep.class.getName();
 

@@ -23,8 +23,8 @@ public final class PipelineSerializer extends StdSerializer<Pipeline> {
         gen.writeStartObject();
         gen.writeFieldName("id");
         gen.writeString(pipeline.info.id);
-        gen.writeFieldName("title");
-        gen.writeString(pipeline.info.title);
+        gen.writeFieldName("name");
+        gen.writeString(pipeline.info.name);
         gen.writeFieldName("repositoryUrl");
         gen.writeString(pipeline.info.repositoryUrl);
         gen.writeFieldName("scmHead");

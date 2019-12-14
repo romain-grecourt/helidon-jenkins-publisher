@@ -49,8 +49,8 @@ public abstract class Stage extends Node {
      * @param timings the timings object
      * @throws NullPointerException if parent, status or timings is {@code null}
      */
-    protected Stage(int id, Node parent, String name, String path, Status status, Timings timings) {
-        super(id, parent, name, path, status, timings);
+    protected Stage(Node parent, String id, String name, String path, Status status, Timings timings) {
+        super(parent, id, name, path, status, timings);
     }
 
     /**
@@ -142,7 +142,7 @@ public abstract class Stage extends Node {
         if (previous != null) {
             previous.fireCompleted();
         }
-        int parentId = parent == null ? -1 : parent.id;
+        String parentId = parent == null ? "" : parent.id;
         fireEvent(new StageCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, type()));
     }
 }

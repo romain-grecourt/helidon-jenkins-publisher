@@ -32,8 +32,8 @@ public final class Steps extends Stage {
         super(parent, null, null, status, timings);
     }
 
-    Steps(int id, Node parent, Status status, Timings timings) {
-        super(id, parent, null, null, status, timings);
+    Steps( Node parent, String id, Status status, Timings timings) {
+        super(parent, id, null, null, status, timings);
     }
 
     @JsonIgnore // steps is synthetic, it doesn't have a name

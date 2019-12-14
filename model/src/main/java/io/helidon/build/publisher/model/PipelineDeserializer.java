@@ -40,7 +40,7 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
     @Override
     public Pipeline deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
         JsonNode node = jp.getCodec().readTree(jp);
-        PipelineInfo info = readPipelineInfo(node);
+        PipelineInfo info = PipelineInfoDeserializer.readPipelineInfo(node);
         Pipeline pipeline = new Pipeline(info, readStatus(node), readTimings(node));
 
         // depth first traversal
@@ -51,7 +51,7 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
         Node parent = pipeline;
         while (!stack.isEmpty()) {
             JsonNode stageNode = stack.peek();
-            int stageId = stageNode.get("id").asInt(-1);
+            String stageId = stageNode.get("id").asText();
             StageType stageType = StageType.valueOf(stageNode.get("type").asText());
             if (stageType == StageType.STEPS) {
                 // tree leaf
@@ -62,7 +62,7 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
                 stack.pop();
             } else {
                 // tree node
-                if (parent.id == stageId) {
+                if (stageId.equals(parent.id)) {
                     // leaving a node (2nd pass)
                     parent = parent.parent;
                     stack.pop();
@@ -100,18 +100,13 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
         return pipeline;
     }
 
-    private static PipelineInfo readPipelineInfo(JsonNode node) {
-        return new PipelineInfo(node.get("id").asText(null), node.get("repositoryUrl").asText(null),
-                node.get("title").asText(null), node.get("scmHead").asText(null), node.get("scmHash").asText(null));
-    }
-
     private static Step readStep(JsonNode node, Steps parent) {
-        return new Step(node.get("id").asInt(), parent, node.get("name").asText(), node.get("args").asText(), /* meta */ false,
+        return new Step(node.get("id").asText(), parent, node.get("name").asText(), node.get("args").asText(), /* meta */ false,
                 /* declared */ true, readStatus(node), readTimings(node));
     }
 
-    private static Steps readSteps(JsonNode node, int id, Stages parent) {
-        Steps steps = new Steps(id, parent, readStatus(node), readTimings(node));
+    private static Steps readSteps(JsonNode node, String id, Stages parent) {
+        Steps steps = new Steps(parent, id, readStatus(node), readTimings(node));
         steps.artifacts = node.get("artifacts").asInt(0);
         if (node.hasNonNull("tests")) {
             steps.tests = readTestsInfo(node.get("tests"));
@@ -125,15 +120,15 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
                 node.get("skipped").asInt(0));
     }
 
-    private static Sequence readSequence(JsonNode node, int id, Stages parent) {
-        Sequence sequence = new Sequence(id, parent, node.get("name").asText(), readStatus(node), readTimings(node));
+    private static Sequence readSequence(JsonNode node, String id, Stages parent) {
+        Sequence sequence = new Sequence(parent, id, node.get("name").asText(), readStatus(node), readTimings(node));
         parent.addStage(sequence);
         return sequence;
     }
 
-    private static Parallel readParallel(JsonNode node, int id, Stages parent) {
-        Parallel parallel = new Parallel(id, parent, node.get("name").asText(), readStatus(node), readTimings(node));
-        parent.addStage(parent);
+    private static Parallel readParallel(JsonNode node, String id, Stages parent) {
+        Parallel parallel = new Parallel(parent, id, node.get("name").asText(), readStatus(node), readTimings(node));
+        parent.addStage(parallel);
         return parallel;
     }
 

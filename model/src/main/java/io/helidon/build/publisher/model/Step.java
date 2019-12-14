@@ -42,10 +42,10 @@ public final class Step extends Node {
         this.declared = declared;
     }
 
-    public Step(int id, Steps parent, String name, String args, boolean meta, boolean declared,
+    public Step(String id, Steps parent, String name, String args, boolean meta, boolean declared,
             Status status, Timings timings) {
 
-        super(id, parent, name, createPath(parent, name, args), status, timings);
+        super(parent, id, name, createPath(parent, name, args), status, timings);
         this.args = args != null ? args : "";
         this.meta = meta;
         this.declared = declared;
@@ -131,8 +131,8 @@ public final class Step extends Node {
         if (previous != null) {
             previous.fireCompleted();
         }
-        int parentId = parent == null ? -1 : parent.id;
-        fireEvent(new StepCreatedEvent(info.id, id, parentId, index(), name, timings.startTime, args));
+        fireEvent(new StepCreatedEvent(info.id, id, Objects.requireNonNull(parent, "parent is null!").id, index(), name,
+                timings.startTime, args));
     }
 
     @Override

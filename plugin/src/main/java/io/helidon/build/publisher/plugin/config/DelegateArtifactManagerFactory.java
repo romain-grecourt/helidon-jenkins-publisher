@@ -1,8 +1,9 @@
 package io.helidon.build.publisher.plugin.config;
 
-import hudson.model.Run;
 import java.util.HashSet;
 import java.util.Set;
+
+import hudson.model.Run;
 import jenkins.model.ArtifactManager;
 import jenkins.model.ArtifactManagerConfiguration;
 import jenkins.model.ArtifactManagerFactory;
@@ -27,7 +28,6 @@ public final class DelegateArtifactManagerFactory extends ArtifactManagerFactory
                 // found a deserialized instance
                 // set it as the singleton instance
                 INSTANCE = (DelegateArtifactManagerFactory) factory;
-                INSTANCE.delegates = new HashSet<>();
                 return INSTANCE;
             }
         }
@@ -40,22 +40,27 @@ public final class DelegateArtifactManagerFactory extends ArtifactManagerFactory
     /**
      * The field transient to avoid serializing the delegates, and non final as it is set to {@code null} when de-serialized.
      */
-    private transient Set<ArtifactManagerFactory> delegates = new HashSet<>();
+    private transient Set<ArtifactManagerFactory> delegates;
 
     /**
      * Register an {@link ArtifactManagerFactory} delegate.
      * @param delegate the manager to register
      */
     public synchronized void register(ArtifactManagerFactory delegate) {
-        this.delegates.add(delegate);
+        if (delegates == null) {
+            delegates = new HashSet<>();
+        }
+        delegates.add(delegate);
     }
 
     @Override
     public ArtifactManager managerFor(Run<?, ?> run) {
-        for (ArtifactManagerFactory delegate : delegates){
-            ArtifactManager manager = delegate.managerFor(run);
-            if (manager != null) {
-                return manager;
+        if (delegates != null) {
+            for (ArtifactManagerFactory delegate : delegates){
+                ArtifactManager manager = delegate.managerFor(run);
+                if (manager != null) {
+                    return manager;
+                }
             }
         }
         return null;

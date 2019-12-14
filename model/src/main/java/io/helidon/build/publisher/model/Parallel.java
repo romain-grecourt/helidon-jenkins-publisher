@@ -22,8 +22,8 @@ public final class Parallel extends Stages {
         super(parent, name, Objects.requireNonNull(parent, "parent is null!").path, status, timings);
     }
 
-    Parallel(int id, Node parent, String name, Status status, Timings timings) {
-        super(id, parent, name, Objects.requireNonNull(parent, "parent is null!").path, status, timings);
+    Parallel(Node parent, String id, String name, Status status, Timings timings) {
+        super(parent, id, name, Objects.requireNonNull(parent, "parent is null!").path, status, timings);
     }
 
     @Override

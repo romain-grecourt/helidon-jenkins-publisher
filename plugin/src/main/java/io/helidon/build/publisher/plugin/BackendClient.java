@@ -3,6 +3,7 @@ package io.helidon.build.publisher.plugin;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
@@ -119,10 +120,13 @@ final class BackendClient implements PipelineEventListener {
             executor.submit(new ClientThread(serverUrl, queueId, queue, mapper));
         }
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Adding event to queue, serverUrl={0}, queueId={1}", new Object[]{
-                serverUrl,
-                queueId
-            });
+            LOGGER.log(Level.FINE, "Adding event to queue, serverUrl={0}, queueId={1}, queueSize={2}, event={3}",
+                    new Object[]{
+                        serverUrl,
+                        queueId,
+                        queue.size(),
+                        event
+                    });
         }
         if (!queue.offer(event)) {
             LOGGER.log(Level.WARNING, "Queue is full, dropping pipeline events, serverUrl={0}, queueId={1}, pipelineId={2}",
@@ -170,8 +174,15 @@ final class BackendClient implements PipelineEventListener {
         @Override
         public void run() {
             while (true) {
+                PipelineEvent event = null;
                 try {
-                    PipelineEvent event = queue.take();
+                    event = queue.take();
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.log(Level.FINE, "New event processing, queueId={0}, event={1}", new Object[]{
+                            queueId,
+                            event
+                        });
+                    }
                     switch (event.eventType()) {
                         case PIPELINE_CREATED:
                         case STEP_CREATED:
@@ -196,8 +207,26 @@ final class BackendClient implements PipelineEventListener {
                         default:
                             LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
                     }
+                    if (LOGGER.isLoggable(Level.FINE)) {
+                        LOGGER.log(Level.FINE, "End of event processing, queueId={0, event={1}", new Object[]{
+                            queueId,
+                            event
+                        });
+                    }
+                } catch (InterruptedException ex) {
+                    LOGGER.log(Level.WARNING, "Client thread interupted, queueId={0}, event={1}", new Object[]{
+                        queueId,
+                        event
+                    });
+                } catch (SocketTimeoutException ex) {
+                    LOGGER.log(Level.WARNING, "Client request timeout, queueId={0}, event={1}", new Object[]{
+                        queueId,
+                        event
+                    });
+                } catch (IOException ex) {
+                    LOGGER.log(Level.WARNING, "Client request IO error, queueId=" + queueId + ", event=" + event, ex);
                 } catch (Throwable ex) {
-                    LOGGER.log(Level.WARNING, ex.getMessage(), ex);
+                    LOGGER.log(Level.WARNING, "Client unexpected error, queueId=" + queueId + ", event=" + event, ex);
                 }
             }
         }
@@ -249,8 +278,8 @@ final class BackendClient implements PipelineEventListener {
 
             URL url = URI.create(serverUrl + "/events/").toURL();
 
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Sending events, queueId={0}, url={1}, events={2}", new Object[]{
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "Sending events, queueId={0}, url={1}, events={2}", new Object[]{
                     queueId,
                     url,
                     events
@@ -270,9 +299,10 @@ final class BackendClient implements PipelineEventListener {
             mapper.writeValue(hcon.getOutputStream(), new PipelineEvents(events));
             int code = hcon.getResponseCode();
             if (200 != code) {
-                LOGGER.log(Level.WARNING, "Invalid response code for event, url: {0}, code: {1}",
+                LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}",
                         new Object[]{
-                            url.toString(),
+                            queueId,
+                            url,
                             code
                         });
             }
@@ -319,7 +349,7 @@ final class BackendClient implements PipelineEventListener {
                 for (int i = 0; it.hasNext() && i < AGGREGATE_SIZE && len < OUTPUT_THRESHOLD; i++) {
                     PipelineEvent e = it.next();
                     if (e.eventType() == PipelineEventType.STEP_OUTPUT_DATA
-                            && ((StepOutputDataEvent)e).stepId() == event.stepId()) {
+                            && ((StepOutputDataEvent)e).stepId().equals(event.stepId())) {
                         data = ((StepOutputDataEvent)e).data();
                         out.write(data, 0, data.length);
                         len += data.length;
@@ -330,9 +360,10 @@ final class BackendClient implements PipelineEventListener {
             }
             int code = hcon.getResponseCode();
             if (200 != code) {
-                LOGGER.log(Level.WARNING, "Invalid response code for output data event, url={0}, code={1}, step: {1}",
+                LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}, event={3}",
                         new Object[]{
-                            url.toString(),
+                            queueId,
+                            url,
                             code,
                             event
                         });
@@ -374,9 +405,10 @@ final class BackendClient implements PipelineEventListener {
             mapper.writeValue(hcon.getOutputStream(), event.suite());
             int code = hcon.getResponseCode();
             if (201 != code) {
-                LOGGER.log(Level.WARNING, "Invalid response code for test suite event, url={0}, code={1}, step: {1}",
+                LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}, event={3}",
                         new Object[]{
-                            url.toString(),
+                            queueId,
+                            url,
                             code,
                             event
                         });
@@ -404,7 +436,6 @@ final class BackendClient implements PipelineEventListener {
                     event
                 });
             }
-
             URLConnection con = url.openConnection();
             if (!(con instanceof HttpURLConnection)) {
                 throw new IllegalStateException("Not an HttpURLConnection");
@@ -430,9 +461,10 @@ final class BackendClient implements PipelineEventListener {
             }
             int code = hcon.getResponseCode();
             if (201 != code) {
-                LOGGER.log(Level.WARNING, "Invalid response code for artifact data event, url={0}, code={1}, step: {1}",
+                LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}, event={3}",
                         new Object[]{
-                            url.toString(),
+                            queueId,
+                            url,
                             code,
                             event
                         });

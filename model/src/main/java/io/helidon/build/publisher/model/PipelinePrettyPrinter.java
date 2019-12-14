@@ -31,8 +31,8 @@ public class PipelinePrettyPrinter implements PipelineVisitor {
     }
 
     @Override
-    public void visitStart() {
-        sb.append("pipeline {\n");
+    public void visitStart(Pipeline pipeline) {
+        sb.append(pipeline.name).append(" {\n");
     }
 
     @Override
@@ -74,7 +74,7 @@ public class PipelinePrettyPrinter implements PipelineVisitor {
     }
 
     @Override
-    public void visitEnd() {
+    public void visitEnd(Pipeline pipeline) {
         sb.append("}\n");
     }
 

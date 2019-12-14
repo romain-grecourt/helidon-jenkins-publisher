@@ -1,36 +1,42 @@
 package io.helidon.build.publisher.frontend;
 
-import io.helidon.build.publisher.reactive.DataChunkLimiter;
-import io.helidon.build.publisher.reactive.Multi;
+import io.helidon.build.publisher.model.Pipeline;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import io.helidon.build.publisher.model.PipelineInfo;
+import io.helidon.build.publisher.model.PipelineInfos;
+import io.helidon.build.publisher.model.PipelineDescriptorFileManager;
 import io.helidon.common.http.DataChunk;
 import io.helidon.common.http.MediaType;
 import io.helidon.common.reactive.Flow.Publisher;
-import io.helidon.common.reactive.RetrySchema;
-import io.helidon.media.common.ReadableByteChannelPublisher;
 import io.helidon.webserver.BadRequestException;
 import io.helidon.webserver.ResponseHeaders;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.Optional;
+
+import static io.helidon.common.http.Http.Status.NOT_FOUND_404;
 
 /**
  * Service that implements the endpoint used by the UI.
  */
 final class FrontendService implements Service {
 
-    private static final RetrySchema RETRY_SCHEMA = RetrySchema.linear(0, 10, 250);
     private static final String LINES_HEADERS = "vnd.io.helidon.publisher.lines";
     private static final String REMAINING_HEADER = "vnd.io.helidon.publisher.remaining";
     private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
+    private static final String PAGES_HEADER = "vnd.io.helidon.publisher.pages";
+    private static final int MAX_PAGES = 4;
+
     private final Path storagePath;
+    private final PipelineDescriptorFileManager descriptorManager;
 
     /**
      * Create a new front-end service.
@@ -46,13 +52,25 @@ final class FrontendService implements Service {
             }
         }
         this.storagePath = dirPath;
+        this.descriptorManager = new PipelineDescriptorFileManager(storagePath);
     }
 
     @Override
     public void update(Routing.Rules rules) {
         rules.get("/", this::listPipelines)
              .get("/{pipelineId}", this::getPipeline)
-             .get("/{pipelineId}/output/{stepId}", this::getOutput);
+             .get("/{pipelineId}/output/{stepId}", this::getOutput)
+             .get("/{pipelineId}/artifacts/{stageId}/{filepath:.+}", this::getArtifact)
+             .get("/{pipelineId}/tests/{stageId}", this::getTests);
+    }
+
+    private void getTests(ServerRequest req, ServerResponse res) {
+        
+    }
+
+    private void getArtifact(ServerRequest req, ServerResponse res) {
+        // TODO double check that filepath is nested under storage/pipelineId
+        // TODO double check taht filepath is nested under a subdirectory under storage/pipelineId
     }
 
     private void listPipelines(ServerRequest req, ServerResponse res) {
@@ -61,41 +79,45 @@ final class FrontendService implements Service {
         ResponseHeaders headers = res.headers();
         headers.contentType(MediaType.APPLICATION_JSON);
         headers.put("Access-Control-Allow-Origin", "*");
-        res.send(MockHelper.mockPipelines(page, numitems));
+        try {
+            List<Path> descriptorFiles = Files.list(storagePath)
+                    .skip((page - 1) * numitems) // skip to get to the current page
+                    .limit(((page + MAX_PAGES) * numitems) + 1) // max limit calculate the remaining pages
+                    .collect(Collectors.toList());
+            List<PipelineInfo> pipelines = descriptorFiles.stream()
+                    .limit(numitems)
+                    .map(descriptorManager::loadInfoFromDir)
+                    .collect(Collectors.toList());
+            int pages = (int) Math.ceil((double)((descriptorFiles.size() - pipelines.size()) / numitems));
+            res.headers().put(PAGES_HEADER, String.valueOf(pages));
+            res.send(new PipelineInfos(pipelines));
+        } catch (IOException ex) {
+            req.next(ex);
+        }
     }
+
+//    private void getPipeline(ServerRequest req, ServerResponse res) {
+//        String pipelineId = req.path().param("pipelineId");
+//        ResponseHeaders headers = res.headers();
+//        headers.contentType(MediaType.APPLICATION_JSON);
+//        headers.put("Access-Control-Allow-Origin", "*");
+//        if ("non-existent".equals(pipelineId)) {
+//            res.status(404).send();
+//        } else {
+//            res.send(MockHelper.mockPipeline(pipelineId));
+//        }
+//    }
 
     private void getPipeline(ServerRequest req, ServerResponse res) {
         String pipelineId = req.path().param("pipelineId");
         ResponseHeaders headers = res.headers();
-        headers.contentType(MediaType.APPLICATION_JSON);
         headers.put("Access-Control-Allow-Origin", "*");
-        if ("non-existent".equals(pipelineId)) {
-            res.status(404).send();
+        Pipeline pipeline = descriptorManager.load(pipelineId);
+        if (pipeline != null) {
+            headers.contentType(MediaType.APPLICATION_JSON);
+            res.send(pipeline);
         } else {
-            res.send(MockHelper.mockPipeline(pipelineId));
-        }
-    }
-
-    private void getDescriptor(ServerRequest req, ServerResponse res) {
-        // TODO adapt between backend model and UI model
-        // OR, maybe not..
-        String pipelineId = req.path().param("pipelineId");
-        Path filePath = storagePath.resolve(pipelineId + "/pipeline.json");
-        if (Files.exists(filePath)) {
-            res.status(404).send();
-            return;
-        }
-        try {
-            long size = Files.size(filePath);
-            FileChannel fc = FileChannel.open(filePath, StandardOpenOption.READ);
-            Multi<DataChunk> publisher = Multi
-                    .from(new ReadableByteChannelPublisher(fc, RETRY_SCHEMA))
-                    .limit(new DataChunkLimiter(size));
-            res.headers().contentType(MediaType.APPLICATION_JSON);
-            res.headers().contentLength(size);
-            res.send(publisher);
-        } catch (IOException ex) {
-            req.next(ex);
+            res.status(NOT_FOUND_404).send();
         }
     }
 
@@ -113,6 +135,8 @@ final class FrontendService implements Service {
         boolean linesOnly = req.queryParams().first("lines_only").map(Boolean::valueOf).orElse(false);
         // wrap each lines with div markups ? (default is false)
         boolean wrapHtml = req.queryParams().first("html").map(Boolean::valueOf).orElse(false);
+        // TODO return a proper html page with css to render lines nicely
+        // set content-type to text/html
 
         Path filePath = storagePath.resolve(pipelineId + "/step-" + stepId + ".log");
         if (!Files.exists(filePath)) {

@@ -1,6 +1,9 @@
 package io.helidon.build.publisher.plugin.config;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 import hudson.Extension;
@@ -17,6 +20,8 @@ import org.kohsuke.stapler.StaplerRequest;
 @Extension
 public final class HelidonPublisherGlobalConfiguration extends GlobalConfiguration {
 
+    private static final Logger LOGGER = Logger.getLogger(HelidonPublisherGlobalConfiguration.class.getName());
+
     @Nonnull
     public static HelidonPublisherGlobalConfiguration get() {
         return (HelidonPublisherGlobalConfiguration) Jenkins.get().getDescriptorOrDie(HelidonPublisherGlobalConfiguration.class);
@@ -26,6 +31,21 @@ public final class HelidonPublisherGlobalConfiguration extends GlobalConfigurati
 
     public HelidonPublisherGlobalConfiguration() {
         load();
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "servers: {0}", logServers());
+        }
+    }
+
+    private String logServers() {
+        String s = "[";
+        Iterator<HelidonPublisherServer> it = servers.iterator();
+        while (it.hasNext()) {
+            s += it.next().toString();
+            if (it.hasNext()) {
+                s += ", ";
+            }
+        }
+        return s + "]";
     }
 
     @Override

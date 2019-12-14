@@ -2,6 +2,7 @@ package io.helidon.build.publisher.model.events;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.Objects;
 
 /**
  * {@link PipelineEventType#ARTIFACTS_INFO} event.
@@ -9,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({"pipelineId", "eventType", "stageId"})
 public final class ArtifactsInfoEvent extends PipelineEvent {
 
-    final int stepsId;
+    final String stepsId;
     final int count;
 
     /**
@@ -19,8 +20,9 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
      * @param stepsId the corresponding steps stage id
      * @param count the count of archived files
      */
-    public ArtifactsInfoEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepsId") int stepsId,
+    public ArtifactsInfoEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepsId") String stepsId,
             @JsonProperty("files") int count) {
+
         super(pipelineId);
         this.stepsId = stepsId;
         this.count = count;
@@ -32,7 +34,7 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
      * @return String
      */
     @JsonProperty
-    public int stepsId() {
+    public String stepsId() {
         return stepsId;
     }
 
@@ -53,9 +55,9 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = 29 * hash + this.stepsId;
-        hash = 29 * hash + this.count;
+        int hash = 5;
+        hash = 53 * hash + Objects.hashCode(this.stepsId);
+        hash = 53 * hash + this.count;
         return hash;
     }
 
@@ -71,10 +73,10 @@ public final class ArtifactsInfoEvent extends PipelineEvent {
             return false;
         }
         final ArtifactsInfoEvent other = (ArtifactsInfoEvent) obj;
-        if (this.stepsId != other.stepsId) {
+        if (this.count != other.count) {
             return false;
         }
-        return this.count == other.count;
+        return Objects.equals(this.stepsId, other.stepsId);
     }
 
     @Override

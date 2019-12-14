@@ -18,16 +18,16 @@ public final class StageCreatedEvent extends NodeCreatedEvent {
     /**
      * Create a new {@link PipelineEventType#STAGE_CREATED} event.
      *
-     * @param id node id
      * @param pipelineId pipelineId
+     * @param id node id
      * @param parentId node parent id
      * @param index index in the parent node
      * @param name node name
      * @param startTime start timestamp
      * @param stageType stage type
      */
-    public StageCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") int id,
-            @JsonProperty("parentId") int parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
+    public StageCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") String id,
+            @JsonProperty("parentId") String parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
             @JsonProperty("startTime") long startTime,
             @JsonProperty("stageType") Stage.StageType stageType) {
 

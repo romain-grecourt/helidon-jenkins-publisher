@@ -8,7 +8,7 @@ import java.util.Objects;
  */
 public final class StepOutputDataEvent extends PipelineEvent {
 
-    final int stepId;
+    final String stepId;
     final byte[] data;
 
     /**
@@ -18,7 +18,7 @@ public final class StepOutputDataEvent extends PipelineEvent {
      * @param stepId the corresponding stepId
      * @param data the output data
      */
-    public StepOutputDataEvent(String pipelineId, int stepId, byte[] data) {
+    public StepOutputDataEvent(String pipelineId, String stepId, byte[] data) {
         super(pipelineId);
         this.stepId = stepId;
         this.data = data;
@@ -29,7 +29,7 @@ public final class StepOutputDataEvent extends PipelineEvent {
      *
      * @return String
      */
-    public int stepId() {
+    public String stepId() {
         return stepId;
     }
 

@@ -24,8 +24,8 @@ public final class StepCreatedEvent extends NodeCreatedEvent {
      * @param startTime start timestamp
      * @param args step arguments
      */
-    public StepCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") int id,
-            @JsonProperty("parentId") int parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
+    public StepCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") String id,
+            @JsonProperty("parentId") String parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
             @JsonProperty("startTime") long startTime, @JsonProperty("args") String args) {
 
         super(pipelineId, id, parentId, index, name, startTime);

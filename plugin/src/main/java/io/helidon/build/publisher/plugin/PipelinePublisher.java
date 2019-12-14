@@ -56,11 +56,12 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
             excludeMetaSteps = runInfo.excludeMetaSteps;
             pipelineId = runInfo.id;
             pipeline = new Pipeline(runInfo.toPipelineInfo(), runInfo.startTime);
+            modelAdapter = new PipelineModelAdapter(PipelineSignatures.getOrCreate(execution), pipeline, excludeSyntheticSteps,
+                    excludeMetaSteps);
             pipeline.addEventListener(client);
-            PipelineSignatures signatures = PipelineSignatures.getOrCreate(execution);
-            modelAdapter = new PipelineModelAdapter(signatures, pipeline, excludeSyntheticSteps, excludeMetaSteps);
             pipeline.addEventListener(new TestResulProcessor(pipeline, client, Helper.getRun(execution.getOwner()),
                     new TestResultSuiteMatcher(modelAdapter)));
+            pipeline.fireCreated();
             ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Pipeline enabled, execution={0}, pipelineId={1}", new Object[]{
@@ -103,7 +104,7 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
     public void onNewHead(FlowNode node) {
         if (enabled) {
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "New head, pipelineId{0}, node={1}", new Object[]{
+                LOGGER.log(Level.FINE, "New head, pipelineId={0}, node={1}", new Object[]{
                     pipelineId,
                     node
                 });
@@ -179,11 +180,10 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                         if (LOGGER.isLoggable(Level.FINE)) {
                             LOGGER.log(Level.FINE, "Pipeline completed, pipelineId={0}, pipeline={1}", new Object[]{
                                 pipelinePublisher.pipelineId,
-                                pipelinePublisher.pipeline.toPrettyString(pipelinePublisher.excludeSyntheticSteps,
-                                        pipelinePublisher.excludeSyntheticSteps)
+                                "\n" + pipelinePublisher.pipeline.toPrettyString(pipelinePublisher.excludeSyntheticSteps,
+                                    pipelinePublisher.excludeSyntheticSteps)
                             });
                         }
-                        // TODO pass the result to fireComplete
                         pipelinePublisher.pipeline.fireCompleted();
                         return;
                     }

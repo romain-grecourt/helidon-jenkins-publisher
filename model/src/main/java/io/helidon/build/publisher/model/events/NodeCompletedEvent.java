@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public abstract class NodeCompletedEvent extends PipelineEvent {
 
     final PipelineEventType type;
-    final int id;
+    final String id;
     final Status.Result result;
     final long endTime;
 
@@ -25,7 +25,7 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
      * @param result node result
      * @param endTime node end timestamp
      */
-    NodeCompletedEvent(String pipelineId, PipelineEventType type, int id, Status.Result result, long endTime) {
+    NodeCompletedEvent(String pipelineId, PipelineEventType type, String id, Status.Result result, long endTime) {
         super(pipelineId);
         this.type = type;
         this.id = id;
@@ -42,10 +42,10 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
     /**
      * Get the node id.
      *
-     * @return int
+     * @return String
      */
     @JsonProperty
-    public final int id() {
+    public final String id() {
         return id;
     }
 
@@ -81,8 +81,10 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
 
     @Override
     public int hashCode() {
-        int hash = 5;
-        hash = 97 * hash + Objects.hashCode(this.type);
+        int hash = 3;
+        hash = 83 * hash + Objects.hashCode(this.pipelineId);
+        hash = 83 * hash + Objects.hashCode(this.id);
+        hash = 83 * hash + Objects.hashCode(eventType());
         return hash;
     }
 
@@ -98,15 +100,9 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
             return false;
         }
         final NodeCompletedEvent other = (NodeCompletedEvent) obj;
-        if (this.id != other.id) {
+        if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
-        if (this.endTime != other.endTime) {
-            return false;
-        }
-        if (this.type != other.type) {
-            return false;
-        }
-        return this.result == other.result;
+        return Objects.equals(this.id, other.id);
     }
 }

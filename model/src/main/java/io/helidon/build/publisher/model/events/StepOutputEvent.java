@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({"pipelineId", "eventType", "stepId"})
 public final class StepOutputEvent extends PipelineEvent {
 
-    final int stepId;
+    final String stepId;
 
     /**
      * Create a new {@link PipelineEventType#OUTPUT} event.
@@ -19,7 +19,7 @@ public final class StepOutputEvent extends PipelineEvent {
      * @param pipelineId pipelineId
      * @param stepId the corresponding step id
      */
-    public StepOutputEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepId") int stepId) {
+    public StepOutputEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("stepId") String stepId) {
         super(pipelineId);
         this.stepId = stepId;
     }
@@ -30,7 +30,7 @@ public final class StepOutputEvent extends PipelineEvent {
      * @return String
      */
     @JsonProperty
-    public int stepId() {
+    public String stepId() {
         return stepId;
     }
 

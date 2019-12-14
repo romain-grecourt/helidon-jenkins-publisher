@@ -23,8 +23,8 @@ public class PipelineTest {
 
     @Test
     public void testJson() throws IOException {
-        String runId = "abcdefgh";
-        PipelineInfo info = new PipelineInfo(runId, "testJob", REPO_URL, "master", "123456789");
+        String pipelineId = "abcdefgh";
+        PipelineInfo info = new PipelineInfo(pipelineId, "testJob", REPO_URL, "master", "123456789");
         Pipeline pipeline  = new Pipeline(info, TIMESTAMP);
 
         Steps steps = new Steps(pipeline, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));

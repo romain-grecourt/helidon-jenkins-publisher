@@ -40,6 +40,14 @@ public final class Pipeline extends Stages {
     }
 
     /**
+     * Create a new running pipeline from a {@link PipelineCreatedEvent} event.
+     * @param event created event
+     */
+    public Pipeline(PipelineCreatedEvent event) {
+        this(event.info(), event.startTime());
+    }
+
+    /**
      * Add an event listener.
      * @param listener listener to register
      */
@@ -52,7 +60,7 @@ public final class Pipeline extends Stages {
      * @param id node id
      * @return {@link Node} or {@code null} if not found
      */
-    public Node node(int id) {
+    public Node node(String id) {
         return nodesByIds.get(id);
     }
 
@@ -85,9 +93,9 @@ public final class Pipeline extends Stages {
      */
     public void visit(PipelineVisitor visitor) {
         LinkedList<Stage> stack = new LinkedList<>(children);
-        int parentId = 0;
+        String parentId = null;
         int depth = 1;
-        visitor.visitStart();
+        visitor.visitStart(this);
         while (!stack.isEmpty()) {
             Stage stage = stack.peek();
             if (stage instanceof Steps) {
@@ -101,7 +109,7 @@ public final class Pipeline extends Stages {
                 stack.pop();
             } else if (stage instanceof Stages) {
                 // node
-                if (parentId == stage.id) {
+                if (stage.id.equals(parentId)) {
                     // leaving (2nd pass)
                     visitor.visitStagesEnd((Stages) stage, depth);
                     parentId = stage.parent.id;
@@ -126,7 +134,7 @@ public final class Pipeline extends Stages {
                 }
             }
         }
-        visitor.visitEnd();
+        visitor.visitEnd(this);
     }
 
     /**
@@ -139,12 +147,5 @@ public final class Pipeline extends Stages {
         PipelinePrettyPrinter printer = new PipelinePrettyPrinter(excludeSyntheticSteps, excludeMetaSteps);
         visit(printer);
         return printer.getString();
-    }
-
-    @Override
-    public String toString() {
-        return Pipeline.class.getSimpleName() + "{"
-                + " id=" + info.id
-                + " }";
     }
 }

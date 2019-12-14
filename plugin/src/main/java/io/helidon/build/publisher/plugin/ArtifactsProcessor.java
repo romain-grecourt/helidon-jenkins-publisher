@@ -74,7 +74,7 @@ final class ArtifactsProcessor extends StandardArtifactManager {
         Steps steps = stepsProvider != null ? stepsProvider.getSteps() : null;
         super.archive(workspace, launcher, listener, artifacts);
         if (steps != null) {
-            final int stepsId = steps.id();
+            final String stepsId = steps.id();
             final AtomicInteger artifactsCount = new AtomicInteger(0);
             new FilePath.ExplicitlySpecifiedDirScanner(artifacts).scan(getArtifactsDir(), new FileVisitor() {
                 @Override

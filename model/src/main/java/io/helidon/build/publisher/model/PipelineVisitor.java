@@ -7,8 +7,9 @@ public interface PipelineVisitor {
 
     /**
      * The start of the traversal.
+     * @param pipeline the pipeline
      */
-    void visitStart();
+    void visitStart(Pipeline pipeline);
 
     /**
      * The start of the traversal of a stages node.
@@ -50,6 +51,7 @@ public interface PipelineVisitor {
 
     /**
      * The end of the traversal.
+     * @param pipeline the pipeline
      */
-    void visitEnd();
+    void visitEnd(Pipeline pipeline);
 }

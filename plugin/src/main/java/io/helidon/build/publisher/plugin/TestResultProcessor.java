@@ -58,7 +58,7 @@ final class TestResulProcessor implements PipelineEventListener {
     @Override
     public void onEvent(PipelineEvent event) {
         if (event instanceof StageCompletedEvent) {
-            int stageId = ((StageCompletedEvent) event).id();
+            String stageId = ((StageCompletedEvent) event).id();
             Node node = pipeline.node(stageId);
             if (node instanceof Steps) {
                 Steps steps = (Steps) node;

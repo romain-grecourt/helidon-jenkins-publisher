@@ -37,12 +37,12 @@ public class PipelineEventsTest {
         List<PipelineEvent> events = new LinkedList<>();
         PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789");
         events.add(new PipelineCreatedEvent(info, TIMESTAMP));
-        events.add(new StageCreatedEvent(info.id, 1, 0, 0, "build", TIMESTAMP, StageType.STEPS));
-        events.add(new StepCreatedEvent(info.id, 2, 1, 0, "sh", TIMESTAMP, "echo foo"));
-        events.add(new StepOutputEvent(info.id, 2));
-        events.add(new StepCompletedEvent(info.id, 2, Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(info.id, 1, Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(info.id, 0, Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCreatedEvent(info.id, "1", "0", 0, "build", TIMESTAMP, StageType.STEPS));
+        events.add(new StepCreatedEvent(info.id, "2", "1", 0, "sh", TIMESTAMP, "echo foo"));
+        events.add(new StepOutputEvent(info.id, "2"));
+        events.add(new StepCompletedEvent(info.id, "2", Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(info.id, "1", Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(info.id, "0", Result.SUCCESS, TIMESTAMP));
         events.add(new PipelineCompletedEvent(info.id, Result.SUCCESS, TIMESTAMP));
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

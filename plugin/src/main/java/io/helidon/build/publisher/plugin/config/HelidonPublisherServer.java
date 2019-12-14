@@ -204,4 +204,13 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
             return Messages.Server_DisplayName();
         }
     }
+
+    @Override
+    public String toString() {
+        return "{"
+                + " serverUrl=" + serverUrl
+                + ", nthreads=" + nthread
+                + ", credentialId=" + (credentialsId == null ? "null" : credentialsId)
+                + " }";
+    }
 }

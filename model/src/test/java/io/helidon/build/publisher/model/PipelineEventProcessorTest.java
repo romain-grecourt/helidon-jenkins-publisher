@@ -35,15 +35,15 @@ public class PipelineEventProcessorTest {
         List<PipelineEvent> events = new LinkedList<>();
         String pid = "abcdefgh";
         events.add(new PipelineCreatedEvent(new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789"), TIMESTAMP));
-        events.add(new StageCreatedEvent(pid, 1, 0, 0, "build", TIMESTAMP, Stage.StageType.SEQUENCE));
-        events.add(new StageCreatedEvent(pid, 2, 1, 0, null, TIMESTAMP, Stage.StageType.STEPS));
-        events.add(new StepCreatedEvent(pid, 3, 2, 0, "sh", TIMESTAMP, "echo foo"));
-        events.add(new StepCompletedEvent(pid, 3, Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new TestsInfoEvent(pid, 2, new TestsInfo(1, 1, 0, 0)));
-        events.add(new ArtifactsInfoEvent(pid, 2, 1));
-        events.add(new StageCompletedEvent(pid, 2, Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(pid, 1, Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(pid, 0, Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCreatedEvent(pid, "1", "0", 0, "build", TIMESTAMP, Stage.StageType.SEQUENCE));
+        events.add(new StageCreatedEvent(pid, "2", "1", 0, null, TIMESTAMP, Stage.StageType.STEPS));
+        events.add(new StepCreatedEvent(pid, "3", "2", 0, "sh", TIMESTAMP, "echo foo"));
+        events.add(new StepCompletedEvent(pid, "3", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new TestsInfoEvent(pid, "2", new TestsInfo(1, 1, 0, 0)));
+        events.add(new ArtifactsInfoEvent(pid, "2", 1));
+        events.add(new StageCompletedEvent(pid, "2", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(pid, "1", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(pid, "0", Status.Result.SUCCESS, TIMESTAMP));
         events.add(new PipelineCompletedEvent(pid, Status.Result.SUCCESS, TIMESTAMP));
         AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
         new PipelineEventProcessor(new PipelineDescriptorManager(){
@@ -68,7 +68,7 @@ public class PipelineEventProcessorTest {
         assertThat(pipeline.status.state, is(Status.State.FINISHED));
         assertThat(pipeline.status.result, is(Status.Result.SUCCESS));
         Stage stage = pipeline.children.get(0);
-        assertThat(stage.id, is(1));
+        assertThat(stage.id, is("1"));
         assertThat(stage.name, is("build"));
         assertThat(stage.type(), is(Stage.StageType.SEQUENCE));
         assertThat(stage.status.state, is(Status.State.FINISHED));
@@ -76,7 +76,7 @@ public class PipelineEventProcessorTest {
 
         Sequence sequence = (Sequence)stage;
         assertThat(sequence.children.size(), is(1));
-        assertThat(sequence.children.get(0).id, is(2));
+        assertThat(sequence.children.get(0).id, is("2"));
         assertThat(sequence.children.get(0).type(), is(Stage.StageType.STEPS));
 
         Steps steps = (Steps) sequence.children.get(0);
@@ -91,7 +91,7 @@ public class PipelineEventProcessorTest {
 
         assertThat(steps.children.size(), is(1));
         Step step = steps.children.get(0);
-        assertThat(step.id, is(3));
+        assertThat(step.id, is("3"));
         assertThat(step.name, is("sh"));
         assertThat(step.status.state, is(Status.State.FINISHED));
         assertThat(step.status.result, is(Status.Result.SUCCESS));

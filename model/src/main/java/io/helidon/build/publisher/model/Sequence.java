@@ -20,8 +20,8 @@ public final class Sequence extends Stages {
         super(parent, name, createPath(parent, name), status, timings);
     }
 
-    Sequence(int id, Node parent, String name, Status status, Timings timings) {
-        super(id, parent, name, createPath(parent, name), status, timings);
+    Sequence(Node parent, String id, String name, Status status, Timings timings) {
+        super(parent, id, name, createPath(parent, name), status, timings);
     }
 
     @Override
