@@ -15,12 +15,17 @@ final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
 
     private static final Logger LOGGER = Logger.getLogger(HtmlLineEncoder.class.getName());
 
-    static final String DIV_TEXT = "<div class=\"line\">";
-    static final String SLASH_DIV_TEXT = "</div>";
+    static final String DIV_TEXT = "  <div class=\"line\">";
+    static final String SLASH_DIV_TEXT = "</div>\n";
+
+    private final ByteBuffer PAGE_BEGIN_DATA = ByteBuffer.wrap(getPageBeginTemplate().getBytes());
+    private final ByteBuffer PAGE_END_DATA = ByteBuffer.wrap(" <body>\n</html>\n".getBytes());
 
     private final ByteBuffer DIV_DATA = ByteBuffer.wrap(DIV_TEXT.getBytes());
     private final ByteBuffer SLASH_DIV_DATA = ByteBuffer.wrap(SLASH_DIV_TEXT.getBytes());
 
+    private final DataChunk PAGE_BEGIN = DataChunk.create(false, PAGE_BEGIN_DATA, true);
+    private final DataChunk PAGE_END = DataChunk.create(false, PAGE_END_DATA, true);
     private final DataChunk DIV = DataChunk.create(false, DIV_DATA, true);
     private final DataChunk SLASH_DIV = DataChunk.create(false, SLASH_DIV_DATA, true);
 
@@ -35,6 +40,10 @@ final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
 
     @Override
     protected void hookOnNext(DataChunk item) {
+        if (parent == null) {
+            PAGE_BEGIN_DATA.position(0);
+            submit(PAGE_BEGIN);
+        }
         parent = new VirtualChunk.Parent(item);
         vbuf.offer(item.data(), position);
         position = 0;
@@ -75,11 +84,49 @@ final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
     protected void hookOnComplete() {
         int buflen = vbuf.length();
         submitLine(position, buflen);
+        PAGE_END_DATA.position(0);
+        submit(PAGE_END);
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.log(Level.FINE, "onComplete, requestId={0}, lastLine={1}", new Object[] {
                 requestId,
                 buflen > position
             });
         }
+    }
+
+    private static String getPageBeginTemplate() {
+        return "<html>\n"
+                + " <head>\n"
+                + "  <style type=\"text/css\">\n"
+                + "    body {\n"
+                + "      counter-reset: log;\n"
+                + "      padding: 0;\n"
+                + "      text-decoration: none;\n"
+                + "      font: 13px \"Source Code Pro\", Menlo, Monaco, Consolas, \"Courier New\", monospace;\n"
+                + "      display: block;\n"
+                + "      position: relative;\n"
+                + "      color: #E0E0E0;\n"
+                + "      background-color: #424242;\n"
+                + "    }\n"
+                + "    body > div.line {\n"
+                + "      color: #eee;\n"
+                + "      position: relative;\n"
+                + "      display: block;\n"
+                + "      padding: 0px 0 0 30px;\n"
+                + "      line-height: 20px;\n"
+                + "      word-break: break-all;\n"
+                + "    }\n"
+                + "    body > div.line:before {\n"
+                + "      counter-increment: log;\n"
+                + "      content: counter(log);\n"
+                + "      min-width: 25px;\n"
+                + "      position: absolute;\n"
+                + "      display: inline-block;\n"
+                + "      text-align: right;\n"
+                + "      margin-left: -35px;\n"
+                + "      color: #777777;\n"
+                + "    }\n"
+                + "  </style>\n"
+                + " <body>";
     }
 }

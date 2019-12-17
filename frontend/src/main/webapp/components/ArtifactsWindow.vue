@@ -13,7 +13,7 @@
       </v-icon>
     </template>
     <artifacts
-      :artifacts="artifacts"
+      :id="id"
     />
   </window>
 </template>
@@ -36,15 +36,11 @@ export default {
   },
   props: {
     id: {
-      type: Number,
+      type: String,
       required: true
     },
     title: {
       type: String,
-      required: true
-    },
-    artifacts: {
-      type: Object,
       required: true
     }
   },

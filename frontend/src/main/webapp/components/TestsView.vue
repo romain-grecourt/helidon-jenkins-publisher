@@ -3,7 +3,7 @@
     fluid
   >
     <h2>Tests</h2>
-    <v-subheader>{{ tests.passed }} passed, {{ tests.failed }} failed , {{ tests.skipped }} skipped</v-subheader>
+    <v-subheader>{{ aggregatedtests.passed }} passed, {{ aggregatedtests.failed }} failed , {{ aggregatedtests.skipped }} skipped</v-subheader>
     <v-row
       justify="center"
       class="px-5 mt-4"
@@ -13,37 +13,29 @@
         multiple
       >
         <v-expansion-panel
-          v-for="(item,i) in tests.items"
+          v-for="(testsinfo,i) in aggregatedtests.items"
           :key="i"
         >
           <v-expansion-panel-header>
             <v-badge
               overlap
               class="mr-4 noflex "
-              :color="statusColors[item.status]"
+              :color="statusColors(null, testsinfo.failed > 0 ? 'UNSTABLE' : 'PASSED')"
             >
               <template
-                v-if="item.status=='UNSTABLE'"
+                v-if="testsinfo.failed > 0"
                 v-slot:badge
               >
                 !
               </template>
-              <v-icon
-                v-if="item.type=='SEQUENCE'"
-              >
-                mdi-hexagon-outline
-              </v-icon>
-              <v-icon
-                v-else-if="item.type=='PARALLEL'"
-              >
-                mdi-layers-triple-outline
-              </v-icon>
+              <v-icon>mdi-hexagon-outline</v-icon>
             </v-badge>
-            <span>{{ item.path }}</span>
+            <span>{{ testsinfo.path }}</span>
           </v-expansion-panel-header>
           <v-expansion-panel-content>
             <tests
-              :tests="item"
+              :id="testsinfo.id"
+              :testsinfo="testsinfo"
             />
           </v-expansion-panel-content>
         </v-expansion-panel>
@@ -65,13 +57,13 @@ export default {
     Tests
   },
   props: {
-    tests: {
+    aggregatedtests: {
       type: Object,
       required: true
     }
   },
-  data: () => ({
+  methods: {
     statusColors: statusColors
-  })
+  }
 }
 </script>

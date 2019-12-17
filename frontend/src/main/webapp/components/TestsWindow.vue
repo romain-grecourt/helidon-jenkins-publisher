@@ -13,7 +13,8 @@
       </v-icon>
     </template>
     <tests
-      :tests="tests"
+      :id="id"
+      :testsinfo="testsinfo"
     />
   </window>
 </template>
@@ -36,14 +37,14 @@ export default {
   },
   props: {
     id: {
-      type: Number,
+      type: String,
       required: true
     },
     title: {
       type: String,
       required: true
     },
-    tests: {
+    testsinfo: {
       type: Object,
       required: true
     }

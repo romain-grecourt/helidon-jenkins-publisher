@@ -10,11 +10,11 @@ public interface PipelineDescriptorManager {
      * @param id pipeline id
      * @return Pipeline
      */
-    Pipeline load(String id);
+    Pipeline loadPipeline(String id);
 
     /**
      * Save a pipeline.
      * @param pipeline pipeline to save
      */
-    void save(Pipeline pipeline);
+    void savePipeline(Pipeline pipeline);
 }

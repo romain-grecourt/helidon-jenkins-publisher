@@ -86,8 +86,7 @@ final class BackendClient implements PipelineEventListener {
     /**
      * Create a new publisher client.
      * @param serverUrl publisher server URL
-     * @param scmHead
-     * @param scmHash 
+     * @param nThreads number of threads
      */
     private BackendClient(String serverUrl, int nThreads) {
         if (LOGGER.isLoggable(Level.FINE)) {

@@ -30,10 +30,12 @@ const store = new Vuex.Store({
   }
 })
 
+const apiUrl = 'http://localhost:9191/api/'
 Vue.use({
   install (Vue) {
+    Vue.prototype.$apiUrl = apiUrl
     Vue.prototype.$api = axios.create({
-      baseURL: 'http://localhost:9191/api/'
+      baseURL: apiUrl
     })
   }
 })

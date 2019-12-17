@@ -19,12 +19,10 @@ public abstract class Stages extends Stage {
      * Create a new non parented stages.
      *
      * @param info pipeline info
-     * @param status the status object
-     * @param timings the timings object
-     * @throws NullPointerException if info, status or timings is {@code null}
+     * @throws NullPointerException if info is {@code null}
      */
-    protected Stages(PipelineInfo info, Status status, Timings timings) {
-        super(info, status, timings);
+    protected Stages(PipelineInfo info) {
+        super(info);
     }
 
     /**

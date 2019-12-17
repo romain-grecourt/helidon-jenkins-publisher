@@ -55,12 +55,12 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
             excludeSyntheticSteps = runInfo.excludeSyntheticSteps;
             excludeMetaSteps = runInfo.excludeMetaSteps;
             pipelineId = runInfo.id;
-            pipeline = new Pipeline(runInfo.toPipelineInfo(), runInfo.startTime);
+            WorkflowRun run = Helper.getRun(execution.getOwner());
+            pipeline = new Pipeline(runInfo.toPipelineInfo(new GlobalStatus(run), new GlobalTimings(run)));
             modelAdapter = new PipelineModelAdapter(PipelineSignatures.getOrCreate(execution), pipeline, excludeSyntheticSteps,
                     excludeMetaSteps);
             pipeline.addEventListener(client);
-            pipeline.addEventListener(new TestResulProcessor(pipeline, client, Helper.getRun(execution.getOwner()),
-                    new TestResultSuiteMatcher(modelAdapter)));
+            pipeline.addEventListener(new TestResulProcessor(pipeline, client, run, new TestResultSuiteMatcher(modelAdapter)));
             pipeline.fireCreated();
             ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
             if (LOGGER.isLoggable(Level.FINE)) {

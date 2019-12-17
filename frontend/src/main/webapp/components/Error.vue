@@ -10,16 +10,19 @@
         class="mx-0"
       >
         <v-icon
-          size="128"
+          :size="big? 128 : 96"
         >
           mdi-emoticon-dead
         </v-icon>
         <h1
-          v-if="message"
+          v-if="message && big"
           class="mt-2"
         >
           {{ message }}
         </h1>
+        <h3 v-else-if="message">
+          {{ message }}
+        </h3>
         <div style="display:block">
           <slot />
         </div>
@@ -34,6 +37,10 @@ export default {
     message: {
       type: String,
       default: 'Error !'
+    },
+    big: {
+      type: Boolean,
+      default: true
     }
   }
 }

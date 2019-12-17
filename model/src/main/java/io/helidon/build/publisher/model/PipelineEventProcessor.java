@@ -59,10 +59,10 @@ public final class PipelineEventProcessor {
             if (pipeline == null || !pipeline.pipelineId().equals(epid)) {
                 if (pipeline != null) {
                     process(pipeline, events);
-                    manager.save(pipeline);
+                    manager.savePipeline(pipeline);
                     events = new LinkedList<>();
                 }
-                pipeline = manager.load(epid);
+                pipeline = manager.loadPipeline(epid);
                 if (pipeline == null) {
                     if (event.eventType() == PipelineEventType.PIPELINE_CREATED) {
                         pipeline = new Pipeline((PipelineCreatedEvent) event);
@@ -75,7 +75,7 @@ public final class PipelineEventProcessor {
         }
         if (pipeline != null) {
             process(pipeline, events);
-            manager.save(pipeline);
+            manager.savePipeline(pipeline);
         }
     }
 

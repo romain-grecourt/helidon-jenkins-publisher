@@ -50,7 +50,7 @@
                     <th
                       class="text-left"
                     >
-                      Title
+                      Message
                     </th>
                     <th
                       class="text-left hidden-xs-only"
@@ -84,7 +84,7 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="item in pipelines.pipelines"
+                    v-for="item in pipelineInfos.items"
                     :key="item.id"
                     class="table-link"
                     @click="goToPipeline(item.id)"
@@ -101,28 +101,28 @@
                         v-else
                         :color="statusColors[item.status]"
                       >
-                        {{ statusIcons[item.status] }}
+                        {{ statusIcons(item.state, item.result) }}
                       </v-icon>
                     </td>
-                    <td>{{ item.title }}</td>
+                    <td>{{ item.name }}</td>
                     <td
                       class="hidden-xs-only"
                     >
-                      {{ item.repository }}
+                      {{ item.gitRepositoryUrl }}
                     </td>
                     <td
                       class="hidden-xs-only"
                     >
-                      {{ item.branch }}
+                      {{ item.gitHead }}
                     </td>
-                    <td>{{ item.when }}</td>
+                    <td>{{ when(item.date) }}</td>
                   </tr>
                 </tbody>
               </template>
             </v-simple-table>
             <v-pagination
-              v-model="pipelines.page"
-              :length="pipelines.numpages"
+              v-model="pipelineInfos.pagenum"
+              :length="pipelineInfos.totalpages"
               @input="onPageChange"
             />
           </v-col>
@@ -140,6 +140,7 @@
 <script>
 import statusColors from '@/statusColors'
 import statusIcons from '@/statusIcons'
+import moment from 'moment'
 import Error from './Error'
 import Loading from './Loading'
 export default {
@@ -148,32 +149,34 @@ export default {
     Error,
     Loading
   },
-
   data: () => ({
-    statusColors: statusColors,
-    statusIcons: statusIcons,
     loading: true,
     errored: false,
-    pipelines: {
-      page: 1,
-      numpages: 0
+    pipelineInfos: {
+      pagenum: 1,
+      totalpages: 0
     }
   }),
   mounted () {
     this.refresh()
   },
   methods: {
+    statusColors: statusColors,
+    statusIcons: statusIcons,
+    when (date) {
+      return moment.duration(moment(date).diff(moment())).humanize(true)
+    },
     goToPipeline (id) {
       this.$router.push({ path: '/' + id })
     },
-    onPageChange (pageId) {
-      this.$api.get('?page=' + pageId)
-        .then(response => (this.pipelines = response.data))
+    onPageChange (pagenum) {
+      this.$api.get('?pagenum=' + pagenum)
+        .then(response => (this.pipelineInfos = response.data))
         .catch(error => (this.errored = error.message))
         .finally(() => (this.loading = false))
     },
     refresh () {
-      this.onPageChange(this.pipelines.page)
+      this.onPageChange(this.pipelineInfos.pagenum)
     }
   }
 }

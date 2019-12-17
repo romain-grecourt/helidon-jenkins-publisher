@@ -12,7 +12,7 @@
         hoverable
         shaped
         open-on-click
-        style="width:100%"
+        class="pipeline-tree-view"
         :items="items"
       >
         <template
@@ -22,7 +22,7 @@
             v-if="item.type == 'STEP'"
           >
             <v-progress-circular
-              v-if="item.status=='RUNNING'"
+              v-if="item.state=='RUNNING'"
               size="20"
               width="3"
               class="mr-5"
@@ -30,11 +30,11 @@
               color="primary"
             />
             <v-icon
-              v-else-if="item.status"
-              :color="statusColors[item.status]"
+              v-else
+              :color="statusColors(item.state, item.result)"
               class="mr-4"
             >
-              {{ statusIcons[item.status] }}
+              {{ statusIcons(item.state, item.result) }}
             </v-icon>
           </template>
           <v-icon
@@ -54,31 +54,31 @@
           <consoleOutputWindow
             v-if="item.type=='STEP'"
             :id="item.id"
-            :title="item.name"
+            :title="itemTitle(item)"
           />
           <testsWindow
-            v-else-if="item.tests"
+            v-else-if="hasTests(item)"
             :id="item.id"
-            :title="item.name"
-            :tests="item.tests"
+            :title="itemTitle(item)"
+            :testsinfo="item.tests"
           />
           <artifactsWindow
-            v-if="item.artifacts"
+            v-if="item.artifacts > 0"
             :id="item.id"
-            :title="item.name"
+            :title="itemTitle(item)"
             :artifacts="item.artifacts"
           />
           <div
             class="node-label-text"
           >
-            {{ item.name }}
+            {{ itemTitle(item) }}
           </div>
           <v-chip
-            v-if="item.tests||item.artifacts"
+            v-if="hasTestsOrArtifacts(item)"
             class="ml-4"
           >
             <v-btn
-              v-if="item.tests"
+              v-if="hasTests(item)"
               fab
               x-small
               icon
@@ -88,7 +88,7 @@
                 v-if="item.tests.failed > 0"
                 class="small-badge"
                 overlap
-                :color="statusColors['UNSTABLE']"
+                :color="statusColors(null, 'UNSTABLE')"
               >
                 <template
                   v-slot:badge
@@ -109,7 +109,7 @@
               </v-icon>
             </v-btn>
             <v-btn
-              v-if="item.artifacts"
+              v-if="item.artifacts > 0"
               fab
               x-small
               icon
@@ -138,17 +138,40 @@
                 mdi-console
               </v-icon>
             </v-btn>
-            <v-btn
-              fab
-              x-small
-              icon
+            <a
+              :href="link(item, true)"
+              target="new"
+              class="link-icon"
             >
-              <v-icon
-                class="px-0"
+              <v-btn
+                fab
+                x-small
+                icon
               >
-                mdi-download
-              </v-icon>
-            </v-btn>
+                <v-icon
+                  class="px-0"
+                >
+                  mdi-open-in-new
+                </v-icon>
+              </v-btn>
+            </a>
+            <a
+              :href="link(item, false)"
+              target="new"
+              class="link-icon"
+            >
+              <v-btn
+                fab
+                x-small
+                icon
+              >
+                <v-icon
+                  class="px-0"
+                >
+                  mdi-download
+                </v-icon>
+              </v-btn>
+            </a>
           </v-chip>
         </template>
       </v-treeview>
@@ -156,11 +179,14 @@
   </v-container>
 </template>
 <style>
-.v-treeview-node__label {
+.pipeline-tree-view {
+  width:100%;
+}
+.pipeline-tree-view .v-treeview-node__label {
   display: flex;
   align-items: center;
 }
-.v-treeview-node--leaf > .v-treeview-node__root {
+.pipeline-tree-view .v-treeview-node--leaf > .v-treeview-node__root {
   background-color: #353434;
 }
 .small-badge > .v-badge__badge {
@@ -177,6 +203,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.link-icon {
+  text-decoration: none
 }
 </style>
 <script>
@@ -198,13 +227,32 @@ export default {
       required: true
     }
   },
-  data: () => ({
-    statusColors: statusColors,
-    statusIcons: statusIcons
-  }),
   methods: {
+    statusColors: statusColors,
+    statusIcons: statusIcons,
     openWindow (id) {
       this.$store.commit('PIPELINE_WINDOW_ID', id)
+    },
+    hasTests (item) {
+      return typeof item.tests !== 'undefined' && item.tests !== null
+    },
+    hasTestsOrArtifacts (item) {
+      return this.hasTests(item) || item.artifacts > 0
+    },
+    link (item, html) {
+      var link = this.$apiUrl + this.$route.params.pipelineid + '/output/' + item.id
+      if (html) {
+        return link + '?html'
+      } else {
+        return link
+      }
+    },
+    itemTitle (item) {
+      if (item.type === 'STEP') {
+        return item.name + ' [ ' + item.args + ' ]'
+      } else {
+        return item.name
+      }
     }
   }
 }

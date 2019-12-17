@@ -9,7 +9,6 @@ import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import io.helidon.build.publisher.model.Status.State;
 
 /**
  * Pipeline model.
@@ -19,24 +18,12 @@ import io.helidon.build.publisher.model.Status.State;
 public final class Pipeline extends Stages {
 
     /**
-     * Create a new pipeline.
-     *
-     * @param info pipeline info
-     * @param status the status object
-     * @param timings the timings object
-     * @throws NullPointerException if info, status or timings is {@code null}
-     */
-    public Pipeline(PipelineInfo info, Status status, Timings timings) {
-        super(info, status, timings);
-    }
-
-    /**
      * Create a new running pipeline.
      * @param info pipeline info
-     * @param startTime start timestamp
+     * @throws NullPointerException if info is {@code null}
      */
-    public Pipeline(PipelineInfo info, long startTime) {
-        this(info, new Status(State.RUNNING), new Timings(startTime));
+    public Pipeline(PipelineInfo info) {
+        super(info);
     }
 
     /**
@@ -44,7 +31,7 @@ public final class Pipeline extends Stages {
      * @param event created event
      */
     public Pipeline(PipelineCreatedEvent event) {
-        this(event.info(), event.startTime());
+        this(event.info());
     }
 
     /**
@@ -84,7 +71,7 @@ public final class Pipeline extends Stages {
 
     @Override
     public void fireCreated() {
-        fireEvent(new PipelineCreatedEvent(info, timings.startTime));
+        fireEvent(new PipelineCreatedEvent(info));
     }
 
     /**

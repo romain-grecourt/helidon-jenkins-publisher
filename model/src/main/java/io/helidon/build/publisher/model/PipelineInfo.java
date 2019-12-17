@@ -10,27 +10,33 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
  * Pipeline info.
  */
 @JsonDeserialize(using = PipelineInfoDeserializer.class)
-@JsonPropertyOrder({"id", "name", "repositoryUrl", "scmHead", "scmHash"})
+@JsonPropertyOrder({"id", "name", "gitRepositoryUrl", "gitHead", "gitCommit"})
 public final class PipelineInfo {
 
     final String id;
     final String name;
-    final String repositoryUrl;
-    final String scmHead;
-    final String scmHash;
+    final String gitRepositoryUrl;
+    final String gitHead;
+    final String gitCommit;
+    final Status status;
+    final Timings timings;
 
     /**
      * Create a new pipeline info.
      *
      * @param id the pipeline id
      * @param name the pipeline name, must be a valid {@code String}
-     * @param repositoryUrl the repository URL, may be {@code null}
-     * @param scmHead the ref name that this pipeline was triggered against, may be {@code null}
-     * @param scmHash the GIT commit id that this pipeline was triggered against, may be {@code null}
+     * @param gitRepositoryUrl the repository URL, may be {@code null}
+     * @param gitHead the ref name that this pipeline was triggered against, may be {@code null}
+     * @param gitCommit the GIT commit id that this pipeline was triggered against, may be {@code null}
+     * @param status the pipeline status
+     * @param timings the pipeline timings
      * @throws IllegalArgumentException if name is not a valid {@code String}
      * @throws NullPointerException if pipeline {@code null}
      */
-    public PipelineInfo(String id, String name, String repositoryUrl, String scmHead, String scmHash) {
+    public PipelineInfo(String id, String name, String gitRepositoryUrl, String gitHead, String gitCommit, Status status,
+            Timings timings) {
+
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("id is null or empty");
         }
@@ -39,9 +45,11 @@ public final class PipelineInfo {
         }
         this.id = id;
         this.name = name;
-        this.repositoryUrl = repositoryUrl;
-        this.scmHead = scmHead;
-        this.scmHash = scmHash;
+        this.gitRepositoryUrl = gitRepositoryUrl;
+        this.gitHead = gitHead;
+        this.gitCommit = gitCommit;
+        this.status = Objects.requireNonNull(status, "status is null!");
+        this.timings = Objects.requireNonNull(timings, "timings is null!");
     }
 
     /**
@@ -63,21 +71,21 @@ public final class PipelineInfo {
     }
 
     /**
-     * Get the repository URL.
+     * Get the GIT repository URL.
      * @return String
      */
     @JsonProperty
-    public String repositoryUrl() {
-        return repositoryUrl;
+    public String gitRepositoryUrl() {
+        return gitRepositoryUrl;
     }
 
     /**
-     * Get the branch name for this pipeline.
+     * Get the GIT head for this pipeline.
      * @return String
      */
     @JsonProperty
-    public String scmHead() {
-        return scmHead;
+    public String gitHead() {
+        return gitHead;
     }
 
     /**
@@ -85,8 +93,8 @@ public final class PipelineInfo {
      * @return String
      */
     @JsonProperty
-    public String scmHash() {
-        return scmHash;
+    public String gitCommit() {
+        return gitCommit;
     }
 
     @Override
@@ -94,11 +102,50 @@ public final class PipelineInfo {
         return PipelineInfo.class.getSimpleName() + "{"
                 + " id=" + id
                 + ", name=" + name
-                + ", repositoryUrl=" + repositoryUrl
-                + ", scmHead=" + scmHead
-                + ", scmHash=" + scmHash
-                + ", scmHead=" + scmHead
+                + ", gitRepositoryUrl=" + gitRepositoryUrl
+                + ", gitHead=" + gitHead
+                + ", gitCommit=" + gitCommit
                 + " }";
+    }
+
+    /**
+     * Get the start timestamp.
+     *
+     * @return String
+     */
+    @JsonProperty
+    public final String date() {
+        return timings.date;
+    }
+
+    /**
+     * Get the duration in seconds.
+     *
+     * @return long
+     */
+    @JsonProperty
+    public final long duration() {
+        return timings.endTime > timings.startTime? (timings.endTime - timings.startTime) / 1000 : 0;
+    }
+
+    /**
+     * Get the state.
+     *
+     * @return State
+     */
+    @JsonProperty
+    public final Status.State state() {
+        return status.state;
+    }
+
+    /**
+     * Get the result.
+     *
+     * @return Result
+     */
+    @JsonProperty
+    public final Status.Result result() {
+        return status.result;
     }
 
     @Override

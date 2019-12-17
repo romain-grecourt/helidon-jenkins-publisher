@@ -1,5 +1,6 @@
 package io.helidon.build.publisher.model;
 
+import io.helidon.build.publisher.model.Status.State;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,7 +35,9 @@ public class PipelineEventProcessorTest {
     public void testSimpleEvents() {
         List<PipelineEvent> events = new LinkedList<>();
         String pid = "abcdefgh";
-        events.add(new PipelineCreatedEvent(new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789"), TIMESTAMP));
+        PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789", new Status(State.RUNNING),
+                new Timings(TIMESTAMP));
+        events.add(new PipelineCreatedEvent(info));
         events.add(new StageCreatedEvent(pid, "1", "0", 0, "build", TIMESTAMP, Stage.StageType.SEQUENCE));
         events.add(new StageCreatedEvent(pid, "2", "1", 0, null, TIMESTAMP, Stage.StageType.STEPS));
         events.add(new StepCreatedEvent(pid, "3", "2", 0, "sh", TIMESTAMP, "echo foo"));
@@ -48,12 +51,12 @@ public class PipelineEventProcessorTest {
         AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
         new PipelineEventProcessor(new PipelineDescriptorManager(){
             @Override
-            public Pipeline load(String id) {
+            public Pipeline loadPipeline(String id) {
                 return null;
             }
 
             @Override
-            public void save(Pipeline pipeline) {
+            public void savePipeline(Pipeline pipeline) {
                 pipelineRef.set(pipeline);
             }
         }).process(events);

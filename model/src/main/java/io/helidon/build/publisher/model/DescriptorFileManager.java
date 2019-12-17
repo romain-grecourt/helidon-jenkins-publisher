@@ -12,9 +12,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * File based descriptor manager.
  */
-public final class PipelineDescriptorFileManager implements PipelineDescriptorManager {
+public final class DescriptorFileManager implements PipelineDescriptorManager {
 
-    private static final Logger LOGGER = Logger.getLogger(PipelineDescriptorFileManager.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(DescriptorFileManager.class.getName());
     private static final String PIPELINE_FNAME = "pipeline.json";
 
     private final Path storage;
@@ -24,15 +24,37 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
      * Create a new descriptor file manager.
      * @param storage storage path
      */
-    public PipelineDescriptorFileManager(Path storage) {
+    public DescriptorFileManager(Path storage) {
         this.storage = storage;
         this.mapper = new ObjectMapper();
+    }
+
+    /**
+     * Load a test suite result.
+     * @param filePath
+     * @return TestSuiteResult or {@code null} if not found
+     * @throws NullPointerException if filePath is {@code null}
+     */
+    public TestSuiteResult loadTestSuiteResult(Path filePath) {
+        Objects.requireNonNull(filePath, "filePath is null");
+        if (Files.exists(filePath)) {
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.log(Level.FINEST, "Reading test suite result descriptor: {0}", filePath);
+            }
+            try {
+                return mapper.readValue(Files.newInputStream(filePath), TestSuiteResult.class);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+        return null;
     }
 
     /**
      * Load a pipeline info for a given pipeline directory.
      * @param dirPath dir path containing the pipeline descriptor
      * @return PipelineInfo or {@code null} if not found
+     * @throws NullPointerException if dirPath is {@code null}
      */
     public PipelineInfo loadInfoFromDir(Path dirPath) {
         Objects.requireNonNull(dirPath, "dirPath is null");
@@ -42,7 +64,7 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
                 LOGGER.log(Level.FINEST, "Reading pipeline info descriptor: {0}", filePath);
             }
             try {
-                return mapper.readValue(Files.newInputStream(dirPath), PipelineInfo.class);
+                return mapper.readValue(Files.newInputStream(filePath), PipelineInfo.class);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
@@ -54,8 +76,9 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
      * Load a pipeline.
      * @param filePath pipeline descriptor file path
      * @return Pipeline
+     * @throws NullPointerException if filePath is {@code null}
      */
-    public Pipeline load(Path filePath) {
+    public Pipeline loadPipeline(Path filePath) {
         Objects.requireNonNull(filePath, "filePath is null");
         if (Files.exists(filePath)) {
             if (LOGGER.isLoggable(Level.FINEST)) {
@@ -71,12 +94,12 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
     }
 
     @Override
-    public Pipeline load(String id) {
+    public Pipeline loadPipeline(String id) {
         if (storage == null) {
             throw new IllegalStateException("storage not set");
         }
         Objects.requireNonNull(id, "id is null");
-        return load(storage.resolve(id).resolve(PIPELINE_FNAME));
+        return loadPipeline(storage.resolve(id).resolve(PIPELINE_FNAME));
     }
 
     /**
@@ -84,7 +107,7 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
      * @param pipeline pipeline to save
      * @param filePath file path
      */
-    public void save(Pipeline pipeline, Path filePath) {
+    public void savePipeline(Pipeline pipeline, Path filePath) {
         Objects.requireNonNull(pipeline, "pipeline is null");
         Objects.requireNonNull(filePath, "filePath is null");
         Path dirPath = filePath.getParent();
@@ -105,11 +128,11 @@ public final class PipelineDescriptorFileManager implements PipelineDescriptorMa
     }
 
     @Override
-    public void save(Pipeline pipeline) {
+    public void savePipeline(Pipeline pipeline) {
         if (storage == null) {
             throw new IllegalStateException("storage not set");
         }
         Objects.requireNonNull(pipeline, "pipeline is null");
-        save(pipeline, storage.resolve(pipeline.pipelineId()).resolve(PIPELINE_FNAME));
+        savePipeline(pipeline, storage.resolve(pipeline.pipelineId()).resolve(PIPELINE_FNAME));
     }
 }

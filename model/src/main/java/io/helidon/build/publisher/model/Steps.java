@@ -6,14 +6,13 @@ import java.util.List;
 
 import io.helidon.build.publisher.model.events.StageCompletedEvent;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 /**
  * A steps stage.
  */
-@JsonPropertyOrder({"id", "type", "state", "result", "startTime", "endTime", "artifacts", "tests", "children"})
+@JsonPropertyOrder({"id", "type", "name", "state", "result", "startTime", "endTime", "artifacts", "tests", "children"})
 public final class Steps extends Stage {
 
     final List<Step> children = new LinkedList<>();
@@ -29,17 +28,11 @@ public final class Steps extends Stage {
      * @throws NullPointerException if type, status or timings is {@code null}
      */
     public Steps(Node parent, Status status, Timings timings) {
-        super(parent, null, null, status, timings);
+        super(parent, "steps", null, status, timings);
     }
 
     Steps( Node parent, String id, Status status, Timings timings) {
-        super(parent, id, null, null, status, timings);
-    }
-
-    @JsonIgnore // steps is synthetic, it doesn't have a name
-    @Override
-    public String name() {
-        return null;
+        super(parent, id, "steps", null, status, timings);
     }
 
     /**

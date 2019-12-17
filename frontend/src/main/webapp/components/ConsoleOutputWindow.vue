@@ -27,7 +27,11 @@
         stream
       />
     </template>
-    <error v-if="errored">
+    <error
+      v-if="errored"
+      :message="errored"
+      :big="false"
+    >
       <v-btn
         class="mt-5"
         @click="retry"
@@ -38,7 +42,6 @@
     <consoleOutput
       v-else
       ref="output"
-      :dohtml="false"
     />
   </window>
 </template>
@@ -60,7 +63,7 @@ export default {
   },
   props: {
     id: {
-      type: Number,
+      type: String,
       required: true
     },
     title: {
@@ -130,7 +133,7 @@ export default {
               (!backward && remaining === 0 && position > 0)) {
         return
       }
-      let uri = 'test' + '/output/' + 1 // TODO this is hard-coded
+      let uri = this.$route.params.pipelineid + '/output/' + this.id
       uri += '?position=' + position
       uri += '&lines=' + lines
       if (backward) {
@@ -146,7 +149,8 @@ export default {
           this.renderOutput(position, remaining, backward, linesOnly, lines, response.data)
         })
         .catch(error => {
-          this.errored = true
+          this.errored = error.message
+          this.loading = false
         })
     },
     onWindowClosed () {

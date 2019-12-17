@@ -1,6 +1,6 @@
-const PipelinesView= () => import('@/components/PipelinesView')
-const PipelineView= () => import('@/components/PipelineView')
-const NotFoundView= () => import('@/components/NotFoundView')
+const PipelinesView = () => import('@/components/PipelinesView')
+const PipelineView = () => import('@/components/PipelineView')
+const NotFoundView = () => import('@/components/NotFoundView')
 
 const routes = [
   {

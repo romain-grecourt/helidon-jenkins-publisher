@@ -59,9 +59,9 @@ public final class JobPublisher {
             enabled = true;
             pipelineId = runInfo.id;
             client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
-            StatusImpl status = new StatusImpl(run);
-            TimingsImpl timings = new TimingsImpl(run);
-            pipeline = new Pipeline(runInfo.toPipelineInfo(), status, timings);
+            GlobalStatus status = new GlobalStatus(run);
+            GlobalTimings timings = new GlobalTimings(run);
+            pipeline = new Pipeline(runInfo.toPipelineInfo(status, timings));
             pipeline.addEventListener(client);
             pipeline.addEventListener(new TestResulProcessor(pipeline, client, run, TEST_RESULT_SUITE_MATCHER));
             steps = new Steps(pipeline, status, timings);
@@ -168,48 +168,6 @@ public final class JobPublisher {
                 return new PipelineOutputStream(outputStream, jobPublisher.pipelineId, jobPublisher.step, jobPublisher.client);
             }
             return outputStream;
-        }
-    }
-
-    /**
-     * {@link Timings} implementation that can get the end time from the run.
-     */
-    private static final class TimingsImpl extends Timings {
-
-        private final Run run;
-
-        /**
-         * Create a new timing with start time derived from the given {@link FlowNode}.
-         * @param source 
-         */
-        TimingsImpl(Run run) {
-            super(run.getStartTimeInMillis());
-            this.run = run;
-        }
-
-        @Override
-        protected void refresh() {
-            if (super.endTime == 0 && !run.isBuilding()) {
-                 super.endTime = run.getDuration();
-            }
-        }
-    }
-
-    /**
-     * {@link Status} implementation that can compute the state and result from the run.
-     */
-    private static final class StatusImpl extends Status {
-
-        private final Run run;
-
-        StatusImpl(Run run) {
-            super(run.isBuilding() ? State.RUNNING : State.FINISHED);
-            this.run = run;
-        }
-
-        @Override
-        protected void refresh() {
-            result = Helper.convertResult(run.getResult());
         }
     }
 

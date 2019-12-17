@@ -11,7 +11,9 @@ import java.util.stream.Collectors;
 
 import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.PipelineInfos;
-import io.helidon.build.publisher.model.PipelineDescriptorFileManager;
+import io.helidon.build.publisher.model.DescriptorFileManager;
+import io.helidon.build.publisher.model.TestSuiteResult;
+import io.helidon.build.publisher.model.TestSuiteResults;
 import io.helidon.common.http.DataChunk;
 import io.helidon.common.http.MediaType;
 import io.helidon.common.reactive.Flow.Publisher;
@@ -32,11 +34,11 @@ final class FrontendService implements Service {
     private static final String LINES_HEADERS = "vnd.io.helidon.publisher.lines";
     private static final String REMAINING_HEADER = "vnd.io.helidon.publisher.remaining";
     private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
-    private static final String PAGES_HEADER = "vnd.io.helidon.publisher.pages";
     private static final int MAX_PAGES = 4;
 
     private final Path storagePath;
-    private final PipelineDescriptorFileManager descriptorManager;
+    private final DescriptorFileManager descriptorManager;
+    private final ContentTypeSelector contentTypeSelector;
 
     /**
      * Create a new front-end service.
@@ -51,8 +53,9 @@ final class FrontendService implements Service {
                 throw new IllegalStateException("Error initializing storage directory", ex);
             }
         }
-        this.storagePath = dirPath;
-        this.descriptorManager = new PipelineDescriptorFileManager(storagePath);
+        storagePath = dirPath;
+        descriptorManager = new DescriptorFileManager(storagePath);
+        contentTypeSelector = new ContentTypeSelector(null);
     }
 
     @Override
@@ -60,59 +63,123 @@ final class FrontendService implements Service {
         rules.get("/", this::listPipelines)
              .get("/{pipelineId}", this::getPipeline)
              .get("/{pipelineId}/output/{stepId}", this::getOutput)
+             .get("/{pipelineId}/artifacts/{stageId}", this::getArtifacts)
              .get("/{pipelineId}/artifacts/{stageId}/{filepath:.+}", this::getArtifact)
              .get("/{pipelineId}/tests/{stageId}", this::getTests);
     }
 
     private void getTests(ServerRequest req, ServerResponse res) {
-        
-    }
-
-    private void getArtifact(ServerRequest req, ServerResponse res) {
-        // TODO double check that filepath is nested under storage/pipelineId
-        // TODO double check taht filepath is nested under a subdirectory under storage/pipelineId
-    }
-
-    private void listPipelines(ServerRequest req, ServerResponse res) {
-        int page = toInt(req.queryParams().first("page"), 1);
-        int numitems = toInt(req.queryParams().first("numitems"), 20);
         ResponseHeaders headers = res.headers();
         headers.contentType(MediaType.APPLICATION_JSON);
+        // TODO remove me
         headers.put("Access-Control-Allow-Origin", "*");
+
+        Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
+        Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
+        if (!stagePath.getParent().equals(pipelinePath)) {
+            throw new BadRequestException("Invalid stageId");
+        }
+        if (!(Files.exists(stagePath) && Files.isDirectory(stagePath))) {
+            res.send(NOT_FOUND_404);
+            return;
+        }
+        Path testsPath = stagePath.resolve("tests");
         try {
-            List<Path> descriptorFiles = Files.list(storagePath)
-                    .skip((page - 1) * numitems) // skip to get to the current page
-                    .limit(((page + MAX_PAGES) * numitems) + 1) // max limit calculate the remaining pages
+            List<TestSuiteResult> results = Files.list(testsPath)
+                    .filter((path) -> path.toString().endsWith(".json"))
+                    .map(descriptorManager::loadTestSuiteResult)
                     .collect(Collectors.toList());
-            List<PipelineInfo> pipelines = descriptorFiles.stream()
-                    .limit(numitems)
-                    .map(descriptorManager::loadInfoFromDir)
-                    .collect(Collectors.toList());
-            int pages = (int) Math.ceil((double)((descriptorFiles.size() - pipelines.size()) / numitems));
-            res.headers().put(PAGES_HEADER, String.valueOf(pages));
-            res.send(new PipelineInfos(pipelines));
+            res.send(new TestSuiteResults(results));
         } catch (IOException ex) {
             req.next(ex);
         }
     }
 
-//    private void getPipeline(ServerRequest req, ServerResponse res) {
-//        String pipelineId = req.path().param("pipelineId");
-//        ResponseHeaders headers = res.headers();
-//        headers.contentType(MediaType.APPLICATION_JSON);
-//        headers.put("Access-Control-Allow-Origin", "*");
-//        if ("non-existent".equals(pipelineId)) {
-//            res.status(404).send();
-//        } else {
-//            res.send(MockHelper.mockPipeline(pipelineId));
-//        }
-//    }
+    private void getArtifacts(ServerRequest req, ServerResponse res) {
+        ResponseHeaders headers = res.headers();
+        // TODO remove me
+        headers.put("Access-Control-Allow-Origin", "*");
+
+        Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
+        Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
+        if (!stagePath.getParent().equals(pipelinePath)) {
+            throw new BadRequestException("Invalid stageId");
+        }
+        if (!(Files.exists(stagePath) && Files.isDirectory(stagePath))) {
+            res.send(NOT_FOUND_404);
+            return;
+        }
+        try {
+            headers.contentType(MediaType.APPLICATION_JSON);
+            res.send(Artifacts.find(stagePath.resolve("artifacts")));
+        } catch (IOException ex) {
+            req.next(ex);
+        }
+    }
+
+    private void getArtifact(ServerRequest req, ServerResponse res) {
+        // produce raw text ? (default is false)
+        boolean download = toBoolean(req.queryParams().first("download"), false);
+
+        ResponseHeaders headers = res.headers();
+        // TODO remove me
+        headers.put("Access-Control-Allow-Origin", "*");
+
+        Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
+        Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
+        if (!stagePath.getParent().equals(pipelinePath)) {
+            throw new BadRequestException("Invalid stageId");
+        }
+        Path artifactsPath = stagePath.resolve("artifacts");
+        Path filePath = artifactsPath.resolve(req.path().param("filepath"));
+        if (!filePath.startsWith(artifactsPath)) {
+            throw new BadRequestException("Invalid filepath");
+        }
+        if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+            res.status(NOT_FOUND_404).send();
+        } else {
+            try {
+                if (download) {
+                    headers.contentType(MediaType.APPLICATION_OCTET_STREAM);
+                    headers.put("Content-Disposition", "attachment; filename=\"" + filePath.getFileName().toString() + "\"");
+                } else {
+                    headers.contentType(contentTypeSelector.determine(filePath.getFileName().toString(), req.headers()));
+                }
+                res.send(new FileSegmentPublisher(new FileSegment(0, Files.size(filePath), filePath.toFile())));
+            } catch (IOException ex) {
+                req.next(ex);
+            }
+        }
+    }
+
+    private void listPipelines(ServerRequest req, ServerResponse res) {
+        int pagenum = toInt(req.queryParams().first("pagenum"), 1);
+        int numitems = toInt(req.queryParams().first("numitems"), 20);
+        ResponseHeaders headers = res.headers();
+        // TODO remove me
+        headers.put("Access-Control-Allow-Origin", "*");
+        try {
+            List<Path> descriptorFiles = Files.list(storagePath)
+                    .skip((pagenum - 1) * numitems) // skip to get to the current page
+                    .limit(((pagenum + MAX_PAGES) * numitems) + 1) // max limit calculate the remaining pages
+                    .collect(Collectors.toList());
+            List<PipelineInfo> pipelines = descriptorFiles.stream()
+                    .limit(numitems)
+                    .map(descriptorManager::loadInfoFromDir)
+                    .collect(Collectors.toList());
+            int totalpages = (int) Math.ceil((double)((descriptorFiles.size() - pipelines.size()) / numitems));
+            headers.contentType(MediaType.APPLICATION_JSON);
+            res.send(new PipelineInfos(pipelines, pagenum, totalpages + 1));
+        } catch (IOException ex) {
+            req.next(ex);
+        }
+    }
 
     private void getPipeline(ServerRequest req, ServerResponse res) {
-        String pipelineId = req.path().param("pipelineId");
         ResponseHeaders headers = res.headers();
+        // TODO remove me
         headers.put("Access-Control-Allow-Origin", "*");
-        Pipeline pipeline = descriptorManager.load(pipelineId);
+        Pipeline pipeline = descriptorManager.loadPipeline(req.path().param("pipelineId"));
         if (pipeline != null) {
             headers.contentType(MediaType.APPLICATION_JSON);
             res.send(pipeline);
@@ -122,23 +189,31 @@ final class FrontendService implements Service {
     }
 
     private void getOutput(ServerRequest req, ServerResponse res) {
-        String pipelineId = req.path().param("pipelineId");
-        int stepId = toInt(Optional.ofNullable(req.path().param("stepId")));
-
         // number of lines (default is infinite)
         int lines = toInt(req.queryParams().first("lines"), Integer.MAX_VALUE);
         // start position (default is 0)
         long position = toLong(req.queryParams().first("position"), 0L);
         // count lines from the end? (default is false)
-        boolean backward = req.queryParams().first("backward").map(Boolean::valueOf).orElse(false);
+        boolean backward = toBoolean(req.queryParams().first("backward"), false);
         // return only complete lines? (default is false)
-        boolean linesOnly = req.queryParams().first("lines_only").map(Boolean::valueOf).orElse(false);
-        // wrap each lines with div markups ? (default is false)
-        boolean wrapHtml = req.queryParams().first("html").map(Boolean::valueOf).orElse(false);
-        // TODO return a proper html page with css to render lines nicely
-        // set content-type to text/html
+        boolean linesOnly = toBoolean(req.queryParams().first("lines_only"), false);
+        // produce html ? (default is false)
+        boolean html = toBoolean(req.queryParams().first("html"), false);
+        // produce raw text ? (default is false)
+        boolean raw = toBoolean(req.queryParams().first("html"), false);
 
-        Path filePath = storagePath.resolve(pipelineId + "/step-" + stepId + ".log");
+        String pipelineId = req.path().param("pipelineId");
+        Path pipelinePath = storagePath.resolve(pipelineId);
+        String stepId = req.path().param("stepId");
+        String fname = "step-" + stepId + ".log";
+        Path filePath = pipelinePath.resolve(fname);
+        if (!filePath.getParent().equals(pipelinePath)) {
+            throw new BadRequestException("Invalid stepId");
+        }
+
+        ResponseHeaders headers = res.headers();
+        // TODO remove me
+        headers.put("Access-Control-Allow-Origin", "*");
         if (!Files.exists(filePath)) {
             res.status(404).send();
             return;
@@ -152,20 +227,24 @@ final class FrontendService implements Service {
                 fseg = new FileSegment(0, Files.size(filePath), filePath.toFile());
             }
             FileSegment lseg = fseg.findLines(lines, linesOnly, backward);
-            ResponseHeaders headers = res.headers();
-            headers.contentType(MediaType.TEXT_PLAIN);
+            // TODO remove me
+            headers.put("Access-Control-Expose-Headers", LINES_HEADERS, REMAINING_HEADER, POSITION_HEADER);
+
             headers.put(LINES_HEADERS, String.valueOf(lseg.lines));
             headers.put(REMAINING_HEADER, String.valueOf(backward ? lseg.begin : fseg.end - lseg.end));
             headers.put(POSITION_HEADER, String.valueOf(lseg.end));
 
-            // TODO remove me
-            headers.put("Access-Control-Allow-Origin", "*");
-            headers.put("Access-Control-Expose-Headers", LINES_HEADERS, REMAINING_HEADER, POSITION_HEADER);
-
             Publisher<DataChunk> publisher = new FileSegmentPublisher(lseg);
-            if (!wrapHtml) {
+            if (!html) {
+                if (raw) {
+                    headers.contentType(MediaType.TEXT_PLAIN);
+                } else {
+                    headers.contentType(MediaType.APPLICATION_OCTET_STREAM);
+                    headers.put("Content-Disposition", "attachment; filename=\"" + pipelineId + "-" + stepId + ".log\"");
+                }
                 res.send(publisher);
             } else {
+                headers.contentType(MediaType.TEXT_HTML);
                 HtmlLineEncoder htmlEncoder = new HtmlLineEncoder(req.requestId());
                 publisher.subscribe(htmlEncoder);
                 res.send(htmlEncoder);
@@ -175,9 +254,8 @@ final class FrontendService implements Service {
         }
     }
 
-    private static int toInt(Optional<String> optional) {
-        return optional.map(Integer::valueOf)
-                .orElseThrow(() -> new BadRequestException(""));
+    private static boolean toBoolean(Optional<String> optional, boolean defaultValue) {
+        return optional.map((s) -> s.isEmpty() || Boolean.valueOf(s)).orElse(false);
     }
 
     private static int toInt(Optional<String> optional, int defaultValue) {

@@ -98,7 +98,7 @@ final class PipelineModelAdapter {
         if (!headNodes.isEmpty()) {
             StepAtomNode node = headNodes.pollLast();
             Step step = steps.get(node.getId());
-            if (isStepIncluded(step.declared(), step.meta())) {
+            if (step.isIncluded(excludeSyntheticSteps, excludeMetaSteps)) {
                 return step;
             }
         }
@@ -141,7 +141,7 @@ final class PipelineModelAdapter {
         }
         Step step = new Step(psteps, name, truncateStepArgs(args), meta, declared, new StatusImpl(node), new TimingsImpl(node));
         steps.put(node.getId(), step);
-        if (!isStepIncluded(declared, meta)) {
+        if (!step.isIncluded(excludeSyntheticSteps, excludeMetaSteps)) {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Excluding step, pipelineId={0}, signature={1}, stepId={2}, ", new Object[]{
                     node.getId(),
@@ -153,11 +153,6 @@ final class PipelineModelAdapter {
             psteps.addStep(step);
             step.fireCreated();
         }
-    }
-
-    private boolean isStepIncluded(boolean declared, boolean meta) {
-        return ((excludeSyntheticSteps && declared) || (!excludeSyntheticSteps && declared))
-                && ((excludeMetaSteps && !meta) || (!excludeMetaSteps && meta));
     }
 
     private String truncateStepArgs(String args) {

@@ -1,11 +1,15 @@
 package io.helidon.build.publisher.model;
 
+import java.io.IOException;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import java.io.IOException;
+
+import static io.helidon.build.publisher.model.PipelineDeserializer.readStatus;
+import static io.helidon.build.publisher.model.PipelineDeserializer.readTimings;
 
 /**
  * Jackson deserializer for {@link PipelineInfo}.
@@ -34,7 +38,8 @@ public final class PipelineInfoDeserializer extends StdDeserializer<PipelineInfo
     }
 
     static PipelineInfo readPipelineInfo(JsonNode node) {
-        return new PipelineInfo(node.get("id").asText(), node.get("repositoryUrl").asText(null),
-                node.get("name").asText(null), node.get("scmHead").asText(null), node.get("scmHash").asText(null));
+        return new PipelineInfo(node.get("id").asText(), node.get("gitRepositoryUrl").asText(null),
+                node.get("name").asText(null), node.get("gitHead").asText(null), node.get("gitCommit").asText(null),
+                readStatus(node), readTimings(node));
     }
 }

@@ -22,7 +22,7 @@
         temporary
         disable-route-watcher
       >
-        <pipelineNotifications />
+        <!--<pipelineNotifications />-->
       </v-navigation-drawer>
       <v-app-bar
         app
@@ -32,10 +32,11 @@
         <v-app-bar-nav-icon
           @click.stop="drawerLeft = !drawerLeft"
         />
-        <v-toolbar-title>{{ pipeline.title }}</v-toolbar-title>
+        <v-toolbar-title>{{ pipeline.name }}</v-toolbar-title>
         <v-spacer />
         <v-btn
           icon
+          disabled
           @click.stop="drawerRight = !drawerRight"
         >
           <v-badge
@@ -45,7 +46,7 @@
             <template
               v-slot:badge
             >
-              <span>6</span>
+              <span>0</span>
             </template>
             <v-icon>mdi-bell</v-icon>
           </v-badge>
@@ -84,11 +85,11 @@
       <v-content>
         <testsView
           v-if="viewid=='tests'"
-          :tests="tests"
+          :aggregatedtests="aggregatedtests"
         />
         <artifactsView
           v-else-if="viewid=='artifacts'"
-          :artifacts="artifacts"
+          :aggregatedartifacts="aggregatedartifacts"
         />
         <pipelineTreeView
           v-else
@@ -104,7 +105,7 @@ import statusIcons from '@/statusIcons'
 import statusText from '@/statusText'
 import PipelineInfo from './PipelineInfo'
 import PipelineMenu from './PipelineMenu'
-import PipelineNotifications from './PipelineNotifications'
+// import PipelineNotifications from './PipelineNotifications'
 import PipelineTreeView from './PipelineTreeView'
 import TestsView from './TestsView'
 import ArtifactsView from './ArtifactsView'
@@ -117,7 +118,7 @@ export default {
   components: {
     PipelineInfo,
     PipelineMenu,
-    PipelineNotifications,
+    // PipelineNotifications,
     Loading,
     Error,
     NotFound,
@@ -151,16 +152,17 @@ export default {
     viewIdNotFound () {
       return !viewIds.includes(this.viewid)
     },
-    artifacts () {
+    aggregatedartifacts () {
       const res = {}
       res.items = []
       res.count = 0
       this.visitPipeline(this.artifactsVisitor, res)
       return res
     },
-    tests () {
+    aggregatedtests () {
       const res = {}
       res.items = []
+      res.total = 0
       res.passed = 0
       res.failed = 0
       res.skipped = 0
@@ -208,29 +210,28 @@ export default {
       }
     },
     artifactsVisitor (item, path, data) {
-      if (typeof item.artifacts !== 'undefined') {
+      if (item.artifacts > 0) {
         const copy = {}
-        copy.count = item.artifacts.count
+        copy.count = item.artifacts
         data.count += copy.count
-        copy.items = item.artifacts.items
         copy.path = path
-        copy.type = item.type
+        copy.id = item.id
         data.items.push(copy)
       }
     },
     testsVisitor (item, path, data) {
-      if (typeof item.tests !== 'undefined') {
+      if (typeof item.tests !== 'undefined' && item.tests !== null) {
         const copy = {}
+        copy.total = item.tests.total
+        data.total += copy.total
         copy.passed = item.tests.passed
         data.passed += copy.passed
         copy.failed = item.tests.failed
         data.failed += copy.failed
         copy.skipped = item.tests.skipped
         data.skipped += copy.skipped
-        copy.status = copy.failed === 0 ? 'SUCCESS' : 'UNSTABLE'
-        copy.items = item.tests.items
         copy.path = path
-        copy.type = item.type
+        copy.id = item.id
         data.items.push(copy)
       }
     }

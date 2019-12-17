@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import io.helidon.build.publisher.model.Status.Result;
+import io.helidon.build.publisher.model.Status.State;
 import io.helidon.build.publisher.model.Stage.StageType;
 import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
@@ -35,8 +36,9 @@ public class PipelineEventsTest {
     @Test
     public void testJSON() throws IOException {
         List<PipelineEvent> events = new LinkedList<>();
-        PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789");
-        events.add(new PipelineCreatedEvent(info, TIMESTAMP));
+        PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789", new Status(State.RUNNING),
+                new Timings(TIMESTAMP));
+        events.add(new PipelineCreatedEvent(info));
         events.add(new StageCreatedEvent(info.id, "1", "0", 0, "build", TIMESTAMP, StageType.STEPS));
         events.add(new StepCreatedEvent(info.id, "2", "1", 0, "sh", TIMESTAMP, "echo foo"));
         events.add(new StepOutputEvent(info.id, "2"));

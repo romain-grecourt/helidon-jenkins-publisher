@@ -16,12 +16,10 @@ public abstract class Stage extends Node {
      * Create a new non parented stage.
      *
      * @param info pipeline info
-     * @param status the status object
-     * @param timings the timings object
-     * @throws NullPointerException if info, status or timings is {@code null}
+     * @throws NullPointerException if info is {@code null}
      */
-    protected Stage(PipelineInfo info, Status status, Timings timings) {
-        super(info, status, timings);
+    protected Stage(PipelineInfo info) {
+        super(info);
     }
 
     /**
@@ -114,7 +112,7 @@ public abstract class Stage extends Node {
         if (parent != null) {
             Iterator<Stage> it = ((Stages) parent).children.iterator();
             for (int i = 0; it.hasNext(); i++) {
-                if (it.next().id == id) {
+                if (it.next().id.equals(id)) {
                     return i;
                 }
             }

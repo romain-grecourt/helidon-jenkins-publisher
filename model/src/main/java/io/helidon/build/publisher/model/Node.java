@@ -30,14 +30,12 @@ public abstract class Node {
     /**
      * Create a new non parented node.
      * @param info pipeline info
-     * @param status the status object
-     * @param timings the timings object
-     * @throws NullPointerException if info, status or timings is {@code null}
+     * @throws NullPointerException if info is {@code null}
      */
-    protected Node(PipelineInfo info, Status status, Timings timings) {
+    protected Node(PipelineInfo info) {
         this.info = Objects.requireNonNull(info, "info is null");
-        this.status = Objects.requireNonNull(status, "status is null");
-        this.timings = Objects.requireNonNull(timings, "timings is null");
+        this.status = info.status;
+        this.timings = info.timings;
         this.listeners = new LinkedList<>();
         this.parent = null;
         this.name = "pipeline";

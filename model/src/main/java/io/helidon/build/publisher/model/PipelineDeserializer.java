@@ -41,11 +41,11 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
     public Pipeline deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
         JsonNode node = jp.getCodec().readTree(jp);
         PipelineInfo info = PipelineInfoDeserializer.readPipelineInfo(node);
-        Pipeline pipeline = new Pipeline(info, readStatus(node), readTimings(node));
+        Pipeline pipeline = new Pipeline(info);
 
         // depth first traversal
         LinkedList<JsonNode> stack = new LinkedList<>();
-        for (JsonNode stage : node.get("children")) {
+        for (JsonNode stage : node.get("items")) {
             stack.add(stage);
         }
         Node parent = pipeline;
@@ -132,15 +132,17 @@ public final class PipelineDeserializer extends StdDeserializer<Pipeline> {
         return parallel;
     }
 
-    private static Status readStatus(JsonNode node) {
+    static Status readStatus(JsonNode node) {
         String state = node.get("state").asText(null);
         String result = node.get("result").asText(null);
         return new Status(State.valueOf(state), result != null ? Result.valueOf(result) : null);
     }
 
-    private static Timings readTimings(JsonNode node) {
-        long startTime = node.get("startTime").asLong(-1);
-        long endTime = node.get("endTime").asLong(-1);
-        return new Timings(startTime, endTime);
+    static Timings readTimings(JsonNode node) {
+        if (node.hasNonNull("date")) {
+            return new Timings(node.get("date").asText(), node.get("duration").asLong(0));
+        } else {
+            return new Timings(node.get("startTime").asLong(-1), node.get("endTime").asLong(-1));
+        }
     }
 }

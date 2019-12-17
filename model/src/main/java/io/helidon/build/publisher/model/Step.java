@@ -16,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A step node.
  */
-@JsonPropertyOrder({"id", "name", "args", "state", "result", "startTime", "endTime"})
+@JsonPropertyOrder({"id", "type", "name", "args", "state", "result", "startTime", "endTime"})
 public final class Step extends Node {
 
     final String args;
@@ -62,6 +62,15 @@ public final class Step extends Node {
     }
 
     /**
+     * Get the node type.
+     * @return {@code "STEP"}
+     */
+    @JsonProperty
+    public String type() {
+        return "STEP";
+    }
+
+    /**
      * Get the meta flag.
      *
      * @return {@code boolean}
@@ -104,7 +113,7 @@ public final class Step extends Node {
     public int index() {
         Iterator<Step> it = ((Steps) parent).children.iterator();
         for (int i = 0; it.hasNext(); i++) {
-            if (it.next().id == id) {
+            if (it.next().id.equals(id)) {
                 return i;
             }
         }

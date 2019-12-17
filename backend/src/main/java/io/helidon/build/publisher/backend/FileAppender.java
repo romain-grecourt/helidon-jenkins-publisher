@@ -56,12 +56,12 @@ final class FileAppender {
     /**
      * Append the data of a publisher to a file in the storage at the given path.
      * @param chunks the data
-     * @param paththe file path
+     * @param filePath the file path
      * @param compressed true if the payload is {@code gzip} compressed
      * @return a future that completes normally when the data is appended or exceptionally if an error occurred
      */
-    CompletionStage<Void> append(Publisher<DataChunk> chunks, String path, boolean compressed) {
-        int queueId = Math.floorMod(path.hashCode(), workQueues.length);
+    CompletionStage<Void> append(Publisher<DataChunk> chunks, Path filePath, boolean compressed) {
+        int queueId = Math.floorMod(filePath.hashCode(), workQueues.length);
         BlockingQueue<WorkItem> queue = workQueues[queueId];
         if (queue == null) {
             queue = new LinkedBlockingQueue<>(QUEUE_SIZE);
@@ -72,7 +72,7 @@ final class FileAppender {
             executors.submit(new AppenderThread(queue, queueId));
         }
         CompletableFuture<Void> future = new CompletableFuture<>();
-        WorkItem workItem = new WorkItem(chunks, path, compressed, future);
+        WorkItem workItem = new WorkItem(chunks, filePath, compressed, future);
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.log(Level.FINE, "Adding work item to queue, queueId={0}, queueSize={1}, workItem={2}",
                     new Object[]{
@@ -110,8 +110,7 @@ final class FileAppender {
         return future;
     }
 
-    private OutputStream outputStream(String path) {
-        Path filePath = storagePath.resolve(path);
+    private OutputStream outputStream(Path filePath) {
         try {
             if (!Files.exists(filePath.getParent())) {
                 if (LOGGER.isLoggable(Level.FINE)) {
@@ -121,7 +120,7 @@ final class FileAppender {
             }
             if (!Files.exists(filePath)) {
                 if (LOGGER.isLoggable(Level.FINE)) {
-                    LOGGER.log(Level.FINE, "Creating file: {0}", path);
+                    LOGGER.log(Level.FINE, "Creating file: {0}", filePath);
                 }
                 Files.createFile(filePath);
             }
@@ -152,7 +151,7 @@ final class FileAppender {
                             workItem
                         });
                     }
-                    Appender appender = new Appender(outputStream(workItem.path), workItem.compressed, workItem.future);
+                    Appender appender = new Appender(outputStream(workItem.filePath), workItem.compressed, workItem.future);
                     workItem.chunks.subscribe(appender);
                     workItem.future.get(2, TimeUnit.MINUTES);
                     if (LOGGER.isLoggable(Level.FINE)) {
@@ -176,14 +175,14 @@ final class FileAppender {
 
     private final class WorkItem {
 
-        private final String path;
+        private final Path filePath;
         private final Publisher<DataChunk> chunks;
         private final boolean compressed;
         private final CompletableFuture<Void> future;
 
-        WorkItem(Publisher<DataChunk> chunks, String path, boolean compressed, CompletableFuture<Void> future) {
+        WorkItem(Publisher<DataChunk> chunks, Path filePath, boolean compressed, CompletableFuture<Void> future) {
             this.chunks = chunks;
-            this.path = path;
+            this.filePath = filePath;
             this.compressed = compressed;
             this.future = future;
         }
@@ -191,7 +190,7 @@ final class FileAppender {
         @Override
         public String toString() {
             return WorkItem.class.getSimpleName() + " {"
-                    + " path=" + path
+                    + " path=" + filePath
                     + ", compressed=" + compressed
                     + " }";
         }

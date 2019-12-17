@@ -4,12 +4,13 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 
 import io.helidon.common.http.Http;
+import io.helidon.webserver.BadRequestException;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerRequest;
 import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
-import io.helidon.build.publisher.model.PipelineDescriptorFileManager;
+import io.helidon.build.publisher.model.DescriptorFileManager;
 import io.helidon.build.publisher.model.PipelineEventProcessor;
 import io.helidon.build.publisher.model.events.PipelineEvents;
 
@@ -33,7 +34,7 @@ final class BackendService implements Service {
     BackendService(String path, int appenderThreads) {
         this.storagePath = FileSystems.getDefault().getPath(path);
         this.appender = new FileAppender(storagePath, appenderThreads);
-        this.eventProcessor = new PipelineEventProcessor(new PipelineDescriptorFileManager(storagePath));
+        this.eventProcessor = new PipelineEventProcessor(new DescriptorFileManager(storagePath));
     }
 
     @Override
@@ -51,20 +52,23 @@ final class BackendService implements Service {
     }
 
     private void appendOutput(ServerRequest req, ServerResponse res) {
-        String pipelineId = req.path().param("pipelineId");
-        int stepId = Integer.valueOf(req.path().param("stepId"));
-        // TODO double check that filepath is a file under storage/pipelineId
-        appender.append(req.content(), pipelineId + "/step-" + stepId + ".log", isCompressed(req))
+        Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
+        Path path = pipelinePath.resolve(req.path().param("stepId") + ".log");
+        if (!path.getParent().equals(pipelinePath)) {
+            throw new BadRequestException("Invalid stepId");
+        }
+        appender.append(req.content(), path, isCompressed(req))
                 .thenAccept(AsyncHandlers.status(res, OK_200))
                 .exceptionally(AsyncHandlers.error(req));
     }
 
     private void uploadFile(ServerRequest req, ServerResponse res) {
-        String pipelineId = req.path().param("pipelineId");
-        String filepath = req.path().param("filepath");
-        // TODO double check that filepath is nested under storage/pipelineId
-        // TODO double check taht filepath is nested under a subdirectory under storage/pipelineId
-        appender.append(req.content(), pipelineId + "/" + filepath, isCompressed(req))
+        Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
+        Path path = pipelinePath.resolve(req.path().param("filepath"));
+        if (!path.startsWith(pipelinePath)) {
+            throw new BadRequestException("Invalid path");
+        }
+        appender.append(req.content(), path, isCompressed(req))
                 .thenAccept(AsyncHandlers.status(res, CREATED_201))
                 .exceptionally(AsyncHandlers.error(req));
     }

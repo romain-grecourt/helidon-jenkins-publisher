@@ -5,6 +5,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 
 import io.helidon.build.publisher.model.PipelineInfo;
+import io.helidon.build.publisher.model.Status;
+import io.helidon.build.publisher.model.Timings;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherFolderProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherProjectProperty;
 import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
@@ -35,9 +37,9 @@ final class PipelineRunInfo {
     final boolean excludeSyntheticSteps;
     final boolean excludeMetaSteps;
     final String title;
-    final String scmHead;
-    final String scmHash;
-    final String repositoryUrl;
+    final String gitHead;
+    final String gitCommit;
+    final String gitRepositoryUrl;
     final String publisherServerUrl;
     final int publisherClientThreads;
     final long startTime;
@@ -48,9 +50,9 @@ final class PipelineRunInfo {
         excludeMetaSteps = false;
         publisherClientThreads = 0;
         title = null;
-        repositoryUrl = null;
-        scmHead = null;
-        scmHash = null;
+        gitRepositoryUrl = null;
+        gitHead = null;
+        gitCommit = null;
         publisherServerUrl = null;
         startTime = 0;
     }
@@ -66,13 +68,13 @@ final class PipelineRunInfo {
         SCMSource scmSource = project.getSCMSource(revAction.getSourceId());
         if (scmSource instanceof AbstractGitSCMSource) {
             String remote = ((AbstractGitSCMSource)scmSource).getRemote();
-            repositoryUrl = remote;
+            gitRepositoryUrl = remote;
         } else {
-            repositoryUrl = null;
+            gitRepositoryUrl = null;
         }
-        scmHead = rev.getHead().getName();
-        scmHash = rev.toString();
-        if (prop != null && !isBranchExcluded(scmHead, prop.getBranchExcludes())) {
+        gitHead = rev.getHead().getName();
+        gitCommit = rev.toString();
+        if (prop != null && !isBranchExcluded(gitHead, prop.getBranchExcludes())) {
             excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
@@ -83,7 +85,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(title, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, gitRepositoryUrl, gitHead, gitCommit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -115,11 +117,11 @@ final class PipelineRunInfo {
             }
         }
         startTime = run.getStartTimeInMillis();
-        repositoryUrl = remote;
+        gitRepositoryUrl = remote;
         SCMRevision rev = revAction.getRevision();
-        scmHead = rev.getHead().getName();
-        scmHash = rev.toString();
-        if (prop != null && !isBranchExcluded(scmHead, prop.getBranchExcludes())) {
+        gitHead = rev.getHead().getName();
+        gitCommit = rev.toString();
+        if (prop != null && !isBranchExcluded(gitHead, prop.getBranchExcludes())) {
             excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
@@ -130,7 +132,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(title, repositoryUrl, scmHead, scmHash, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, gitRepositoryUrl, gitHead, gitCommit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -140,8 +142,14 @@ final class PipelineRunInfo {
         }
     }
 
-    PipelineInfo toPipelineInfo() {
-        return new PipelineInfo(id, title, repositoryUrl, scmHead, scmHash);
+    /**
+     * Create a {@link PipelineInfo} from this run info.
+     * @param status status object
+     * @param timings timing object
+     * @return PipelineInfo
+     */
+    PipelineInfo toPipelineInfo(Status status, Timings timings) {
+        return new PipelineInfo(id, title, gitRepositoryUrl, gitHead, gitCommit, status, timings);
     }
 
     @Override
@@ -149,8 +157,9 @@ final class PipelineRunInfo {
         return PipelineRunInfo.class.getSimpleName() + "{"
                 + " id=" + id == null ? "null" : id
                 + ", title=" + title
-                + ", scmHead=" + scmHead
-                + ", scmHash=" + scmHash
+                + ", gitRepositoryUrl=" + gitRepositoryUrl
+                + ", gitHead=" + gitHead
+                + ", gitCommit=" + gitCommit
                 + ", publisherServerUrl=" + publisherServerUrl == null ? "null" : publisherServerUrl
                 + ", publisherClientThreads=" + publisherClientThreads == null ? "null" : publisherClientThreads
                 + ", excludeSyntheticSteps=" + excludeSyntheticSteps
@@ -161,16 +170,16 @@ final class PipelineRunInfo {
     /**
      * Create a unique ID.
      * @param title job name
-     * @param scmHead SCM head
-     * @param scmHash SCM hash
+     * @param gitHead GIT head
+     * @param gitCommit GIT commit
      * @param buildNumber build number
      * @param startTime start timestamp
      * @return String
      */
-    private static String createId(String title, String repotistoryUrl, String scmHead, String scmHash, int buildNumber,
+    private static String createId(String title, String repotistoryUrl, String gitHead, String gitCommit, int buildNumber,
             long startTime) {
 
-        String runDesc = title + "/" + repotistoryUrl + "/" + scmHead + "/" + buildNumber + "/" + startTime + "/" + scmHash;
+        String runDesc = title + "/" + repotistoryUrl + "/" + gitHead + "/" + buildNumber + "/" + startTime + "/" + gitCommit;
         return md5sum(runDesc.getBytes());
     }
 

@@ -14,19 +14,16 @@ import java.util.Objects;
 public final class PipelineCreatedEvent extends PipelineEvent {
 
     final PipelineInfo info;
-    final long startTime;
 
     /**
      * Create a new {@link PipelineEventType#PIPELINE_CREATED} event.
      *
      * @param info pipeline info
-     * @param startTime pipeline start time
      */
     @JsonCreator
-    public PipelineCreatedEvent(@JsonProperty("info") PipelineInfo info, @JsonProperty("startTime") long startTime) {
+    public PipelineCreatedEvent(@JsonProperty("info") PipelineInfo info) {
         super(info.id());
         this.info = info;
-        this.startTime = startTime;
     }
 
     @Override
@@ -44,21 +41,10 @@ public final class PipelineCreatedEvent extends PipelineEvent {
         return info;
     }
 
-    /**
-     * Get the start timestamp.
-     *
-     * @return long
-     */
-    @JsonProperty
-    public long startTime() {
-        return startTime;
-    }
-
     @Override
     public int hashCode() {
         int hash = 7;
         hash = 83 * hash + Objects.hashCode(this.info);
-        hash = 83 * hash + (int) (this.startTime ^ (this.startTime >>> 32));
         return hash;
     }
 
@@ -74,9 +60,6 @@ public final class PipelineCreatedEvent extends PipelineEvent {
             return false;
         }
         final PipelineCreatedEvent other = (PipelineCreatedEvent) obj;
-        if (this.startTime != other.startTime) {
-            return false;
-        }
         return Objects.equals(this.info, other.info);
     }
 
@@ -84,7 +67,6 @@ public final class PipelineCreatedEvent extends PipelineEvent {
     public String toString() {
         return PipelineCreatedEvent.class.getSimpleName() + "{"
                 + " pipelineId=" + pipelineId
-                + ", startTime=" + startTime
                 + " }";
     }
 }
