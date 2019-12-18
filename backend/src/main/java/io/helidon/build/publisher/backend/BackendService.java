@@ -13,6 +13,7 @@ import io.helidon.webserver.Service;
 import io.helidon.build.publisher.model.DescriptorFileManager;
 import io.helidon.build.publisher.model.PipelineEventProcessor;
 import io.helidon.build.publisher.model.events.PipelineEvents;
+import io.helidon.common.CollectionsHelper;
 
 import static io.helidon.common.http.Http.Status.CREATED_201;
 import static io.helidon.common.http.Http.Status.OK_200;
@@ -34,7 +35,8 @@ final class BackendService implements Service {
     BackendService(String path, int appenderThreads) {
         this.storagePath = FileSystems.getDefault().getPath(path);
         this.appender = new FileAppender(storagePath, appenderThreads);
-        this.eventProcessor = new PipelineEventProcessor(new DescriptorFileManager(storagePath));
+        this.eventProcessor = new PipelineEventProcessor(new DescriptorFileManager(storagePath),
+                CollectionsHelper.listOf(new GitHubAugmenter()));
     }
 
     @Override
@@ -53,7 +55,7 @@ final class BackendService implements Service {
 
     private void appendOutput(ServerRequest req, ServerResponse res) {
         Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
-        Path path = pipelinePath.resolve(req.path().param("stepId") + ".log");
+        Path path = pipelinePath.resolve("step-" + req.path().param("stepId") + ".log");
         if (!path.getParent().equals(pipelinePath)) {
             throw new BadRequestException("Invalid stepId");
         }

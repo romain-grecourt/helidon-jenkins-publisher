@@ -12,10 +12,8 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 
 import io.helidon.build.publisher.model.Pipeline;
-import io.helidon.build.publisher.model.Status;
 import io.helidon.build.publisher.model.Step;
 import io.helidon.build.publisher.model.Steps;
-import io.helidon.build.publisher.model.Timings;
 
 import hudson.Extension;
 import hudson.console.ConsoleLogFilter;
@@ -23,7 +21,6 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
 import hudson.tasks.junit.SuiteResult;
-import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 
 /**
@@ -70,7 +67,7 @@ public final class JobPublisher {
             pipeline.addStage(steps);
             ArtifactsProcessor.register(ARTIFACTS_PROCESSOR_FACTORY);
         } else {
-            if (LOGGER.isLoggable(Level.FINE)) {
+            if (LOGGER.isLoggable(Level.FINE) && runInfo != null) {
                 LOGGER.log(Level.FINE, "Pipeline NOT enabled, run={0}", run);
             }
             enabled = false;
@@ -107,7 +104,20 @@ public final class JobPublisher {
         }
     }
 
-    private static JobPublisher get(Run run) {
+    /**
+     * Get the pipeline id for this publisher instance.
+     * @return String, {@code null} if not enabled
+     */
+    String pipelineId() {
+        return pipelineId;
+    }
+
+    /**
+     * Get a pipeline publisher for the given run.
+     * @param run workflow run
+     * @return JobPublisher or {@code null} if not found
+     */
+    static JobPublisher get(Run run) {
         if (run == null) {
             return EMPTY_PUBLISHER;
         }

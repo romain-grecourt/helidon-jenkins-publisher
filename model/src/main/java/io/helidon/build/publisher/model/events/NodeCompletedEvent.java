@@ -14,7 +14,7 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
     final PipelineEventType type;
     final String id;
     final Status.Result result;
-    final long endTime;
+    final long duration;
 
     /**
      * Create a new completed node event.
@@ -23,14 +23,14 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
      * @param id node id
      * @param state node state
      * @param result node result
-     * @param endTime node end timestamp
+     * @param duration node duration
      */
-    NodeCompletedEvent(String pipelineId, PipelineEventType type, String id, Status.Result result, long endTime) {
+    NodeCompletedEvent(String pipelineId, PipelineEventType type, String id, Status.Result result, long duration) {
         super(pipelineId);
         this.type = type;
         this.id = id;
         this.result = result;
-        this.endTime = endTime;
+        this.duration = duration;
     }
 
     @JsonProperty
@@ -60,13 +60,13 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
     }
 
     /**
-     * Get the end timestamp.
+     * Get the duration in seconds.
      *
      * @return long
      */
     @JsonProperty
-    public final long endTime() {
-        return endTime;
+    public final long duration() {
+        return duration;
     }
 
     @Override
@@ -75,7 +75,7 @@ public abstract class NodeCompletedEvent extends PipelineEvent {
                 + " pipelineId=" + pipelineId
                 + ", id=" + id
                 + ", result=" + result
-                + ", endTime=" + endTime
+                + ", duration=" + duration
                 + " }";
     }
 

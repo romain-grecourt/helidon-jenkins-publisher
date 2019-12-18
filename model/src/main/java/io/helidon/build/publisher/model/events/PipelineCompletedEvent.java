@@ -14,21 +14,21 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 public final class PipelineCompletedEvent extends PipelineEvent {
 
     final Result result;
-    final long endTime;
+    final long duration;
 
     /**
      * Create a new {@link PipelineEventType#PIPELINE_COMPLETED} event.
      *
      * @param pipelineId pipelineId
      * @param result pipeline result
-     * @param endTime pipeline end timestamp
+     * @param duration pipeline duration
      */
     public PipelineCompletedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("result") Result result,
-            @JsonProperty("endTime") long endTime) {
+            @JsonProperty("duration") long duration) {
 
         super(pipelineId);
         this.result = result;
-        this.endTime = endTime;
+        this.duration = duration;
     }
 
     @Override
@@ -47,13 +47,13 @@ public final class PipelineCompletedEvent extends PipelineEvent {
     }
 
     /**
-     * Get the start timestamp.
+     * Get the duration in seconds.
      *
      * @return long
      */
     @JsonProperty
-    public long endTime() {
-        return endTime;
+    public long duration() {
+        return duration;
     }
 
     @Override
@@ -82,6 +82,7 @@ public final class PipelineCompletedEvent extends PipelineEvent {
     public String toString() {
         return PipelineCompletedEvent.class.getSimpleName() + "{"
                 + " pipelineId=" + pipelineId
+                + ", duration=" + duration
                 + " }";
     }
 }

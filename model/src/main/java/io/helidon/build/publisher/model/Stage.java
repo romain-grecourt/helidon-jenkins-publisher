@@ -66,23 +66,6 @@ public abstract class Stage extends Node {
         return prefix + "stage[" + name + "]/";
     }
 
-    /**
-     * The type of stages.
-     */
-    public enum StageType {
-        STEPS,
-        SEQUENCE,
-        PARALLEL
-    }
-
-    /**
-     * Get the stage type.
-     *
-     * @return Type
-     */
-    @JsonProperty
-    public abstract StageType type();
-
     @Override
     public Stage previous() {
         if (parent != null) {

@@ -49,13 +49,13 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
 
     PipelinePublisher(FlowExecution execution) {
         PipelineRunInfo runInfo = new PipelineRunInfo(execution);
-        if (runInfo.id != null) {
+        WorkflowRun run = Helper.getRun(execution.getOwner());
+        if (run.isBuilding() && runInfo.id != null) {
             enabled = true;
             client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
             excludeSyntheticSteps = runInfo.excludeSyntheticSteps;
             excludeMetaSteps = runInfo.excludeMetaSteps;
             pipelineId = runInfo.id;
-            WorkflowRun run = Helper.getRun(execution.getOwner());
             pipeline = new Pipeline(runInfo.toPipelineInfo(new GlobalStatus(run), new GlobalTimings(run)));
             modelAdapter = new PipelineModelAdapter(PipelineSignatures.getOrCreate(execution), pipeline, excludeSyntheticSteps,
                     excludeMetaSteps);
@@ -111,6 +111,27 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
             }
             modelAdapter.offer(node);
         }
+    }
+
+    /**
+     * Get the pipeline id for this publisher instance.
+     * @return String, {@code null} if not enabled
+     */
+    String pipelineId() {
+        return pipelineId;
+    }
+
+    /**
+     * Get a pipeline publisher for the given run.
+     * @param run workflow run
+     * @return PipelinePublisher or {@code null} if not found
+     */
+    static PipelinePublisher get(WorkflowRun run) {
+        WeakReference<TaskListenerDecorator> ref = PUBLISHERS.get(run.getExecution());
+        if (ref != null && ref.get() instanceof PipelinePublisher) {
+            return (PipelinePublisher) ref.get();
+        }
+        return null;
     }
 
     /**

@@ -3,24 +3,24 @@
     fluid
   >
     <h2>Tests</h2>
-    <v-subheader>{{ aggregatedtests.passed }} passed, {{ aggregatedtests.failed }} failed , {{ aggregatedtests.skipped }} skipped</v-subheader>
+    <v-subheader>{{ alltests.passed }} passed, {{ alltests.failed }} failed , {{ alltests.skipped }} skipped</v-subheader>
     <v-row
       justify="center"
       class="px-5 mt-4"
     >
       <v-expansion-panels
-        accordion
         multiple
+        popout
       >
         <v-expansion-panel
-          v-for="(testsinfo,i) in aggregatedtests.items"
+          v-for="(testsinfo,i) in alltests.items"
           :key="i"
         >
           <v-expansion-panel-header>
             <v-badge
               overlap
               class="mr-4 noflex "
-              :color="statusColors(null, testsinfo.failed > 0 ? 'UNSTABLE' : 'PASSED')"
+              :color="statusColors(testsinfo.failed > 0 ? 'UNSTABLE' : 'PASSED')"
             >
               <template
                 v-if="testsinfo.failed > 0"
@@ -57,7 +57,7 @@ export default {
     Tests
   },
   props: {
-    aggregatedtests: {
+    alltests: {
       type: Object,
       required: true
     }

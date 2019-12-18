@@ -60,15 +60,6 @@ public class Timings {
     }
 
     /**
-     * Get the start timestamp.
-     *
-     * @return long
-     */
-    public final long startTime() {
-        return startTime;
-    }
-
-    /**
      * Get the date.
      *
      * @return String
@@ -77,8 +68,20 @@ public class Timings {
         return date;
     }
 
-    public final long endTime() {
-        return endTime;
+    /**
+     * Set the end timestamp from the given duration in seconds.
+     * @param duration duration in seconds
+     */
+    public void duration(long duration) {
+        endTime = startTime + (duration * 1000);
+    }
+
+    /**
+     * Get the duration in seconds
+     * @return long
+     */
+    public final long duration() {
+        return endTime > startTime? (endTime - startTime) / 1000 : 0;
     }
 
     /**

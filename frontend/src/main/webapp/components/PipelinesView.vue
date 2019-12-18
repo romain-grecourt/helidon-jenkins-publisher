@@ -50,7 +50,7 @@
                     <th
                       class="text-left"
                     >
-                      Message
+                      Title
                     </th>
                     <th
                       class="text-left hidden-xs-only"
@@ -99,21 +99,21 @@
                       />
                       <v-icon
                         v-else
-                        :color="statusColors[item.status]"
+                        :color="statusColors(item.status)"
                       >
-                        {{ statusIcons(item.state, item.result) }}
+                        {{ statusIcons(item.status) }}
                       </v-icon>
                     </td>
-                    <td>{{ item.name }}</td>
+                    <td>{{ item.title }}</td>
                     <td
                       class="hidden-xs-only"
                     >
-                      {{ item.gitRepositoryUrl }}
+                      {{ item.repositoryUrl }}
                     </td>
                     <td
                       class="hidden-xs-only"
                     >
-                      {{ item.gitHead }}
+                      {{ item.headRef }}
                     </td>
                     <td>{{ when(item.date) }}</td>
                   </tr>
@@ -123,6 +123,7 @@
             <v-pagination
               v-model="pipelineInfos.pagenum"
               :length="pipelineInfos.totalpages"
+              :total-visible="10"
               @input="onPageChange"
             />
           </v-col>
@@ -170,7 +171,7 @@ export default {
       this.$router.push({ path: '/' + id })
     },
     onPageChange (pagenum) {
-      this.$api.get('?pagenum=' + pagenum)
+      this.$api.get('?pagenum=' + pagenum + '&numitems=20')
         .then(response => (this.pipelineInfos = response.data))
         .catch(error => (this.errored = error.message))
         .finally(() => (this.loading = false))

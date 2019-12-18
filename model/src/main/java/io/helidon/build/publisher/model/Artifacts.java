@@ -1,4 +1,4 @@
-package io.helidon.build.publisher.frontend;
+package io.helidon.build.publisher.model;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -13,26 +13,20 @@ import java.util.List;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
  * Artifacts model.
  */
+@JsonSerialize(using = JacksonSupport.ArtifactsSerializer.class)
 public final class Artifacts {
 
-    final int count;
     final List<Item> items;
 
-    private Artifacts(int count, List<Item> items) {
-        this.count = count;
+    private Artifacts(List<Item> items) {
         this.items = items;
     }
 
-    @JsonProperty
-    public int count() {
-        return count;
-    }
-
-    @JsonProperty
     public List<Item> items() {
         return items;
     }
@@ -48,7 +42,7 @@ public final class Artifacts {
         FileVisitorImpl visitor = new FileVisitorImpl(dir);
         Files.walkFileTree(dir, visitor);
         List<Item> items = visitor.dirItem != null ? visitor.dirItem.children : Collections.emptyList();
-        return new Artifacts(visitor.count, items);
+        return new Artifacts(items);
     }
 
     /**
@@ -119,13 +113,11 @@ public final class Artifacts {
 
         final Path root;
         final Deque<DirItem> stack;
-        int count;
         DirItem dirItem;
 
         FileVisitorImpl(Path dir) {
             root = dir;
             stack = new LinkedList<>();
-            count = 0;
         }
 
         @Override
@@ -145,7 +137,6 @@ public final class Artifacts {
                 type = "";
             }
             stack.peek().children.add(new FileItem(fname, root.relativize(file).toString(), type));
-            count++;
             return FileVisitResult.CONTINUE;
         }
 

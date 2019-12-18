@@ -1,21 +1,14 @@
 <template>
   <div>
     <v-subheader>{{ testsinfo.passed }} passed, {{ testsinfo.failed }} failed , {{ testsinfo.skipped }} skipped</v-subheader>
-    <div
+    <loading
       v-if="loading"
-      class="loading-container"
-    >
-      <v-progress-circular
-        :width="5"
-        :size="50"
-        color="primary"
-        indeterminate
-      />
-    </div>
+      :width="5"
+      :size="50"
+    />
     <v-expansion-panels
       v-else
       accordion
-      multiple
       focusable
     >
       <template
@@ -32,9 +25,9 @@
           >
             <v-icon
               class="noflex mr-2"
-              :color="statusColors(null, test.status)"
+              :color="statusColors(test.status)"
             >
-              {{ statusIcons(null, test.status) }}
+              {{ statusIcons(test.status) }}
             </v-icon>
             <span>{{ test.name }}</span>
           </v-expansion-panel-header>
@@ -51,31 +44,33 @@
   </div>
 </template>
 <style>
-  .test-output > .v-expansion-panel-content__wrap {
-    padding: 0 0 10px 0;
-  }
-  .test-output > .v-expansion-panel-content__wrap > .output {
-    padding: 10px 10px 10px 20px;
-    font-size: 0.9em;
-    color: #E0E0E0;
-  }
-  .noflex {
-    flex: none !important;
-  }
-  .loading-container {
-    width: 100%;
-    text-align: center;
-    padding: 20px;
-  }
+.test-output > .v-expansion-panel-content__wrap {
+  padding: 0 0 10px 0;
+}
+.test-output > .v-expansion-panel-content__wrap > .output {
+  padding: 10px 10px 10px 20px;
+  font-size: 0.9em;
+  color: #E0E0E0;
+}
+.noflex {
+  flex: none !important;
+}
+.loading-container {
+  width: 100%;
+  text-align: center;
+  padding: 20px;
+}
 </style>
 <script>
 import statusIcons from '@/statusIcons'
 import statusColors from '@/statusColors'
 import ConsoleOutput from './ConsoleOutput'
+import Loading from './Loading'
 export default {
   name: 'Tests',
   components: {
-    ConsoleOutput
+    ConsoleOutput,
+    Loading
   },
   props: {
     id: {
@@ -93,10 +88,8 @@ export default {
   }),
   created () {
     this.$api.get(this.$route.params.pipelineid + '/tests/' + this.id)
-      .then((response) => (this.results = response.data.items))
-      .finally(() => {
-        this.loading = false
-      })
+      .then((response) => (this.results = response.data))
+      .finally(() => (this.loading = false))
   },
   methods: {
     statusColors: statusColors,

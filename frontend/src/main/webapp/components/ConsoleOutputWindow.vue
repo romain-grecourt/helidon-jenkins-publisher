@@ -30,7 +30,8 @@
     <error
       v-if="errored"
       :message="errored"
-      :big="false"
+      :size="96"
+      class="output-error"
     >
       <v-btn
         class="mt-5"
@@ -46,9 +47,12 @@
   </window>
 </template>
 <style>
-  .output {
-    margin: 10px;
-  }
+.output {
+  margin: 10px;
+}
+.output-error .message {
+  font-size: 1em;
+}
 </style>
 <script>
 import Window from './Window'
@@ -97,8 +101,13 @@ export default {
   },
   methods: {
     retry () {
-      const outputContainer = this.$refs.output.$refs.container
-      outputContainer.innerHTML = ''
+      const output = this.$refs.output
+      if (typeof output !== 'undefined' && output != null) {
+        const outputContainer = this.$refs.output.$refs.container
+        if (typeof outputContainer !== 'undefined' && outputContainer != null) {
+          outputContainer.innerHTML = ''
+        }
+      }
       this.loading = true
       this.loadOutput(0, 0, true, this.readonly, 400)
     },

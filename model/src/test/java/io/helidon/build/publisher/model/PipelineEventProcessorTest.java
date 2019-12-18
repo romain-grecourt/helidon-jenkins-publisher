@@ -1,10 +1,9 @@
 package io.helidon.build.publisher.model;
 
-import io.helidon.build.publisher.model.Status.State;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
+import io.helidon.build.publisher.model.Status.State;
 import io.helidon.build.publisher.model.events.ArtifactsInfoEvent;
 import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
@@ -14,6 +13,7 @@ import io.helidon.build.publisher.model.events.StageCreatedEvent;
 import io.helidon.build.publisher.model.events.StepCompletedEvent;
 import io.helidon.build.publisher.model.events.StepCreatedEvent;
 import io.helidon.build.publisher.model.events.TestsInfoEvent;
+import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,35 +34,43 @@ public class PipelineEventProcessorTest {
     @Test
     public void testSimpleEvents() {
         List<PipelineEvent> events = new LinkedList<>();
-        String pid = "abcdefgh";
-        PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789", new Status(State.RUNNING),
-                new Timings(TIMESTAMP));
+        PipelineInfo info = PipelineInfo.builder()
+                .id("abcdefgh")
+                .title("testJob")
+                .repositoryUrl(REPO_URL)
+                .headRef("master")
+                .commit("123456789")
+                .status(new Status(State.RUNNING))
+                .timings(new Timings(TIMESTAMP))
+                .build();
         events.add(new PipelineCreatedEvent(info));
-        events.add(new StageCreatedEvent(pid, "1", "0", 0, "build", TIMESTAMP, Stage.StageType.SEQUENCE));
-        events.add(new StageCreatedEvent(pid, "2", "1", 0, null, TIMESTAMP, Stage.StageType.STEPS));
-        events.add(new StepCreatedEvent(pid, "3", "2", 0, "sh", TIMESTAMP, "echo foo"));
-        events.add(new StepCompletedEvent(pid, "3", Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new TestsInfoEvent(pid, "2", new TestsInfo(1, 1, 0, 0)));
-        events.add(new ArtifactsInfoEvent(pid, "2", 1));
-        events.add(new StageCompletedEvent(pid, "2", Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(pid, "1", Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new StageCompletedEvent(pid, "0", Status.Result.SUCCESS, TIMESTAMP));
-        events.add(new PipelineCompletedEvent(pid, Status.Result.SUCCESS, TIMESTAMP));
-        AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
-        new PipelineEventProcessor(new PipelineDescriptorManager(){
-            @Override
-            public Pipeline loadPipeline(String id) {
-                return null;
-            }
+        events.add(new StageCreatedEvent(info.id, "1", "0", 0, "build", TIMESTAMP, "SEQUENCE"));
+        events.add(new StageCreatedEvent(info.id, "2", "1", 0, null, TIMESTAMP, "STEPS"));
+        events.add(new StepCreatedEvent(info.id, "3", "2", 0, "sh", TIMESTAMP, "echo foo"));
+        events.add(new StepCompletedEvent(info.id, "3", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new TestsInfoEvent(info.id, "2", new TestsInfo(1, 1, 0, 0)));
+        events.add(new ArtifactsInfoEvent(info.id, "2", 1));
+        events.add(new StageCompletedEvent(info.id, "2", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(info.id, "1", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new StageCompletedEvent(info.id, "0", Status.Result.SUCCESS, TIMESTAMP));
+        events.add(new PipelineCompletedEvent(info.id, Status.Result.SUCCESS, TIMESTAMP));
+        TestManager manager = new TestManager();
+        TestAugmenter augmenter = new TestAugmenter(
+                "https://github.com/john_doe/repo/commits/123456789",
+                "https://github.com/john_doe/repo/tree/master",
+                "john_doe",
+                "https://github.com/john_doe");
+        ArrayList<PipelineInfoAugmenter> augmenters = new ArrayList<>();
+        augmenters.add(augmenter);
+        new PipelineEventProcessor(manager, augmenters).process(events);
 
-            @Override
-            public void savePipeline(Pipeline pipeline) {
-                pipelineRef.set(pipeline);
-            }
-        }).process(events);
-
-        Pipeline pipeline = pipelineRef.get();
+        Pipeline pipeline = manager.pipeline;
         assertThat(pipeline, is(not(nullValue())));
+
+        assertThat(pipeline.info.commitUrl, is(augmenter.commitUrl));
+        assertThat(pipeline.info.headRefUrl, is(augmenter.headRefUrl));
+        assertThat(pipeline.info.user, is(augmenter.user));
+        assertThat(pipeline.info.userUrl, is(augmenter.userUrl));
 
         // pretty print
         System.out.println(pipeline.toPrettyString(true, true));
@@ -73,14 +81,14 @@ public class PipelineEventProcessorTest {
         Stage stage = pipeline.children.get(0);
         assertThat(stage.id, is("1"));
         assertThat(stage.name, is("build"));
-        assertThat(stage.type(), is(Stage.StageType.SEQUENCE));
+        assertThat(stage.type(), is("SEQUENCE"));
         assertThat(stage.status.state, is(Status.State.FINISHED));
         assertThat(stage.status.result, is(Status.Result.SUCCESS));
 
         Sequence sequence = (Sequence)stage;
         assertThat(sequence.children.size(), is(1));
         assertThat(sequence.children.get(0).id, is("2"));
-        assertThat(sequence.children.get(0).type(), is(Stage.StageType.STEPS));
+        assertThat(sequence.children.get(0).type(), is("STEPS"));
 
         Steps steps = (Steps) sequence.children.get(0);
 
@@ -98,5 +106,44 @@ public class PipelineEventProcessorTest {
         assertThat(step.name, is("sh"));
         assertThat(step.status.state, is(Status.State.FINISHED));
         assertThat(step.status.result, is(Status.Result.SUCCESS));
+    }
+
+    private static final class TestManager implements PipelineDescriptorManager {
+
+        Pipeline pipeline;
+
+        @Override
+        public Pipeline loadPipeline(String id) {
+            return null;
+        }
+
+        @Override
+        public void savePipeline(Pipeline pipeline) {
+            this.pipeline = pipeline;
+        }
+    }
+
+    private static final class TestAugmenter implements PipelineInfoAugmenter {
+
+        final String commitUrl;
+        final String headRefUrl;
+        final String user;
+        final String userUrl;
+
+        TestAugmenter(String commitUrl, String headRefUrl, String user, String userUrl) {
+            this.commitUrl = commitUrl;
+            this.headRefUrl = headRefUrl;
+            this.user = user;
+            this.userUrl = userUrl;
+        }
+
+        @Override
+        public boolean process(PipelineInfo info) {
+            info.commitUrl(commitUrl);
+            info.headRefUrl(headRefUrl);
+            info.user(user);
+            info.userUrl(userUrl);
+            return true;
+        }
     }
 }

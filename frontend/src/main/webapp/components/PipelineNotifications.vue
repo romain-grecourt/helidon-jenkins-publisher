@@ -14,9 +14,9 @@
         >
           <v-list-item-icon>
             <v-icon
-              :color="statusColors[item.status]"
+              :color="statusColors(item.status)"
             >
-              {{ statusIcons[item.status] }}
+              {{ statusIcons(item.status) }}
             </v-icon>
           </v-list-item-icon>
           <v-list-item-content>

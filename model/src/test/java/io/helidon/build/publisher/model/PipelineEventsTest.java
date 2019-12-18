@@ -8,7 +8,6 @@ import java.util.List;
 
 import io.helidon.build.publisher.model.Status.Result;
 import io.helidon.build.publisher.model.Status.State;
-import io.helidon.build.publisher.model.Stage.StageType;
 import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
 import io.helidon.build.publisher.model.events.PipelineEvent;
@@ -36,10 +35,17 @@ public class PipelineEventsTest {
     @Test
     public void testJSON() throws IOException {
         List<PipelineEvent> events = new LinkedList<>();
-        PipelineInfo info = new PipelineInfo("abcdefgh", "testJob", REPO_URL, "master", "123456789", new Status(State.RUNNING),
-                new Timings(TIMESTAMP));
+        PipelineInfo info = PipelineInfo.builder()
+                .id("abcdefgh")
+                .title("testJob")
+                .repositoryUrl(REPO_URL)
+                .headRef("master")
+                .commit("123456789")
+                .status(new Status(State.RUNNING))
+                .timings(new Timings(TIMESTAMP))
+                .build();
         events.add(new PipelineCreatedEvent(info));
-        events.add(new StageCreatedEvent(info.id, "1", "0", 0, "build", TIMESTAMP, StageType.STEPS));
+        events.add(new StageCreatedEvent(info.id, "1", "0", 0, "build", TIMESTAMP, "STEPS"));
         events.add(new StepCreatedEvent(info.id, "2", "1", 0, "sh", TIMESTAMP, "echo foo"));
         events.add(new StepOutputEvent(info.id, "2"));
         events.add(new StepCompletedEvent(info.id, "2", Result.SUCCESS, TIMESTAMP));

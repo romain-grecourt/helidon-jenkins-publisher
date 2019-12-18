@@ -22,8 +22,8 @@ final class GlobalTimings extends Timings {
 
     @Override
     protected void refresh() {
-        if (super.endTime == 0 && !run.isBuilding()) {
-            super.endTime = run.getDuration();
+        if (endTime == 0 && !run.isBuilding()) {
+            duration(run.getDuration() / 1000);
         }
     }
 }

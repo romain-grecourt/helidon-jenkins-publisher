@@ -27,8 +27,8 @@ public final class Parallel extends Stages {
     }
 
     @Override
-    public StageType type() {
-        return StageType.PARALLEL;
+    public String type() {
+        return "PARALLEL";
     }
 
     @Override
@@ -50,6 +50,6 @@ public final class Parallel extends Stages {
         status.state = Status.State.FINISHED;
         status.result = result;
         timings.endTime = endTime > 0 ? endTime : System.currentTimeMillis();
-        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.endTime));
+        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.duration()));
     }
 }

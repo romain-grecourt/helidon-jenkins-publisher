@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A steps stage.
  */
-@JsonPropertyOrder({"id", "type", "name", "state", "result", "startTime", "endTime", "artifacts", "tests", "children"})
+@JsonPropertyOrder({"id", "type", "name", "status", "date", "duration", "artifacts", "tests", "children"})
 public final class Steps extends Stage {
 
     final List<Step> children = new LinkedList<>();
@@ -56,8 +56,8 @@ public final class Steps extends Stage {
     }
 
     @Override
-    public StageType type() {
-        return StageType.STEPS;
+    public String type() {
+        return "STEPS";
     }
 
     /**
@@ -87,8 +87,8 @@ public final class Steps extends Stage {
             last.fireCompleted();
         }
         status.state = Status.State.FINISHED;
-        status.result = last != null ? last.result() : Status.Result.SUCCESS;
-        timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
-        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.endTime));
+        status.result = last != null ? last.status.result : Status.Result.SUCCESS;
+        timings.endTime = last != null ? last.timings.endTime : System.currentTimeMillis();
+        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.duration()));
     }
 }

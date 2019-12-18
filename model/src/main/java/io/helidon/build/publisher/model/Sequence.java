@@ -32,14 +32,14 @@ public final class Sequence extends Stages {
             last.fireCompleted();
         }
         status.state = Status.State.FINISHED;
-        status.result = last != null ? last.result() : Status.Result.SUCCESS;
-        timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
-        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.endTime));
+        status.result = last != null ? last.status.result : Status.Result.SUCCESS;
+        timings.endTime = last != null ? last.timings.endTime : System.currentTimeMillis();
+        fireEvent(new StageCompletedEvent(info.id, id, status.result, timings.duration()));
     }
 
     @Override
-    public StageType type() {
-        return StageType.SEQUENCE;
+    public String type() {
+        return "SEQUENCE";
     }
 
     private static String createPath(Node parent, String name) {

@@ -7,6 +7,7 @@
     </h2>
     <v-row class="px-5">
       <v-treeview
+        ref="treeview"
         open-all
         dense
         hoverable
@@ -22,7 +23,7 @@
             v-if="item.type == 'STEP'"
           >
             <v-progress-circular
-              v-if="item.state=='RUNNING'"
+              v-if="item.status=='RUNNING'"
               size="20"
               width="3"
               class="mr-5"
@@ -31,10 +32,10 @@
             />
             <v-icon
               v-else
-              :color="statusColors(item.state, item.result)"
+              :color="statusColors(item.status)"
               class="mr-4"
             >
-              {{ statusIcons(item.state, item.result) }}
+              {{ statusIcons(item.status) }}
             </v-icon>
           </template>
           <v-icon
@@ -46,6 +47,11 @@
             v-else-if="item.type=='PARALLEL'"
           >
             mdi-layers-triple-outline
+          </v-icon>
+          <v-icon
+            v-else-if="item.type=='STEPS'"
+          >
+            mdi-circle-double
           </v-icon>
         </template>
         <template
@@ -88,7 +94,7 @@
                 v-if="item.tests.failed > 0"
                 class="small-badge"
                 overlap
-                :color="statusColors(null, 'UNSTABLE')"
+                :color="statusColors('UNSTABLE')"
               >
                 <template
                   v-slot:badge
@@ -122,6 +128,11 @@
               </v-icon>
             </v-btn>
           </v-chip>
+          <div
+            v-if="item.type=='STEP'"
+          >
+            {{ duration(item.date, item.duration) }}
+          </div>
           <v-chip
             v-if="item.type=='STEP'"
             class="ml-4"
@@ -214,6 +225,7 @@ import statusIcons from '@/statusIcons'
 import ConsoleOutputWindow from './ConsoleOutputWindow'
 import TestsWindow from './TestsWindow'
 import ArtifactsWindow from './ArtifactsWindow'
+import moment from 'moment'
 export default {
   name: 'PipelineTreeView',
   components: {
@@ -253,6 +265,35 @@ export default {
       } else {
         return item.name
       }
+    },
+    duration (date, duration) {
+      var m
+      if (duration === 0) {
+        m = moment.duration(moment().diff(moment(date)))
+      } else {
+        m = moment.duration(duration, 'seconds')
+      }
+      const hours = m.asHours()
+      const minutes = m.minutes()
+      const seconds = m.seconds()
+      console.log(duration, hours, minutes, seconds)
+      let res = ''
+      if (hours >= 1) {
+        res = parseInt(hours) + ' h'
+      }
+      if (minutes > 0) {
+        if (res.length > 0) {
+          res += ' '
+        }
+        res += minutes + ' min'
+      }
+      if (seconds > 0) {
+        if (res.length > 0) {
+          res += ' '
+        }
+        res += seconds + ' s'
+      }
+      return res
     }
   }
 }

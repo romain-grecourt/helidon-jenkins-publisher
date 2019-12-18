@@ -67,9 +67,25 @@ public class Status {
 
     @Override
     public String toString() {
-        return Status.class.getSimpleName() + "{"
-                + " state=" + state
-                + ", result=" + result
-                + "}";
+        return state == State.RUNNING ? State.RUNNING.toString() : result.toString();
+    }
+
+    /**
+     * Create a status object from a string.
+     * @param status status string
+     * @return Status
+     */
+    public static Status valueOf(String status) {
+        if (status.equals(State.RUNNING.toString())) {
+            return new Status(State.RUNNING, Result.UNKNOWN);
+        }
+        Result result = Result.UNKNOWN;
+        for(Result r : Result.values()) {
+            if (r.toString().equals(status)) {
+                result = r;
+                break;
+            }
+        }
+        return new Status(State.FINISHED, result);
     }
 }

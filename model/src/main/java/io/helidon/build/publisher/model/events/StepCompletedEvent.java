@@ -16,11 +16,11 @@ public final class StepCompletedEvent extends NodeCompletedEvent {
      * @param pipelineId pipelineId
      * @param id node id
      * @param result node result
-     * @param endTime node end timestamp
+     * @param duration node duration
      */
     public StepCompletedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") String id,
-            @JsonProperty("result") Status.Result result, @JsonProperty("endTime") long endTime) {
+            @JsonProperty("result") Status.Result result, @JsonProperty("duration") long duration) {
 
-        super(pipelineId, PipelineEventType.STEP_COMPLETED, id, result, endTime);
+        super(pipelineId, PipelineEventType.STEP_COMPLETED, id, result, duration);
     }
 }

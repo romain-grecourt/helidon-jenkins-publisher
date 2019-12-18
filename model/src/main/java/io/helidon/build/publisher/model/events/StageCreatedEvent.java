@@ -2,8 +2,6 @@ package io.helidon.build.publisher.model.events;
 
 import java.util.Objects;
 
-import io.helidon.build.publisher.model.Stage;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -13,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({"pipelineId", "eventType", "id", "parentId", "index", "name", "startTime", "state", "stageType"})
 public final class StageCreatedEvent extends NodeCreatedEvent {
 
-    final Stage.StageType stageType;
+    final String stageType;
 
     /**
      * Create a new {@link PipelineEventType#STAGE_CREATED} event.
@@ -29,7 +27,7 @@ public final class StageCreatedEvent extends NodeCreatedEvent {
     public StageCreatedEvent(@JsonProperty("pipelineId") String pipelineId, @JsonProperty("id") String id,
             @JsonProperty("parentId") String parentId, @JsonProperty("index") int index, @JsonProperty("name") String name,
             @JsonProperty("startTime") long startTime,
-            @JsonProperty("stageType") Stage.StageType stageType) {
+            @JsonProperty("stageType") String stageType) {
 
         super(pipelineId, id, parentId, index, name, startTime);
         this.stageType = stageType;
@@ -43,10 +41,10 @@ public final class StageCreatedEvent extends NodeCreatedEvent {
     /**
      * Get the stage type.
      *
-     * @return Stage.Type
+     * @return String
      */
     @JsonProperty
-    public Stage.StageType stageType() {
+    public String stageType() {
         return stageType;
     }
 
@@ -71,7 +69,7 @@ public final class StageCreatedEvent extends NodeCreatedEvent {
         if (!Objects.equals(this.pipelineId, other.pipelineId)) {
             return false;
         }
-        if (this.stageType != other.stageType) {
+        if (!this.stageType.equals(other.stageType)) {
             return false;
         }
         return super.equals(obj);

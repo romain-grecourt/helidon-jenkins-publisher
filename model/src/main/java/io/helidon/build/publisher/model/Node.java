@@ -100,6 +100,14 @@ public abstract class Node {
     }
 
     /**
+     * Get the node type.
+     *
+     * @return String
+     */
+    @JsonProperty
+    public abstract String type();
+
+    /**
      * Get the pipeline id.
      * @return String
      */
@@ -154,23 +162,23 @@ public abstract class Node {
     }
 
     /**
-     * Get the start timestamp.
+     * Get the start date.
      *
-     * @return long
+     * @return String
      */
     @JsonProperty
-    public final long startTime() {
-        return timings.startTime;
+    public String date() {
+        return timings.date;
     }
 
     /**
-     * Get the end timestamp.
+     * Get the duration in seconds.
      *
      * @return long
      */
     @JsonProperty
-    public final long endTime() {
-        return timings.endTime;
+    public final long duration() {
+        return timings.duration();
     }
 
     /**
@@ -179,18 +187,8 @@ public abstract class Node {
      * @return State
      */
     @JsonProperty
-    public final Status.State state() {
-        return status.state;
-    }
-
-    /**
-     * Get the result.
-     *
-     * @return Result
-     */
-    @JsonProperty
-    public final Status.Result result() {
-        return status.result;
+    public final String status() {
+        return status.toString();
     }
 
     /**

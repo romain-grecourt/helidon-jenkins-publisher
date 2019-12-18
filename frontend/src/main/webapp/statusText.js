@@ -1,13 +1,13 @@
-export default function (status, result) {
+export default function (status) {
   if (status === 'RUNNING') {
     return 'Running'
-  } else if (result === 'SUCCESS' || result === 'PASSED') {
+  } else if (status === 'SUCCESS' || status === 'PASSED') {
     return 'Passed'
-  } else if (result === 'FAILURE') {
+  } else if (status === 'FAILURE') {
     return 'Failed'
-  } else if (result === 'UNSTABLE') {
+  } else if (status === 'UNSTABLE') {
     return 'Unstable'
-  } else if (result === 'ABORTED') {
+  } else if (status === 'ABORTED') {
     return 'Aborted'
   } else {
     return 'Unknown'

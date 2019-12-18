@@ -1,17 +1,17 @@
 <template>
   <v-container fluid>
     <h2>Artifacts</h2>
-    <v-subheader>{{ aggregatedartifacts.count }} files.</v-subheader>
+    <v-subheader>{{ allartifacts.count }} files.</v-subheader>
     <v-row
       justify="center"
       class="px-5 mt-4"
     >
       <v-expansion-panels
-        accordion
         multiple
+        popout
       >
         <v-expansion-panel
-          v-for="(artifacts,i) in aggregatedartifacts.items"
+          v-for="(artifactsInfo,i) in allartifacts.items"
           :key="i"
         >
           <v-expansion-panel-header>
@@ -22,15 +22,15 @@
               <template
                 v-slot:badge
               >
-                {{ artifacts.count }}
+                {{ artifactsInfo.count }}
               </template>
               <v-icon> mdi-hexagon-outline</v-icon>
             </v-badge>
-            <span>{{ artifacts.path }}</span>
+            <span>{{ artifactsInfo.path }}</span>
           </v-expansion-panel-header>
           <v-expansion-panel-content>
             <artifacts
-              :id="artifacts.id"
+              :id="artifactsInfo.id"
             />
           </v-expansion-panel-content>
         </v-expansion-panel>
@@ -51,7 +51,7 @@ export default {
     Artifacts
   },
   props: {
-    aggregatedartifacts: {
+    allartifacts: {
       type: Object,
       required: true
     }

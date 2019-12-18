@@ -1,11 +1,11 @@
-export default function (status, result) {
+export default function (status) {
   if (status === 'RUNNING') {
     return 'blue'
-  } else if (result === 'SUCCESS' || result === 'PASSED') {
+  } else if (status === 'SUCCESS' || status === 'PASSED') {
     return 'green'
-  } else if (result === 'FAILURE' || result === 'FAILED') {
+  } else if (status === 'FAILURE' || status === 'FAILED') {
     return 'red'
-  } else if (result === 'UNSTABLE') {
+  } else if (status === 'UNSTABLE') {
     return 'orange'
   } else {
     return 'grey'

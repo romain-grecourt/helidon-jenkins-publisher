@@ -32,8 +32,8 @@
         <v-app-bar-nav-icon
           @click.stop="drawerLeft = !drawerLeft"
         />
-        <v-toolbar-title>{{ pipeline.name }}</v-toolbar-title>
-        <v-spacer />
+        <v-toolbar-title>{{ pipeline.title }}</v-toolbar-title>
+        <!--<v-spacer />
         <v-btn
           icon
           disabled
@@ -50,7 +50,7 @@
             </template>
             <v-icon>mdi-bell</v-icon>
           </v-badge>
-        </v-btn>
+        </v-btn>-->
       </v-app-bar>
       <v-navigation-drawer
         v-model="drawerLeft"
@@ -80,19 +80,41 @@
           :pipeline="pipeline"
         />
         <v-divider />
-        <pipelineMenu />
+        <pipelineMenu
+          @refresh="refresh"
+        />
+        <v-divider />
+        <v-list
+          dense
+          nav
+          flat
+        >
+          <v-list-item-group>
+            <v-list-item
+              @click="refresh"
+            >
+              <v-list-item-icon>
+                <v-icon>mdi-cached</v-icon>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title>REFRESH</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+          </v-list-item-group>
+        </v-list>
       </v-navigation-drawer>
       <v-content>
         <testsView
           v-if="viewid=='tests'"
-          :aggregatedtests="aggregatedtests"
+          :alltests="alltests"
         />
         <artifactsView
           v-else-if="viewid=='artifacts'"
-          :aggregatedartifacts="aggregatedartifacts"
+          :allartifacts="allartifacts"
         />
         <pipelineTreeView
           v-else
+          ref="treeview"
           :items="pipeline.items"
         />
       </v-content>
@@ -152,14 +174,14 @@ export default {
     viewIdNotFound () {
       return !viewIds.includes(this.viewid)
     },
-    aggregatedartifacts () {
+    allartifacts () {
       const res = {}
       res.items = []
       res.count = 0
       this.visitPipeline(this.artifactsVisitor, res)
       return res
     },
-    aggregatedtests () {
+    alltests () {
       const res = {}
       res.items = []
       res.total = 0
@@ -171,18 +193,41 @@ export default {
     }
   },
   created () {
-    this.$api.get(this.$route.params.pipelineid)
-      .then((response) => (this.pipeline = response.data))
-      .catch(error => {
-        if (typeof error.response !== 'undefined' && error.response.status === 404) {
-          this.notfound = true
-        } else {
-          this.errored = error.message
-        }
-      })
-      .finally(() => (this.loading = false))
+    this.refresh()
   },
   methods: {
+    updateTree () {
+      const treeviewComp = this.$refs.treeview
+      if (typeof treeviewComp !== 'undefined' && treeviewComp !== null) {
+        const treeComp = treeviewComp.$refs.treeview
+        if (typeof treeComp !== 'undefined' && treeComp !== null) {
+          treeComp.updateAll(true)
+        }
+      }
+    },
+    refresh () {
+      if (this.pipeline !== null &&
+              (this.pipeline.status === 'SUCCESS' ||
+              this.pipeline.status === 'FAILURE' ||
+              this.pipeline.status === 'UNSTABLE' ||
+              this.pipeline.status === 'ABORTED')) {
+        this.updateTree()
+        return
+      }
+      this.$api.get(this.$route.params.pipelineid)
+        .then((response) => {
+          this.pipeline = response.data
+          this.updateTree()
+        })
+        .catch(error => {
+          if (typeof error.response !== 'undefined' && error.response.status === 404) {
+            this.notfound = true
+          } else {
+            this.errored = error.message
+          }
+        })
+        .finally(() => (this.loading = false))
+    },
     visitPipeline (visitor, data) {
       if (this.pipeline === null ||
             typeof this.pipeline.items === 'undefined') {

@@ -10,7 +10,7 @@
         <v-list-item-title>Status</v-list-item-title>
         <v-list-item-subtitle>
           <v-chip
-            :color="statusColors(pipeline.state, pipeline.result)"
+            :color="statusColors(pipeline.status)"
             small
             label
             text-color="white"
@@ -19,9 +19,9 @@
               small
               left
             >
-              {{ statusIcons(pipeline.state, pipeline.result) }}
+              {{ statusIcons(pipeline.status) }}
             </v-icon>
-            <span>{{ statusText(pipeline.state, pipeline.result) }}</span>
+            <span>{{ statusText(pipeline.status) }}</span>
           </v-chip>
         </v-list-item-subtitle>
       </v-list-item-content>
@@ -38,10 +38,10 @@
           </v-icon>
           <div class="repoUrl">
             <a
-              :href="pipeline.gitRepositoryUrl"
+              :href="pipeline.repositoryUrl"
               target="new"
             >
-              {{ pipeline.gitRepositoryUrl }}
+              {{ pipeline.repositoryUrl }}
             </a>
           </div>
         </v-list-item-subtitle>
@@ -57,14 +57,14 @@
             mdi-source-branch
           </v-icon>
           <a
-            v-if="pipeline.gitHeadUrl"
-            :href="pipeline.gitHeadUrl"
+            v-if="pipeline.headRefUrl"
+            :href="pipeline.headRefUrl"
             target="new"
           >
-            {{ pipeline.gitHead }}
+            {{ pipeline.headRef }}
           </a>
           <span v-else>
-            {{ pipeline.gitHead }}
+            {{ pipeline.headRef }}
           </span>
         </v-list-item-subtitle>
       </v-list-item-content>
@@ -83,10 +83,32 @@
             :href="pipeline.commitUrl"
             target="new"
           >
-            {{ pipeline.gitCommit }}
+            {{ pipeline.commit }}
           </a>
           <span v-else>
-            {{ pipeline.gitCommit }}
+            {{ pipeline.commit }}
+          </span>
+        </v-list-item-subtitle>
+      </v-list-item-content>
+    </v-list-item>
+    <v-list-item v-if="pipeline.mergeCommit">
+      <v-list-item-content>
+        <v-list-item-title>Merged with</v-list-item-title>
+        <v-list-item-subtitle>
+          <v-icon
+            class="mr-2"
+          >
+            mdi-source-merge
+          </v-icon>
+          <a
+            v-if="pipeline.mergeCommitUrl"
+            :href="pipeline.mergeCommitUrl"
+            target="new"
+          >
+            {{ pipeline.mergeCommit }}
+          </a>
+          <span v-else>
+            {{ pipeline.mergeCommit }}
           </span>
         </v-list-item-subtitle>
       </v-list-item-content>
@@ -100,16 +122,16 @@
           >
             mdi-account
           </v-icon>
-          <span v-if="!pipeline.author">unknown</span>
+          <span v-if="!pipeline.user">unknown</span>
           <a
-            v-else-if="pipeline.authorUrl"
-            :href="pipeline.authorUrl"
+            v-else-if="pipeline.userUrl"
+            :href="pipeline.userUrl"
             target="new"
           >
-            {{ pipeline.author }}
+            {{ pipeline.user }}
           </a>
           <span v-else>
-            {{ pipeline.author }}
+            {{ pipeline.user }}
           </span>
         </v-list-item-subtitle>
       </v-list-item-content>
@@ -174,7 +196,7 @@ export default {
       return moment(date).format('ddd, MMM Do YYYY, h:mm A')
     },
     displayDuration (duration) {
-      return moment.duration(duration, 'seconds').humanize(true)
+      return moment.duration(duration, 'seconds').humanize()
     }
   }
 }

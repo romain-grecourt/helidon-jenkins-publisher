@@ -13,8 +13,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 /**
  * Pipeline model.
  */
-@JsonDeserialize(using = PipelineDeserializer.class)
-@JsonSerialize(using = PipelineSerializer.class)
+@JsonDeserialize(using = JacksonSupport.PipelineDeserializer.class)
+@JsonSerialize(using = JacksonSupport.PipelineSerializer.class)
 public final class Pipeline extends Stages {
 
     /**
@@ -24,14 +24,6 @@ public final class Pipeline extends Stages {
      */
     public Pipeline(PipelineInfo info) {
         super(info);
-    }
-
-    /**
-     * Create a new running pipeline from a {@link PipelineCreatedEvent} event.
-     * @param event created event
-     */
-    public Pipeline(PipelineCreatedEvent event) {
-        this(event.info());
     }
 
     /**
@@ -52,21 +44,19 @@ public final class Pipeline extends Stages {
     }
 
     @Override
-    public StageType type() {
-        return StageType.SEQUENCE;
+    public String type() {
+        return "PIPELINE";
     }
 
     @Override
     public void fireCompleted() {
-        Stage last = null;
         if (!children.isEmpty()) {
-            last = children.get(children.size() - 1);
-            last.fireCompleted();
+            children.get(children.size() - 1).fireCompleted();
         }
         status.state = Status.State.FINISHED;
-        status.result = last != null ? last.result() : Status.Result.SUCCESS;
-        timings.endTime = last != null ? last.endTime() : System.currentTimeMillis();
-        fireEvent(new PipelineCompletedEvent(info.id, status.result, timings.endTime));
+        status.refresh();
+        timings.refresh();
+        fireEvent(new PipelineCompletedEvent(info.id, status.result, timings.duration()));
     }
 
     @Override
@@ -87,11 +77,11 @@ public final class Pipeline extends Stages {
             Stage stage = stack.peek();
             if (stage instanceof Steps) {
                 // leaf
-                visitor.visitStepsStart((Steps) stage, depth + 1);
+                visitor.visitStepsStart((Steps) stage, depth);
                 for (Step step : ((Steps) stage).children) {
-                    visitor.visitStep(step, depth + 2);
+                    visitor.visitStep(step, depth + 1);
                 }
-                visitor.visitStepsEnd((Steps) stage, depth + 1);
+                visitor.visitStepsEnd((Steps) stage, depth);
                 parentId = stage.parent.id;
                 stack.pop();
             } else if (stage instanceof Stages) {

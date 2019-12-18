@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 import io.helidon.build.publisher.model.Status.State;
 import io.helidon.build.publisher.model.events.ArtifactsInfoEvent;
 import io.helidon.build.publisher.model.events.NodeCompletedEvent;
+import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import io.helidon.build.publisher.model.events.PipelineEvent;
 import io.helidon.build.publisher.model.events.PipelineCreatedEvent;
 import io.helidon.build.publisher.model.events.PipelineEventType;
@@ -15,9 +16,6 @@ import io.helidon.build.publisher.model.events.StageCreatedEvent;
 import io.helidon.build.publisher.model.events.StepCreatedEvent;
 import io.helidon.build.publisher.model.events.TestsInfoEvent;
 
-import static io.helidon.build.publisher.model.Stage.StageType.PARALLEL;
-import static io.helidon.build.publisher.model.Stage.StageType.SEQUENCE;
-import static io.helidon.build.publisher.model.Stage.StageType.STEPS;
 import static io.helidon.build.publisher.model.events.PipelineEventType.ARTIFACTS_INFO;
 import static io.helidon.build.publisher.model.events.PipelineEventType.PIPELINE_COMPLETED;
 import static io.helidon.build.publisher.model.events.PipelineEventType.STAGE_COMPLETED;
@@ -25,6 +23,8 @@ import static io.helidon.build.publisher.model.events.PipelineEventType.STAGE_CR
 import static io.helidon.build.publisher.model.events.PipelineEventType.STEP_COMPLETED;
 import static io.helidon.build.publisher.model.events.PipelineEventType.STEP_CREATED;
 import static io.helidon.build.publisher.model.events.PipelineEventType.TESTS_INFO;
+import java.util.Collections;
+import java.util.Objects;
 
 /**
  * Pipeline event processor.
@@ -34,13 +34,16 @@ public final class PipelineEventProcessor {
     private static final Logger LOGGER = Logger.getLogger(PipelineEventProcessor.class.getName());
 
     private final PipelineDescriptorManager manager;
+    private final List<PipelineInfoAugmenter> augmenters;
 
     /**
      * Create a new processor.
-     * @param manager
+     * @param manager descriptor manager
+     * @param augmenters pipeline info augmenters, may be {@code null}
      */
-    public PipelineEventProcessor(PipelineDescriptorManager manager) {
-        this.manager = manager;
+    public PipelineEventProcessor(PipelineDescriptorManager manager, List<PipelineInfoAugmenter> augmenters) {
+        this.manager = Objects.requireNonNull(manager, "manager is null!");
+        this.augmenters = augmenters == null ? Collections.emptyList() :augmenters;
     }
 
     /**
@@ -65,7 +68,13 @@ public final class PipelineEventProcessor {
                 pipeline = manager.loadPipeline(epid);
                 if (pipeline == null) {
                     if (event.eventType() == PipelineEventType.PIPELINE_CREATED) {
-                        pipeline = new Pipeline((PipelineCreatedEvent) event);
+                        PipelineInfo info = ((PipelineCreatedEvent) event).info();
+                        for (PipelineInfoAugmenter augmenter : augmenters) {
+                            if (augmenter.process(info)) {
+                                break;
+                            }
+                        }
+                        pipeline = new Pipeline(info);
                     } else {
                         throw new IllegalStateException("Unable to get pipeline descriptor, pipelineId=" + epid);
                     }
@@ -103,7 +112,7 @@ public final class PipelineEventProcessor {
                     processTestsEvent(pipeline, (TestsInfoEvent) event);
                     break;
                 case PIPELINE_COMPLETED:
-                    processPipelineCompletedEvent(pipeline);
+                    processPipelineCompletedEvent(pipeline, (PipelineCompletedEvent) event);
                     break;
                 case STEP_COMPLETED:
                 case STAGE_COMPLETED:
@@ -153,10 +162,11 @@ public final class PipelineEventProcessor {
         getSteps(pipeline, event.stepsId()).tests = event.info();
     }
 
-    private static void processPipelineCompletedEvent(Pipeline pipeline) {
+    private static void processPipelineCompletedEvent(Pipeline pipeline, PipelineCompletedEvent event) {
         if (pipeline.status.state != State.FINISHED) {
             pipeline.status.state = State.FINISHED;
-            pipeline.status.result = Status.Result.UNKNOWN;
+            pipeline.status.result = event.result();
+            pipeline.timings.duration(event.duration());
         }
     }
 
@@ -164,7 +174,7 @@ public final class PipelineEventProcessor {
         Node node = getNode(pipeline, event.id());
         node.status.state = State.FINISHED;
         node.status.result = event.result();
-        node.timings.endTime = event.endTime();
+        node.timings.duration(event.duration());
     }
 
     private static void processStepCreatedEvent(Pipeline pipeline, StepCreatedEvent event) {
@@ -182,13 +192,13 @@ public final class PipelineEventProcessor {
             throw new IllegalStateException("Invalid index");
         }
         switch (event.stageType()) {
-            case PARALLEL:
+            case "PARALLEL":
                 stages.addStage(new Parallel(stages, event.id(), event.name(), new Status(), new Timings(event.startTime())));
                 break;
-            case SEQUENCE:
+            case "SEQUENCE":
                 stages.addStage(new Sequence(stages, event.id(), event.name(), new Status(), new Timings(event.startTime())));
                 break;
-            case STEPS:
+            case "STEPS":
                 stages.addStage(new Steps(stages, event.id(), new Status(), new Timings(event.startTime())));
                 break;
             default:

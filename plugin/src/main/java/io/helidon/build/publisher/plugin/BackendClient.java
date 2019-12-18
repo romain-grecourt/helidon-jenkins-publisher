@@ -207,7 +207,7 @@ final class BackendClient implements PipelineEventListener {
                             LOGGER.log(Level.WARNING, "Unknown event type: {0}", event.eventType());
                     }
                     if (LOGGER.isLoggable(Level.FINE)) {
-                        LOGGER.log(Level.FINE, "End of event processing, queueId={0, event={1}", new Object[]{
+                        LOGGER.log(Level.FINE, "End of event processing, queueId={0}, event={1}", new Object[]{
                             queueId,
                             event
                         });

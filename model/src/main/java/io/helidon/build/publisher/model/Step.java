@@ -61,11 +61,8 @@ public final class Step extends Node {
         return args;
     }
 
-    /**
-     * Get the node type.
-     * @return {@code "STEP"}
-     */
     @JsonProperty
+    @Override
     public String type() {
         return "STEP";
     }
@@ -152,7 +149,7 @@ public final class Step extends Node {
         if (timings.endTime == 0) {
             timings.endTime = System.currentTimeMillis();
         }
-        fireEvent(new StepCompletedEvent(info.id, id, status.result, timings.endTime));
+        fireEvent(new StepCompletedEvent(info.id, id, status.result, timings.duration()));
     }
 
     /**

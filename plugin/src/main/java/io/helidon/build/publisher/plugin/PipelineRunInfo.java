@@ -18,9 +18,11 @@ import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.UserRemoteConfig;
 import hudson.scm.SCM;
 import jenkins.plugins.git.AbstractGitSCMSource;
+import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMRevision;
 import jenkins.scm.api.SCMRevisionAction;
 import jenkins.scm.api.SCMSource;
+import jenkins.scm.api.mixin.ChangeRequestSCMHead;
 import jenkins.triggers.SCMTriggerItem;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
@@ -37,9 +39,8 @@ final class PipelineRunInfo {
     final boolean excludeSyntheticSteps;
     final boolean excludeMetaSteps;
     final String title;
-    final String gitHead;
-    final String gitCommit;
-    final String gitRepositoryUrl;
+    final SCMInfo scmInfo;
+    final String repositoryUrl;
     final String publisherServerUrl;
     final int publisherClientThreads;
     final long startTime;
@@ -50,11 +51,51 @@ final class PipelineRunInfo {
         excludeMetaSteps = false;
         publisherClientThreads = 0;
         title = null;
-        gitRepositoryUrl = null;
-        gitHead = null;
-        gitCommit = null;
+        repositoryUrl = null;
+        scmInfo = null;
         publisherServerUrl = null;
         startTime = 0;
+    }
+
+    private static final class SCMInfo {
+
+        final String headRef;
+        final String commit;
+        final String mergeCommit;
+
+        SCMInfo(SCMRevision rev) {
+            SCMHead scmHead = rev.getHead();
+            if (scmHead instanceof ChangeRequestSCMHead) {
+                headRef = "pull/" + ((ChangeRequestSCMHead) scmHead).getId();
+                String revCommit = rev.toString();
+                int idx = revCommit.indexOf("+");
+                if (idx > 0) {
+                    commit = revCommit.substring(0, idx);
+                    int idx2 = revCommit.indexOf(" ");
+                    if (idx2 > 0) {
+                        mergeCommit = revCommit.substring(idx + 1, idx2);
+                    } else {
+                        mergeCommit = revCommit.substring(idx + 1);
+                    }
+                } else {
+                    commit = revCommit;
+                    mergeCommit = null;
+                }
+            } else {
+                headRef = rev.getHead().getName();
+                commit = rev.toString();
+                mergeCommit = null;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return SCMInfo.class.getSimpleName() + " {"
+                    + " headRef=" + headRef
+                    + ", commit=" + commit
+                    + ", mergeCommit=" + mergeCommit
+                    + " }";
+        }
     }
 
     PipelineRunInfo(FlowExecution execution) {
@@ -68,13 +109,12 @@ final class PipelineRunInfo {
         SCMSource scmSource = project.getSCMSource(revAction.getSourceId());
         if (scmSource instanceof AbstractGitSCMSource) {
             String remote = ((AbstractGitSCMSource)scmSource).getRemote();
-            gitRepositoryUrl = remote;
+            repositoryUrl = remote;
         } else {
-            gitRepositoryUrl = null;
+            repositoryUrl = null;
         }
-        gitHead = rev.getHead().getName();
-        gitCommit = rev.toString();
-        if (prop != null && !isBranchExcluded(gitHead, prop.getBranchExcludes())) {
+        scmInfo = new SCMInfo(rev);
+        if (prop != null && !isBranchExcluded(scmInfo.headRef, prop.getBranchExcludes())) {
             excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
@@ -85,7 +125,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(title, gitRepositoryUrl, gitHead, gitCommit, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -117,11 +157,10 @@ final class PipelineRunInfo {
             }
         }
         startTime = run.getStartTimeInMillis();
-        gitRepositoryUrl = remote;
+        repositoryUrl = remote;
         SCMRevision rev = revAction.getRevision();
-        gitHead = rev.getHead().getName();
-        gitCommit = rev.toString();
-        if (prop != null && !isBranchExcluded(gitHead, prop.getBranchExcludes())) {
+        scmInfo = new SCMInfo(rev);
+        if (prop != null && !isBranchExcluded(scmInfo.headRef, prop.getBranchExcludes())) {
             excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
@@ -132,7 +171,7 @@ final class PipelineRunInfo {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
             }
-            id = createId(title, gitRepositoryUrl, gitHead, gitCommit, run.getNumber(), run.getTimeInMillis());
+            id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
             publisherServerUrl = null;
@@ -149,7 +188,16 @@ final class PipelineRunInfo {
      * @return PipelineInfo
      */
     PipelineInfo toPipelineInfo(Status status, Timings timings) {
-        return new PipelineInfo(id, title, gitRepositoryUrl, gitHead, gitCommit, status, timings);
+        return PipelineInfo.builder()
+                .id(id)
+                .title(title)
+                .repositoryUrl(repositoryUrl)
+                .headRef(scmInfo.headRef)
+                .commit(scmInfo.commit)
+                .mergeCommit(scmInfo.mergeCommit)
+                .status(status)
+                .timings(timings)
+                .build();
     }
 
     @Override
@@ -157,9 +205,8 @@ final class PipelineRunInfo {
         return PipelineRunInfo.class.getSimpleName() + "{"
                 + " id=" + id == null ? "null" : id
                 + ", title=" + title
-                + ", gitRepositoryUrl=" + gitRepositoryUrl
-                + ", gitHead=" + gitHead
-                + ", gitCommit=" + gitCommit
+                + ", repositoryUrl=" + repositoryUrl
+                + ", scmIfno=" + scmInfo
                 + ", publisherServerUrl=" + publisherServerUrl == null ? "null" : publisherServerUrl
                 + ", publisherClientThreads=" + publisherClientThreads == null ? "null" : publisherClientThreads
                 + ", excludeSyntheticSteps=" + excludeSyntheticSteps
@@ -170,16 +217,16 @@ final class PipelineRunInfo {
     /**
      * Create a unique ID.
      * @param title job name
-     * @param gitHead GIT head
-     * @param gitCommit GIT commit
+     * @param headRef GIT head ref
+     * @param commit GIT commit
      * @param buildNumber build number
      * @param startTime start timestamp
      * @return String
      */
-    private static String createId(String title, String repotistoryUrl, String gitHead, String gitCommit, int buildNumber,
+    private static String createId(String title, String repotistoryUrl, String headRef, String commit, int buildNumber,
             long startTime) {
 
-        String runDesc = title + "/" + repotistoryUrl + "/" + gitHead + "/" + buildNumber + "/" + startTime + "/" + gitCommit;
+        String runDesc = title + "/" + repotistoryUrl + "/" + headRef + "/" + buildNumber + "/" + startTime + "/" + commit;
         return md5sum(runDesc.getBytes());
     }
 

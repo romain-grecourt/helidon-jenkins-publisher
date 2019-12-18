@@ -1,15 +1,9 @@
 <template>
-  <div
+  <loading
     v-if="loading"
-    class="loading-container"
-  >
-    <v-progress-circular
-      :width="5"
-      :size="50"
-      color="primary"
-      indeterminate
-    />
-  </div>
+    :width="5"
+    :size="50"
+  />
   <v-treeview
     v-else
     v-model="tree"
@@ -63,9 +57,9 @@
   </v-treeview>
 </template>
 <style>
-  .artifacts-tree-view {
-    width: 100%;
-  }
+.artifacts-tree-view {
+  width: 100%;
+}
 .artifacts-tree-view .v-treeview-node__label {
   display: flex;
   align-items: center;
@@ -84,8 +78,12 @@
 }
 </style>
 <script>
+import Loading from './Loading'
 export default {
   name: 'Artifacts',
+  components: {
+    Loading
+  },
   props: {
     id: {
       type: String,
@@ -111,14 +109,12 @@ export default {
   }),
   created () {
     this.$api.get(this.$route.params.pipelineid + '/artifacts/' + this.id)
-      .then((response) => (this.artifacts = response.data.items))
-      .finally(() => {
-        this.loading = false
-      })
+      .then((response) => (this.artifacts = response.data))
+      .finally(() => (this.loading = false))
   },
   methods: {
     link (item, download) {
-      var link = 'http://localhost:9191/api/' + this.$route.params.pipelineid + '/artifacts/' + this.id + '/' + item.path
+      var link = this.$apiUrl + this.$route.params.pipelineid + '/artifacts/' + this.id + '/' + item.path
       if (download) {
         return link + '?download'
       } else {

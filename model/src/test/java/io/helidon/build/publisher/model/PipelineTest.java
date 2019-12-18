@@ -14,7 +14,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 
 /**
- * Test JSON with {@link PipelineInfo}.
+ * Test JSON with {@link Pipeline}.
  */
 public class PipelineTest {
 
@@ -23,9 +23,15 @@ public class PipelineTest {
 
     @Test
     public void testJson() throws IOException {
-        String pipelineId = "abcdefgh";
-        PipelineInfo info = new PipelineInfo(pipelineId, "testJob", REPO_URL, "master", "123456789", new Status(State.RUNNING),
-                new Timings(TIMESTAMP));
+        PipelineInfo info = PipelineInfo.builder()
+                .id("abcdefgh")
+                .title("testJob")
+                .repositoryUrl(REPO_URL)
+                .headRef("master")
+                .commit("123456789")
+                .status(new Status(State.RUNNING))
+                .timings(new Timings(TIMESTAMP))
+                .build();
         Pipeline pipeline  = new Pipeline(info);
 
         Steps steps = new Steps(pipeline, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
@@ -63,11 +69,5 @@ public class PipelineTest {
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         Pipeline fromJson = mapper.readValue(bais, Pipeline.class);
         assertThat(fromJson, is(equalTo(pipeline)));
-    }
-
-    //@Test
-    public void testJsonFile() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        PipelineInfo fromJson = mapper.readValue(PipelineTest.class.getResourceAsStream("pipeline.json"), PipelineInfo.class);
     }
 }

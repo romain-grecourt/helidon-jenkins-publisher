@@ -1,6 +1,5 @@
 package io.helidon.build.publisher.frontend;
 
-import io.helidon.build.publisher.model.Pipeline;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -9,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.helidon.build.publisher.model.Artifacts;
+import io.helidon.build.publisher.model.Pipeline;
 import io.helidon.build.publisher.model.PipelineInfo;
 import io.helidon.build.publisher.model.PipelineInfos;
 import io.helidon.build.publisher.model.DescriptorFileManager;
@@ -25,6 +26,7 @@ import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
 import static io.helidon.common.http.Http.Status.NOT_FOUND_404;
+import java.util.Comparator;
 
 /**
  * Service that implements the endpoint used by the UI.
@@ -34,7 +36,6 @@ final class FrontendService implements Service {
     private static final String LINES_HEADERS = "vnd.io.helidon.publisher.lines";
     private static final String REMAINING_HEADER = "vnd.io.helidon.publisher.remaining";
     private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
-    private static final int MAX_PAGES = 4;
 
     private final Path storagePath;
     private final DescriptorFileManager descriptorManager;
@@ -159,17 +160,24 @@ final class FrontendService implements Service {
         // TODO remove me
         headers.put("Access-Control-Allow-Origin", "*");
         try {
-            List<Path> descriptorFiles = Files.list(storagePath)
-                    .skip((pagenum - 1) * numitems) // skip to get to the current page
-                    .limit(((pagenum + MAX_PAGES) * numitems) + 1) // max limit calculate the remaining pages
+            List<Path> allDescriptors = Files.list(storagePath)
+                    .sorted(Comparator.<Path>comparingLong((p) -> p.toFile().lastModified()).reversed())
                     .collect(Collectors.toList());
-            List<PipelineInfo> pipelines = descriptorFiles.stream()
+            List<Path> pageDescriptors = allDescriptors.stream()
+                    .skip((pagenum - 1) * numitems) // skip to get to the current page
+                    .limit(numitems) // max limit calculate the remaining pages
+                    .collect(Collectors.toList());
+            List<PipelineInfo> pipelines = pageDescriptors.stream()
                     .limit(numitems)
                     .map(descriptorManager::loadInfoFromDir)
                     .collect(Collectors.toList());
-            int totalpages = (int) Math.ceil((double)((descriptorFiles.size() - pipelines.size()) / numitems));
+            int totalsize = allDescriptors.size();
+            int totalpages = (int) totalsize / numitems;
+            if (totalsize % numitems > 0) {
+                totalpages++;
+            }
             headers.contentType(MediaType.APPLICATION_JSON);
-            res.send(new PipelineInfos(pipelines, pagenum, totalpages + 1));
+            res.send(new PipelineInfos(pipelines, pagenum, totalpages));
         } catch (IOException ex) {
             req.next(ex);
         }

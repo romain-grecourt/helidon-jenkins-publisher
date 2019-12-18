@@ -1,15 +1,15 @@
-export default function (state, result) {
-  if (state === 'RUNNING') {
+export default function (status) {
+  if (status === 'RUNNING') {
     return 'mdi-cached'
-  } else if (result === 'SUCCESS' || result === 'PASSED') {
+  } else if (status === 'SUCCESS' || status === 'PASSED') {
     return 'mdi-checkbox-marked-circle'
-  } else if (result === 'FAILURE' || result === 'FAILED') {
+  } else if (status === 'FAILURE' || status === 'FAILED') {
     return 'mdi-close-circle'
-  } else if (result === 'UNSTABLE') {
+  } else if (status === 'UNSTABLE') {
     return 'mdi-alert-circle'
-  } else if (result === 'ABORTED') {
+  } else if (status === 'ABORTED') {
     return 'mdi-minus-circle'
-  } else if (result === 'SKIPPED') {
+  } else if (status === 'SKIPPED') {
     return 'mdi-cancel'
   } else {
     return 'mdi-help-circle'

@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 /**
  * A stage node with nested stage nodes.
  */
-@JsonPropertyOrder({"id", "type", "name", "state", "result", "startTime", "endTime", "children"})
+@JsonPropertyOrder({"id", "type", "name", "status", "date", "duration", "children"})
 public abstract class Stages extends Stage {
 
     final LinkedList<Stage> children = new LinkedList<>();
