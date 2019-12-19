@@ -137,13 +137,13 @@ final class FileSegment {
             return this;
         }
         if (backward) {
-            return findLinesUp(lines, linesOnly);
+            return findLinesBackward(lines, linesOnly);
         } else {
-            return findLinesDown(lines, linesOnly);
+            return findLinesForward(lines, linesOnly);
         }
     }
 
-    private FileSegment findLinesDown(int lines, boolean linesOnly) throws IOException {
+    private FileSegment findLinesForward(int lines, boolean linesOnly) throws IOException {
         int numlines = 0;
         long beginPos = begin;
         long endPos = begin;
@@ -165,7 +165,7 @@ final class FileSegment {
         return new FileSegment(beginPos, endPos, numlines, raf);
     }
 
-    private FileSegment findLinesUp(int lines, boolean linesOnly) throws IOException {
+    private FileSegment findLinesBackward(int lines, boolean linesOnly) throws IOException {
         int numlines = 0;
         long beginPos = end;
         long endPos = end;

@@ -108,13 +108,13 @@ export default {
     }
   },
   data: () => ({
-    active: false, // window active
-    loading: false, // progress bar
-    readonly: true, // output is not going to change
-    position: 0, // output raw position index
-    remaining: 0, // output raw remaining
-    bytes: 0, // total bytes loaded
-    size: '0 bytes'
+    active: false, // flag to control continuous loading
+    loading: false, // flag to display the progress bar
+    readonly: true, // is the output readonly ? (i.e no more appends)
+    position: 0, // raw position index
+    remaining: 0, // raw remaining bytes
+    bytes: 0, // total bytes (current known end of file)
+    size: '0 bytes' // human readable size displayed
   }),
   computed: {
     windowId () {
@@ -133,6 +133,14 @@ export default {
     }
   },
   methods: {
+    scrollTop () {
+      const windowContent = this.$refs.window.$refs.content
+      windowContent.scrollTop = 0
+    },
+    scrollBottom () {
+      const windowContent = this.$refs.window.$refs.content
+      windowContent.scrollTop = windowContent.scrollHeight
+    },
     refreshSize () {
       if (this.bytes < 1024) {
         this.size = this.bytes + ' bytes'
@@ -143,28 +151,12 @@ export default {
         this.size = (this.bytes / 1048576).toFixed(1) + ' mib'
       }
     },
-    scrollTop () {
-      const windowContent = this.$refs.window.$refs.content
-      windowContent.scrollTop = 0
-    },
-    scrollBottom () {
-      const windowContent = this.$refs.window.$refs.content
-      windowContent.scrollTop = windowContent.scrollHeight
+    onWindowOpened () {
+      this.active = true
+      this.refresh()
     },
     stop () {
       this.active = false
-    },
-    refresh () {
-      if (!this.loading) {
-        this.active = true
-        if (this.position === 0 && this.remaining === 0) {
-          // load backward from the end
-          this.loadOutput(this.position, this.remaining, true, this.readonly, 400)
-        } else {
-          // incremental forward load
-          this.loadOutput(this.bytes, 1, false, this.readonly, 400)
-        }
-      }
     },
     clear () {
       const output = this.$refs.output
@@ -179,64 +171,26 @@ export default {
       this.bytes = 0
       this.size = '0 bytes'
     },
-    onWindowOpened () {
-      this.active = true
-      this.refresh()
-    },
-    renderOutput (position, remaining, backward, linesOnly, lines, output) {
-      if (output.length === 0) {
-        // no data, stop here
-        this.loading = false
-        return
-      }
-      this.remaining = remaining
-      this.position = position
-      if (remaining === 0) {
-        // no more data available for now
-        this.loading = false
-      }
-      if (linesOnly && output[output.length - 1] !== '\n') {
-        // current data needs a newline char
-        output += '\n'
-      }
-      const outputContainer = this.$refs.output.$refs.container
-      if (backward) {
-        outputContainer.innerHTML = output + outputContainer.innerHTML
-        if (this.bytes === 0) {
-          // if going backwards the total size if the position
-          // after the first request
-          this.bytes = this.position
-          this.refreshSize()
-        }
-      } else {
-        outputContainer.innerHTML = outputContainer.innerHTML + output
-        this.bytes = this.position
-        this.refreshSize()
-      }
-      // TODO listen to scrolls and maintain a state to determine
-      // if we should auto scroll
-      this.scrollBottom()
-      // keep loading, there is more
-      if (this.active) {
-        if (backward) {
-          this.loadOutput(remaining, position, backward, linesOnly, lines)
+    refresh () {
+      if (!this.loading) {
+        this.active = true
+        if (this.position === 0 && this.remaining === 0) {
+          // first load
+          this.loadBackward(this.position, this.remaining, this.readonly, 400)
         } else {
-          this.loadOutput(position, remaining, backward, linesOnly, lines)
+          // incremental
+          this.loadForward(this.bytes, 1, this.readonly, 400)
         }
       }
     },
-    loadOutput (position, remaining, backward, linesOnly, lines) {
-      if ((backward && position === 0 && remaining > 0) ||
-              (!backward && remaining === 0 && position > 0)) {
-        // nothing to do.
+    loadForward (position, remaining, linesOnly, lines) {
+      if (remaining === 0 && position > 0) {
+        this.loading = false
         return
       }
       let uri = this.$route.params.pipelineid + '/output/' + this.id
-      uri += '?position=' + position
+      uri += '?backward=false&position=' + position
       uri += '&lines=' + lines
-      if (backward) {
-        uri += '&backward=true'
-      }
       if (linesOnly) {
         uri += '&lines_only=true'
       }
@@ -245,7 +199,80 @@ export default {
         .then((response) => {
           position = parseInt(response.headers['vnd.io.helidon.publisher.position'])
           remaining = parseInt(response.headers['vnd.io.helidon.publisher.remaining'])
-          this.renderOutput(position, remaining, backward, linesOnly, lines, response.data)
+          if (response.data.length > 0) {
+            this.remaining = remaining
+            this.position = position
+            var output = response.data
+            if (linesOnly && output[output.length - 1] !== '\n') {
+              // current data needs a newline char
+              output += '\n'
+            }
+            const outputContainer = this.$refs.output.$refs.container
+            outputContainer.innerHTML = outputContainer.innerHTML + output
+            this.bytes = this.position
+            this.refreshSize()
+            this.scrollBottom() // TODO detect user scroll
+            if (this.active && !(remaining === 0 && position > 0)) {
+              // more data to fetch
+              this.loadForward(position, remaining, linesOnly, lines)
+            } else {
+              // no data, stop here
+              this.loading = false
+            }
+          } else {
+            // no data, stop here
+            this.loading = false
+          }
+        })
+        .catch(error => {
+          this.loading = false
+          console.warn(error)
+        })
+    },
+    loadBackward (position, remaining, linesOnly, lines) {
+      if (position === 0 && remaining > 0) {
+        this.loading = false
+        // no data to fetch
+        return
+      }
+      let uri = this.$route.params.pipelineid + '/output/' + this.id
+      uri += '?backward=true&position=' + position
+      uri += '&lines=' + lines
+      if (linesOnly) {
+        uri += '&lines_only=true'
+      }
+      this.loading = true
+      this.$api.get(uri)
+        .then((response) => {
+          position = parseInt(response.headers['vnd.io.helidon.publisher.position'])
+          remaining = parseInt(response.headers['vnd.io.helidon.publisher.remaining'])
+          if (response.data.length > 0) {
+            this.remaining = remaining
+            this.position = position
+            var output = response.data
+            if (linesOnly && output[output.length - 1] !== '\n') {
+              // current data needs a newline char
+              output += '\n'
+            }
+            const outputContainer = this.$refs.output.$refs.container
+            outputContainer.innerHTML = output + outputContainer.innerHTML
+            if (this.bytes === 0) {
+              // total size is the position return by the first request
+              this.bytes = this.position
+              this.refreshSize()
+            }
+            this.scrollBottom() // TODO detect user scroll
+            if (this.active && !(remaining === 0 && position > 0)) {
+              // more data to fetch
+              this.loadBackward(remaining, position, linesOnly, lines)
+            } else {
+              // no more data to fetch or inactive
+              this.loading = false
+            }
+          } else {
+            // empty data
+            this.loading = false
+          }
         })
         .catch(error => {
           this.loading = false
