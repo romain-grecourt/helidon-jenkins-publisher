@@ -76,7 +76,7 @@
                     </th>
                     <th
                       class="text-left hidden-xs-only"
-                      style="width: 115px"
+                      style="width: 130px"
                     >
                       <v-icon
                         class="mr-2"

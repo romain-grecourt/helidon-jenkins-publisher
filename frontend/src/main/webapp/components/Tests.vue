@@ -11,35 +11,55 @@
       accordion
       focusable
     >
-      <template
-        v-for="(result) in results"
+      <v-expansion-panel
+        v-for="(result,i) in results"
+        :key="i"
+        class="nested-panel"
       >
-        <v-expansion-panel
-          v-for="(test,i) in result.tests"
-          :key="i"
-          :disabled="!test.output"
-          class="nested-panel"
+        <v-expansion-panel-header
+          hide-actions
         >
-          <v-expansion-panel-header
-            hide-actions
+          <v-icon
+            class="noflex mr-2"
+            :color="statusColors(result.failed > 0 ? 'UNSTABLE' : 'PASSED')"
           >
-            <v-icon
-              class="noflex mr-2"
-              :color="statusColors(test.status)"
+            {{ statusIcons(result.failed > 0 ? 'UNSTABLE' : 'PASSED') }}
+          </v-icon>
+          <span>{{ result.name }}</span>
+        </v-expansion-panel-header>
+        <v-expansion-panel-content>
+          <v-expansion-panels
+            accordion
+            focusable
+          >
+            <v-expansion-panel
+              v-for="(test,j) in result.tests"
+              :key="j"
+              :disabled="!test.output"
+              class="nested-panel"
             >
-              {{ statusIcons(test.status) }}
-            </v-icon>
-            <span>{{ test.name }}</span>
-          </v-expansion-panel-header>
-          <v-expansion-panel-content
-            class="test-output"
-          >
-            <consoleOutput
-              v-html="test.output"
-            />
-          </v-expansion-panel-content>
-        </v-expansion-panel>
-      </template>
+              <v-expansion-panel-header
+                hide-actions
+              >
+                <v-icon
+                  class="noflex mr-2"
+                  :color="statusColors(test.status)"
+                >
+                  {{ statusIcons(test.status) }}
+                </v-icon>
+                <span>{{ test.name }}</span>
+              </v-expansion-panel-header>
+              <v-expansion-panel-content
+                class="test-output"
+              >
+                <consoleOutput
+                  v-html="test.output"
+                />
+              </v-expansion-panel-content>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </v-expansion-panel-content>
+      </v-expansion-panel>
     </v-expansion-panels>
   </div>
 </template>

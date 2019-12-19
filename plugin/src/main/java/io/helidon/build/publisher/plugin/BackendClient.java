@@ -22,6 +22,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 
+import io.helidon.build.publisher.model.JacksonSupport;
 import io.helidon.build.publisher.model.events.ArtifactDataEvent;
 import io.helidon.build.publisher.model.events.PipelineErrorEvent;
 import io.helidon.build.publisher.model.events.PipelineEvent;
@@ -30,8 +31,6 @@ import io.helidon.build.publisher.model.events.PipelineEventListener;
 import io.helidon.build.publisher.model.events.PipelineEventType;
 import io.helidon.build.publisher.model.events.StepOutputDataEvent;
 import io.helidon.build.publisher.model.events.TestSuiteResultEvent;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Publisher client.
@@ -50,7 +49,6 @@ final class BackendClient implements PipelineEventListener {
     private final ExecutorService executor;
     private final String serverUrl;
     private final int nThreads;
-    private final ObjectMapper mapper;
 
     /**
      * Get or create the client for the given server URL.
@@ -99,7 +97,6 @@ final class BackendClient implements PipelineEventListener {
         this.nThreads = nThreads;
         this.queues = new BlockingQueue[nThreads];
         this.executor = Executors.newFixedThreadPool(nThreads);
-        this.mapper = new ObjectMapper();
     }
 
     @Override
@@ -116,7 +113,7 @@ final class BackendClient implements PipelineEventListener {
                     queueId
                 });
             }
-            executor.submit(new ClientThread(serverUrl, queueId, queue, mapper));
+            executor.submit(new ClientThread(serverUrl, queueId, queue));
         }
         if (LOGGER.isLoggable(Level.FINE)) {
             LOGGER.log(Level.FINE, "Adding event to queue, serverUrl={0}, queueId={1}, queueSize={2}, event={3}",
@@ -155,19 +152,17 @@ final class BackendClient implements PipelineEventListener {
         private final BlockingQueue<PipelineEvent> queue;
         private final String serverUrl;
         private final int queueId;
-        private final ObjectMapper mapper;
 
         /**
          * Create a new client thread bound to the given queue.
          * @param serverUrl the serverUrl
          * @param queue the queue that this thread processes
          */
-        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvent> queue, ObjectMapper mapper) {
+        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvent> queue) {
             Objects.requireNonNull(queue, "queue is null");
             this.queue = queue;
             this.queueId = queueId;
             this.serverUrl = serverUrl;
-            this.mapper = mapper;
         }
 
         @Override
@@ -295,7 +290,7 @@ final class BackendClient implements PipelineEventListener {
             hcon.setDoOutput(true);
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
-            mapper.writeValue(hcon.getOutputStream(), new PipelineEvents(events));
+            JacksonSupport.write(hcon.getOutputStream(), new PipelineEvents(events));
             int code = hcon.getResponseCode();
             if (200 != code) {
                 LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}",
@@ -401,7 +396,7 @@ final class BackendClient implements PipelineEventListener {
             hcon.setRequestMethod("POST");
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
-            mapper.writeValue(hcon.getOutputStream(), event.suite());
+            JacksonSupport.write(hcon.getOutputStream(), event.suite());
             int code = hcon.getResponseCode();
             if (201 != code) {
                 LOGGER.log(Level.WARNING, "Invalid response code, queueId={0}, url={1}, code={2}, event={3}",
