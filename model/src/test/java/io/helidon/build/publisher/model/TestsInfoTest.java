@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -20,16 +19,12 @@ public class TestsInfoTest {
     public void testJson() throws IOException {
         TestsInfo testsInfo = new TestsInfo(6, 1, 2, 3);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(baos, testsInfo);
+        JacksonSupport.write(baos, testsInfo);
 
         // pretty print
-        Object json = mapper.readValue(new ByteArrayInputStream(baos.toByteArray()), Object.class);
-        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
-        System.out.println(indented);
+        System.out.println(new String(baos.toByteArray()));
 
-        ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-        TestsInfo fromJson = mapper.readValue(bais, TestsInfo.class);
+        TestsInfo fromJson = JacksonSupport.read(new ByteArrayInputStream(baos.toByteArray()), TestsInfo.class);
         assertThat(fromJson, is(equalTo((testsInfo))));
     }
 }

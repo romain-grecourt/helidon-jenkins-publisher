@@ -36,7 +36,7 @@
           >
             mdi-git
           </v-icon>
-          <div class="repoUrl">
+          <div class="repourl">
             <a
               :href="pipeline.repositoryUrl"
               target="new"
@@ -165,15 +165,15 @@
   </v-list>
 </template>
 <style>
-  .repoUrl {
-    display: inline-block;
-    width: 188px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    direction: rtl;
-    text-align: left;
-    line-height: 1.5;
-  }
+.repourl {
+  display: inline-block;
+  width: 188px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  line-height: 1.5;
+}
 </style>
 <script>
 import statusColors from '@/statusColors'

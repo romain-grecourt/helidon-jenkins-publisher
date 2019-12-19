@@ -1,9 +1,9 @@
 package io.helidon.build.publisher.model;
 
 /**
- * Pipeline info processor.
+ * Pipeline info augmenter.
  */
-public interface PipelineInfoAugmenter {
+public interface InfoAugmenter {
 
     /**
      * Process a pipeline info.

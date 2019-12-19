@@ -2,6 +2,7 @@ package io.helidon.build.publisher.model.events;
 
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
@@ -17,14 +18,34 @@ public final class PipelineErrorEvent extends PipelineEvent {
     /**
      * Create a new {@link PipelineEventType#ERROR} event.
      *
-     * @param pipelineId pipelineId
+     * @param pipelineId pipeline id
      * @param code the error code
      * @param message the error message
      */
-    public PipelineErrorEvent(String pipelineId, @JsonProperty("code") int code, @JsonProperty("message") String message) {
+    @JsonCreator
+    public PipelineErrorEvent(@JsonProperty("pipelineId")String pipelineId, @JsonProperty("code") int code,
+            @JsonProperty("message") String message) {
         super(pipelineId);
         this.code = code;
         this.message = message;
+    }
+
+    /**
+     * Get the error message.
+     * @return String
+     */
+    @JsonProperty
+    public String message() {
+        return message;
+    }
+
+    /**
+     * Get the error code
+     * @return String
+     */
+    @JsonProperty
+    public int code() {
+        return code;
     }
 
     @Override

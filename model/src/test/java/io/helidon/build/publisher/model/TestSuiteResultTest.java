@@ -7,7 +7,6 @@ import java.util.LinkedList;
 
 import io.helidon.build.publisher.model.TestSuiteResult.TestResult;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static io.helidon.build.publisher.model.TestSuiteResult.TestStatus.FAILED;
@@ -31,16 +30,12 @@ public class TestSuiteResultTest {
         TestSuiteResult testResults = new TestSuiteResult("suite", 3, 1, 1, 1, tests);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(baos, testResults);
+        JacksonSupport.write(baos, testResults);
 
         // pretty print
-        Object json = mapper.readValue(new ByteArrayInputStream(baos.toByteArray()), Object.class);
-        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
-        System.out.println(indented);
+        System.out.println(new String(baos.toByteArray()));
 
-        ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-        TestSuiteResult fromJson = mapper.readValue(bais, TestSuiteResult.class);
+        TestSuiteResult fromJson = JacksonSupport.read(new ByteArrayInputStream(baos.toByteArray()), TestSuiteResult.class);
         assertThat(fromJson, is(equalTo((testResults))));
     }
 }

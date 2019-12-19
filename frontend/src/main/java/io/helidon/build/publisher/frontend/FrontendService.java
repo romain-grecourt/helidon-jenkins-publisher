@@ -232,7 +232,7 @@ final class FrontendService implements Service {
             if (backward) {
                 fseg = new FileSegment(0, position == 0 ? Files.size(filePath): position, filePath.toFile());
             } else {
-                fseg = new FileSegment(0, Files.size(filePath), filePath.toFile());
+                fseg = new FileSegment(position, Files.size(filePath), filePath.toFile());
             }
             FileSegment lseg = fseg.findLines(lines, linesOnly, backward);
             // TODO remove me

@@ -6,7 +6,6 @@ import java.io.IOException;
 
 import io.helidon.build.publisher.model.Status.State;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -18,56 +17,53 @@ import static org.hamcrest.core.Is.is;
  */
 public class PipelineTest {
 
-    static final String REPO_URL = "https://github.com/john_doe/repo.git";
-    static final long TIMESTAMP = System.currentTimeMillis();
-
     @Test
     public void testJson() throws IOException {
         PipelineInfo info = PipelineInfo.builder()
                 .id("abcdefgh")
                 .title("testJob")
-                .repositoryUrl(REPO_URL)
+                .repositoryUrl("https://github.com/john_doe/repo.git")
                 .headRef("master")
                 .commit("123456789")
                 .status(new Status(State.RUNNING))
-                .timings(new Timings(TIMESTAMP))
+                .timings(new Timings(now()))
                 .build();
         Pipeline pipeline  = new Pipeline(info);
 
-        Steps steps = new Steps(pipeline, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Steps steps = new Steps(pipeline, new Status(State.RUNNING), new Timings(now()));
         pipeline.addStage(steps);
-        steps.addStep(new Step(steps, "sh", "echo foo", false, true, new Status(State.RUNNING), new Timings(TIMESTAMP)));
+        steps.addStep(new Step(steps, "sh", "echo foo", false, true, new Status(State.RUNNING), new Timings(now())));
 
-        Parallel parallel = new Parallel(pipeline, "tests", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Parallel parallel = new Parallel(pipeline, "tests", new Status(State.RUNNING), new Timings(now()));
         pipeline.addStage(parallel);
 
-        Sequence test1 = new Sequence(parallel, "test1", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Sequence test1 = new Sequence(parallel, "test1", new Status(State.RUNNING), new Timings(now()));
         parallel.addStage(test1);
-        Steps test1Steps = new Steps(test1, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Steps test1Steps = new Steps(test1, new Status(State.RUNNING), new Timings(now()));
         test1.addStage(test1Steps);
-        test1Steps.addStep(new Step(test1Steps, "sh", "echo test1a", false, true, new Status(State.RUNNING), new Timings(TIMESTAMP)));
-        test1Steps.addStep(new Step(test1Steps, "sh", "echo test1b", false, true, new Status(State.RUNNING), new Timings(TIMESTAMP)));
+        test1Steps.addStep(new Step(test1Steps, "sh", "echo test1a", false, true, new Status(State.RUNNING), new Timings(now())));
+        test1Steps.addStep(new Step(test1Steps, "sh", "echo test1b", false, true, new Status(State.RUNNING), new Timings(now())));
         test1Steps.tests = new TestsInfo(1, 1, 0, 0);
 
-        Sequence test2 = new Sequence(parallel, "test2", new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Sequence test2 = new Sequence(parallel, "test2", new Status(State.RUNNING), new Timings(now()));
         parallel.addStage(test2);
-        Steps test2Steps = new Steps(test2, new Status(State.RUNNING), new Timings(System.currentTimeMillis()));
+        Steps test2Steps = new Steps(test2, new Status(State.RUNNING), new Timings(now()));
         test2.addStage(test2Steps);
-        test2Steps.addStep(new Step(test2Steps, "sh", "echo test2a", false, true, new Status(State.RUNNING), new Timings(TIMESTAMP)));
-        test2Steps.addStep(new Step(test2Steps, "sh", "echo test2b", false, true, new Status(State.RUNNING), new Timings(TIMESTAMP)));
+        test2Steps.addStep(new Step(test2Steps, "sh", "echo test2a", false, true, new Status(State.RUNNING), new Timings(now())));
+        test2Steps.addStep(new Step(test2Steps, "sh", "echo test2b", false, true, new Status(State.RUNNING), new Timings(now())));
         test2Steps.tests = new TestsInfo(1, 0, 1, 0);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(baos, pipeline);
+        JacksonSupport.write(baos, pipeline);
 
         // pretty print
-        Object json = mapper.readValue(new ByteArrayInputStream(baos.toByteArray()), Object.class);
-        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
-        System.out.println(indented);
+        System.out.println(new String(baos.toByteArray()));
 
-        ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-        Pipeline fromJson = mapper.readValue(bais, Pipeline.class);
+        Pipeline fromJson = JacksonSupport.read(new ByteArrayInputStream(baos.toByteArray()), Pipeline.class);
         assertThat(fromJson, is(equalTo(pipeline)));
+    }
+
+    private static long now() {
+        return System.currentTimeMillis();
     }
 }

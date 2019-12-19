@@ -17,6 +17,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 @JsonSerialize(using = JacksonSupport.PipelineSerializer.class)
 public final class Pipeline extends Stages {
 
+    String error;
+
     /**
      * Create a new running pipeline.
      * @param info pipeline info
@@ -24,6 +26,14 @@ public final class Pipeline extends Stages {
      */
     public Pipeline(PipelineInfo info) {
         super(info);
+    }
+
+    /**
+     * Get the error message.
+     * @return String or {@code null}
+     */
+    public String error() {
+        return error;
     }
 
     /**
@@ -88,10 +98,10 @@ public final class Pipeline extends Stages {
                 // node
                 if (stage.id.equals(parentId)) {
                     // leaving (2nd pass)
+                    depth--;
                     visitor.visitStagesEnd((Stages) stage, depth);
                     parentId = stage.parent.id;
                     stack.pop();
-                    depth--;
                 } else {
                     // entering
                     visitor.visitStagesStart((Stages) stage, depth);

@@ -5,6 +5,17 @@
     >
       View
     </h2>
+    <v-alert
+      v-if="error"
+      text
+      colored-border
+      dense
+      dismissible
+      border="left"
+      type="error"
+    >
+      {{ error }}
+    </v-alert>
     <v-row class="px-5">
       <v-treeview
         ref="treeview"
@@ -152,6 +163,7 @@
             <a
               :href="link(item, true)"
               target="new"
+              x-small
               class="link-icon"
             >
               <v-btn
@@ -200,6 +212,9 @@
 .pipeline-tree-view .v-treeview-node--leaf > .v-treeview-node__root {
   background-color: #353434;
 }
+.pipeline-tree-view .v-chip {
+  overflow: visible !important;
+}
 .small-badge > .v-badge__badge {
   font-size: 12px;
   height: 14px;
@@ -237,6 +252,10 @@ export default {
     items: {
       type: Array,
       required: true
+    },
+    error: {
+      type: String,
+      default: null
     }
   },
   methods: {
@@ -276,7 +295,6 @@ export default {
       const hours = m.asHours()
       const minutes = m.minutes()
       const seconds = m.seconds()
-      console.log(duration, hours, minutes, seconds)
       let res = ''
       if (hours >= 1) {
         res = parseInt(hours) + ' h'

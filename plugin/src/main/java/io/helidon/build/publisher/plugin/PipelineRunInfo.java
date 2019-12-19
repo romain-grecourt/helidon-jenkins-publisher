@@ -262,7 +262,7 @@ final class PipelineRunInfo {
     private static boolean isBranchExcluded(String branch, String excludes) {
         if (excludes != null) {
             for (String exclude : excludes.split(" ")) {
-                if (branch.equals(exclude)) {
+                if (Matcher.match(branch, exclude)) {
                     return true;
                 }
             }

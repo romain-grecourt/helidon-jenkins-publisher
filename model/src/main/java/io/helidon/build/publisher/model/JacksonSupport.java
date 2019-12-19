@@ -1,7 +1,8 @@
 package io.helidon.build.publisher.model;
 
+import java.io.InputStream;
 import java.io.IOException;
-import java.util.Iterator;
+import java.io.OutputStream;
 import java.util.LinkedList;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
@@ -17,6 +19,8 @@ import com.fasterxml.jackson.databind.ser.std.StdSerializer;
  * Jackson support.
  */
 public final class JacksonSupport {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
      * Serializer for {@link Pipeline}.
@@ -155,6 +159,28 @@ public final class JacksonSupport {
     }
 
     /**
+     * Write a JSON object.
+     * @param json object to write
+     * @param os output stream
+     * @throws IOException if an IO error occurs
+     */
+    public static void write(OutputStream os, Object json) throws IOException {
+        MAPPER.writerWithDefaultPrettyPrinter().writeValue(os, json);
+    }
+
+    /**
+     * Read a JSON object.
+     * @param <T> object type
+     * @param is input stream
+     * @param type type
+     * @return T
+     * @throws IOException if an IO error occurs
+     */
+    public static <T> T read(InputStream is, Class<T> type) throws IOException {
+        return MAPPER.readValue(is, type);
+    }
+
+    /**
      * Missing field exception thrown when a field is missing while read a JSON tree.
      */
     private static final class MissingFieldException extends JsonProcessingException {
@@ -259,6 +285,7 @@ public final class JacksonSupport {
     private static Pipeline readPipeline(JsonNode node) throws MissingFieldException {
         PipelineInfo info = readPipelineInfo(node);
         Pipeline pipeline = new Pipeline(info);
+        pipeline.error = optionalTextField(node, "error");
 
         // depth first traversal
         LinkedList<JsonNode> stack = new LinkedList<>();
@@ -326,6 +353,8 @@ public final class JacksonSupport {
     private static void writePipeline(Pipeline pipeline, JsonGenerator generator) throws IOException {
         generator.writeStartObject();
         writePipelineInfo(pipeline.info, generator);
+        generator.writeFieldName("error");
+        generator.writeString(pipeline.error);
         generator.writeFieldName("items");
         generator.writeStartArray();
         for (Stage child : pipeline.children) {

@@ -3,6 +3,8 @@ package io.helidon.build.publisher.plugin;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
 
@@ -20,17 +22,16 @@ import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 @Extension
 public class CustomGitHubNotificationStrategy extends AbstractGitHubNotificationStrategy {
 
+    private static final Logger LOGGER = Logger.getLogger(CustomGitHubNotificationStrategy.class.getName());
     private static final String DEFAULT_MESSAGE_PREFIX = "continuous-integration/jenkins/";
 
     @Override
-    public List<GitHubNotificationRequest> notifications(GitHubNotificationContext notificationContext, TaskListener listener) {
-        HelidonPublisherServer pubServer = HelidonPublisherServer.get(notificationContext.getBuild());
-        String statusUrl = pubServer.getServerUrl();
-        if (statusUrl == null) {
-            statusUrl = "#";
-        } else {
+    public List<GitHubNotificationRequest> notifications(GitHubNotificationContext ctx, TaskListener listener) {
+        HelidonPublisherServer pubServer = HelidonPublisherServer.get(ctx.getBuild());
+        String serverUrl = pubServer.getServerUrl();
+        Run<?, ?> run = ctx.getBuild();
+        if (serverUrl != null) {
             String pipelineId = null;
-            Run<?, ?> run = notificationContext.getBuild();
             if (run instanceof WorkflowRun) {
                 PipelinePublisher publisher = PipelinePublisher.get((WorkflowRun) run);
                 if (publisher != null) {
@@ -43,17 +44,25 @@ public class CustomGitHubNotificationStrategy extends AbstractGitHubNotification
                 }
             }
             if (pipelineId != null) {
-                statusUrl += "/" + pipelineId;
-            } else {
-                statusUrl = "#";
+                String statusUrl = serverUrl + "/" + pipelineId;
+                String context = ctx.getDefaultContext(listener).replace(DEFAULT_MESSAGE_PREFIX, "ci/");
+                String message = ctx.getDefaultMessage(listener);
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Creating commit status, url={0}, context={1}, message={2}", new Object[] {
+                        statusUrl,
+                        context,
+                        message
+                    });
+                }
+                return Collections.singletonList(
+                        GitHubNotificationRequest.build(context, statusUrl, message, ctx.getDefaultState(listener),
+                                ctx.getDefaultIgnoreError(listener)));
             }
         }
-        return Collections.singletonList(GitHubNotificationRequest.build(
-                notificationContext.getDefaultContext(listener),
-                statusUrl,
-                notificationContext.getDefaultMessage(listener).replace(DEFAULT_MESSAGE_PREFIX, ""),
-                notificationContext.getDefaultState(listener),
-                notificationContext.getDefaultIgnoreError(listener)));
+        if (LOGGER.isLoggable(Level.FINE)) {
+            LOGGER.log(Level.FINE, "Skipping commit status for job: {0}", run);
+        }
+        return Collections.emptyList();
     }
 
     @Override

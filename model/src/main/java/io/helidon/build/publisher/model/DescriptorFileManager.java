@@ -7,18 +7,15 @@ import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /**
  * File based descriptor manager.
  */
-public final class DescriptorFileManager implements PipelineDescriptorManager {
+public final class DescriptorFileManager implements DescriptorManager {
 
     private static final Logger LOGGER = Logger.getLogger(DescriptorFileManager.class.getName());
     private static final String PIPELINE_FNAME = "pipeline.json";
 
     private final Path storage;
-    private final ObjectMapper mapper;
 
     /**
      * Create a new descriptor file manager.
@@ -26,7 +23,6 @@ public final class DescriptorFileManager implements PipelineDescriptorManager {
      */
     public DescriptorFileManager(Path storage) {
         this.storage = storage;
-        this.mapper = new ObjectMapper();
     }
 
     /**
@@ -42,7 +38,7 @@ public final class DescriptorFileManager implements PipelineDescriptorManager {
                 LOGGER.log(Level.FINEST, "Reading test suite result descriptor: {0}", filePath);
             }
             try {
-                return mapper.readValue(Files.newInputStream(filePath), TestSuiteResult.class);
+                return JacksonSupport.read(Files.newInputStream(filePath), TestSuiteResult.class);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
@@ -64,7 +60,7 @@ public final class DescriptorFileManager implements PipelineDescriptorManager {
                 LOGGER.log(Level.FINEST, "Reading pipeline info descriptor: {0}", filePath);
             }
             try {
-                return mapper.readValue(Files.newInputStream(filePath), PipelineInfo.class);
+                return JacksonSupport.read(Files.newInputStream(filePath), PipelineInfo.class);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
@@ -85,7 +81,7 @@ public final class DescriptorFileManager implements PipelineDescriptorManager {
                 LOGGER.log(Level.FINEST, "Reading pipeline descriptor: {0}", filePath);
             }
             try {
-                return mapper.readValue(Files.newInputStream(filePath), Pipeline.class);
+                return JacksonSupport.read(Files.newInputStream(filePath), Pipeline.class);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
             }
@@ -121,7 +117,7 @@ public final class DescriptorFileManager implements PipelineDescriptorManager {
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Writing pipeline descriptor: {0}", filePath);
             }
-            mapper.writeValue(Files.newOutputStream(filePath), pipeline);
+            JacksonSupport.write(Files.newOutputStream(filePath), pipeline);
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }

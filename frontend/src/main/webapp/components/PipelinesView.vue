@@ -35,7 +35,7 @@
               </v-btn>
             </h1>
             <v-simple-table
-              class="mt-4 mb-4"
+              class="mt-4 mb-4 pipelines-list"
             >
               <template
                 v-slot:default
@@ -44,6 +44,7 @@
                   <tr>
                     <th
                       class="text-left"
+                      style="width: 65px"
                     >
                       Status
                     </th>
@@ -53,7 +54,7 @@
                       Title
                     </th>
                     <th
-                      class="text-left hidden-xs-only"
+                      class="text-left hidden-sm-and-down"
                     >
                       <v-icon
                         class="mr-2"
@@ -64,15 +65,19 @@
                     </th>
                     <th
                       class="text-left hidden-xs-only"
+                      style="width: 110px"
                     >
                       <v-icon
                         class="mr-2"
                       >
                         mdi-source-branch
                       </v-icon>
-                      Branch/Tag
+                      Ref
                     </th>
-                    <th class="text-left">
+                    <th
+                      class="text-left hidden-xs-only"
+                      style="width: 115px"
+                    >
                       <v-icon
                         class="mr-2"
                       >
@@ -104,18 +109,30 @@
                         {{ statusIcons(item.status) }}
                       </v-icon>
                     </td>
-                    <td>{{ item.title }}</td>
+                    <td>
+                      <div class="right-ellipsis">
+                        {{ item.title }}
+                      </div>
+                    </td>
                     <td
-                      class="hidden-xs-only"
+                      class="hidden-sm-and-down"
                     >
-                      {{ item.repositoryUrl }}
+                      <div class="left-ellipsis">
+                        {{ item.repositoryUrl }}
+                      </div>
                     </td>
                     <td
                       class="hidden-xs-only"
                     >
-                      {{ item.headRef }}
+                      <div class="right-ellipsis">
+                        {{ item.headRef }}
+                      </div>
                     </td>
-                    <td>{{ when(item.date) }}</td>
+                    <td
+                      class="hidden-xs-only"
+                    >
+                      {{ when(item.date) }}
+                    </td>
                   </tr>
                 </tbody>
               </template>
@@ -136,6 +153,23 @@
 .table-link {
   cursor: pointer;
   user-select: none;
+}
+.pipelines-list table {
+  table-layout:fixed;
+}
+.right-ellipsis {
+  width: 98%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.left-ellipsis {
+  width: 98%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  white-space: nowrap;
 }
 </style>
 <script>

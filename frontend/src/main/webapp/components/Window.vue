@@ -29,6 +29,7 @@
       >
         <slot />
       </v-card-text>
+      <slot name="footer" />
     </v-card>
   </v-dialog>
 </template>

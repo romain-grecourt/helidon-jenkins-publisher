@@ -9,17 +9,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import io.helidon.build.publisher.model.PipelineInfo;
-import io.helidon.build.publisher.model.PipelineInfoAugmenter;
+import io.helidon.build.publisher.model.InfoAugmenter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Pipeline augmenter to fill in the missing fields of {@link PipelineInfo}.
+ * Pipeline info augmenter to fill in the missing fields of {@link PipelineInfo}.
  */
-final class GitHubAugmenter implements PipelineInfoAugmenter {
+final class GitHubInfoAugmenter implements InfoAugmenter {
 
-    private static final Logger LOGGER = Logger.getLogger(GitHubAugmenter.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(GitHubInfoAugmenter.class.getName());
     private static final String GITHUB_URL = "https://github.com";
     private static final String GITHUB_GIT = "git@github.com";
     private static final String GITHUB_API_URL = "https://api.github.com";
@@ -30,7 +30,7 @@ final class GitHubAugmenter implements PipelineInfoAugmenter {
 
     private final GitHubClient ghClient;
 
-    GitHubAugmenter() {
+    GitHubInfoAugmenter() {
         this.ghClient = new GitHubClient();
     }
 

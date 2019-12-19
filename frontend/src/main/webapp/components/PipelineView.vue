@@ -91,6 +91,7 @@
         >
           <v-list-item-group>
             <v-list-item
+              :disabled="refreshDisabled"
               @click="refresh"
             >
               <v-list-item-icon>
@@ -116,6 +117,7 @@
           v-else
           ref="treeview"
           :items="pipeline.items"
+          :error="pipeline.error"
         />
       </v-content>
     </template>
@@ -168,7 +170,8 @@ export default {
     pipeline: null,
     loading: true,
     errored: false,
-    notfound: false
+    notfound: false,
+    refreshDisabled: false
   }),
   computed: {
     viewIdNotFound () {
@@ -196,7 +199,8 @@ export default {
     this.refresh()
   },
   methods: {
-    updateTree () {
+    refreshData (data) {
+      this.pipeline = data
       const treeviewComp = this.$refs.treeview
       if (typeof treeviewComp !== 'undefined' && treeviewComp !== null) {
         const treeComp = treeviewComp.$refs.treeview
@@ -204,28 +208,26 @@ export default {
           treeComp.updateAll(true)
         }
       }
+      if (this.pipeline !== null &&
+        (this.pipeline.status === 'SUCCESS' ||
+        this.pipeline.status === 'FAILURE' ||
+        this.pipeline.status === 'UNSTABLE' ||
+        this.pipeline.status === 'ABORTED')) {
+        this.refreshDisabled = true
+      }
+    },
+    refreshError (error) {
+      if (typeof error.response !== 'undefined' &&
+              error.response.status === 404) {
+        this.notfound = true
+      } else {
+        this.errored = error.message
+      }
     },
     refresh () {
-      if (this.pipeline !== null &&
-              (this.pipeline.status === 'SUCCESS' ||
-              this.pipeline.status === 'FAILURE' ||
-              this.pipeline.status === 'UNSTABLE' ||
-              this.pipeline.status === 'ABORTED')) {
-        this.updateTree()
-        return
-      }
       this.$api.get(this.$route.params.pipelineid)
-        .then((response) => {
-          this.pipeline = response.data
-          this.updateTree()
-        })
-        .catch(error => {
-          if (typeof error.response !== 'undefined' && error.response.status === 404) {
-            this.notfound = true
-          } else {
-            this.errored = error.message
-          }
-        })
+        .then(response => this.refreshData(response.data))
+        .catch(error => this.refreshError(error))
         .finally(() => (this.loading = false))
     },
     visitPipeline (visitor, data) {

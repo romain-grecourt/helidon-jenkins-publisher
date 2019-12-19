@@ -11,7 +11,7 @@ import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
 import io.helidon.build.publisher.model.DescriptorFileManager;
-import io.helidon.build.publisher.model.PipelineEventProcessor;
+import io.helidon.build.publisher.model.EventProcessor;
 import io.helidon.build.publisher.model.events.PipelineEvents;
 import io.helidon.common.CollectionsHelper;
 
@@ -24,7 +24,7 @@ import static io.helidon.common.http.Http.Status.OK_200;
 final class BackendService implements Service {
 
     private final Path storagePath;
-    private final PipelineEventProcessor eventProcessor;
+    private final EventProcessor eventProcessor;
     private final FileAppender appender;
 
     /**
@@ -35,8 +35,8 @@ final class BackendService implements Service {
     BackendService(String path, int appenderThreads) {
         this.storagePath = FileSystems.getDefault().getPath(path);
         this.appender = new FileAppender(storagePath, appenderThreads);
-        this.eventProcessor = new PipelineEventProcessor(new DescriptorFileManager(storagePath),
-                CollectionsHelper.listOf(new GitHubAugmenter()));
+        this.eventProcessor = new EventProcessor(new DescriptorFileManager(storagePath),
+                CollectionsHelper.listOf(new GitHubInfoAugmenter()));
     }
 
     @Override

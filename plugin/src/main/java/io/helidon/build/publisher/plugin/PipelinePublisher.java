@@ -196,7 +196,7 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                 WeakReference<TaskListenerDecorator> ref = PUBLISHERS.remove(execution);
                 if (ref != null) {
                     TaskListenerDecorator decorator = ref.get();
-                    if (decorator != null) {
+                    if (decorator instanceof PipelinePublisher) {
                         PipelinePublisher pipelinePublisher = (PipelinePublisher) decorator;
                         if (LOGGER.isLoggable(Level.FINE)) {
                             LOGGER.log(Level.FINE, "Pipeline completed, pipelineId={0}, pipeline={1}", new Object[]{

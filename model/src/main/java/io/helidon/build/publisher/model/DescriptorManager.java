@@ -1,9 +1,9 @@
 package io.helidon.build.publisher.model;
 
 /**
- * Pipeline descriptor manager to load and save a pipeline descriptor.
+ * Descriptor manager to load and save a pipeline descriptor.
  */
-public interface PipelineDescriptorManager {
+public interface DescriptorManager {
 
     /**
      * Load a pipeline.
