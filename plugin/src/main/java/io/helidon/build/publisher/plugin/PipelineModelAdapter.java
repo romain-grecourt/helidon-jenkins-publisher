@@ -315,10 +315,13 @@ final class PipelineModelAdapter {
 
         @Override
         protected void refresh() {
-            if (super.endTime == 0 && source != null && source instanceof BlockStartNode) {
+            if (endTime == 0 && source != null && source instanceof BlockStartNode) {
                 BlockEndNode endNode = ((BlockStartNode) source).getEndNode();
                 if (endNode != null) {
-                    super.endTime = TimingAction.getStartTime(endNode);
+                    long time = TimingAction.getStartTime(endNode);
+                    if (time > startTime) {
+                        endTime = time;
+                    }
                 }
             }
         }

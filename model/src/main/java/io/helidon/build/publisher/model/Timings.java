@@ -13,7 +13,7 @@ public class Timings {
     public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     final String date;
-    final long startTime;
+    protected final long startTime;
     protected long endTime;
 
     /**
