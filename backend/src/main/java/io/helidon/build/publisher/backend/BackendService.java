@@ -2,6 +2,8 @@ package io.helidon.build.publisher.backend;
 
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import io.helidon.common.http.Http;
 import io.helidon.webserver.BadRequestException;
@@ -13,8 +15,8 @@ import io.helidon.webserver.Service;
 import io.helidon.build.publisher.model.DescriptorFileManager;
 import io.helidon.build.publisher.model.EventProcessor;
 import io.helidon.build.publisher.model.events.PipelineEvents;
-import io.helidon.common.CollectionsHelper;
 
+import static io.helidon.common.CollectionsHelper.listOf;
 import static io.helidon.common.http.Http.Status.CREATED_201;
 import static io.helidon.common.http.Http.Status.OK_200;
 
@@ -23,6 +25,7 @@ import static io.helidon.common.http.Http.Status.OK_200;
  */
 final class BackendService implements Service {
 
+    private static final Logger LOGGER = Logger.getLogger(BackendService.class.getName());
     private final Path storagePath;
     private final EventProcessor eventProcessor;
     private final FileAppender appender;
@@ -34,9 +37,12 @@ final class BackendService implements Service {
      */
     BackendService(String path, int appenderThreads) {
         this.storagePath = FileSystems.getDefault().getPath(path);
-        this.appender = new FileAppender(storagePath, appenderThreads);
-        this.eventProcessor = new EventProcessor(new DescriptorFileManager(storagePath),
-                CollectionsHelper.listOf(new GitHubInfoAugmenter()));
+        this.appender = new FileAppender(appenderThreads);
+        this.eventProcessor = new EventProcessor(new DescriptorFileManager(storagePath), listOf(new GitHubInfoAugmenter()));
+        LOGGER.log(Level.INFO, "Creating backend service, storagePath={0}, appender nThreads={1}", new Object[]{
+            storagePath,
+            appenderThreads
+        });
     }
 
     @Override

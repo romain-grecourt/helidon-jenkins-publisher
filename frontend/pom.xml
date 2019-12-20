@@ -15,6 +15,7 @@
     <properties>
         <mainClass>io.helidon.build.publisher.frontend.Main</mainClass>
         <version.plugin.frontend>1.6</version.plugin.frontend>
+        <version.plugin.jib>1.8.0</version.plugin.jib>
         <version.tool.node>v8.11.1</version.tool.node>
         <version.tool.npm>5.6.0</version.tool.npm>
     </properties>
@@ -67,7 +68,7 @@
 
     <build>
         <plugins>
-<!--            <plugin>
+            <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
                 <version>${version.plugin.frontend}</version>
@@ -100,13 +101,51 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>-->
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
                     <execution>
                         <id>copy-libs</id>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>${version.plugin.jib}</version>
+                <configuration>
+                    <to>
+                        <image>build-publisher-frontend</image>
+                        <tags>
+                            <tag>${project.version}</tag>
+                            <tag>latest</tag>
+                        </tags>
+                    </to>
+                    <container>
+                        <jvmFlags>
+                            <jmxFlag>-server</jmxFlag>
+                            <jmxFlag>-Djava.awt.headless=true</jmxFlag>
+                            <jmxFlag>-XX:+UnlockExperimentalVMOptions</jmxFlag>
+                            <jmxFlag>-XX:+UseCGroupMemoryLimitForHeap</jmxFlag>
+                            <jmxFlag>-XX:InitialRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:MinRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:MaxRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:+UseG1GC</jmxFlag>
+                        </jvmFlags>
+                        <mainClass>${mainClass}</mainClass>
+                        <ports>
+                            <port>8080</port>
+                        </ports>
+                    </container>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>dockerBuild</goal>
+                        </goals>
+                        <phase>package</phase>
                     </execution>
                 </executions>
             </plugin>

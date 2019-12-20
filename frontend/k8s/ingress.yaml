@@ -1,0 +1,13 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: build-publisher-frontend
+spec:
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /frontend
+        backend:
+          serviceName: build-publisher-frontend
+          servicePort: 9292

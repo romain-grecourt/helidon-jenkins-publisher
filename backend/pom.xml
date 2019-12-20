@@ -14,6 +14,7 @@
 
     <properties>
         <mainClass>io.helidon.build.publisher.backend.Main</mainClass>
+        <version.plugin.jib>1.8.0</version.plugin.jib>
     </properties>
 
     <dependencies>
@@ -60,6 +61,44 @@
                 <executions>
                     <execution>
                         <id>copy-libs</id>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>${version.plugin.jib}</version>
+                <configuration>
+                    <to>
+                        <image>build-publisher-backend</image>
+                        <tags>
+                            <tag>${project.version}</tag>
+                            <tag>latest</tag>
+                        </tags>
+                    </to>
+                    <container>
+                        <jvmFlags>
+                            <jmxFlag>-server</jmxFlag>
+                            <jmxFlag>-Djava.awt.headless=true</jmxFlag>
+                            <jmxFlag>-XX:+UnlockExperimentalVMOptions</jmxFlag>
+                            <jmxFlag>-XX:+UseCGroupMemoryLimitForHeap</jmxFlag>
+                            <jmxFlag>-XX:InitialRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:MinRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:MaxRAMFraction=2</jmxFlag>
+                            <jmxFlag>-XX:+UseG1GC</jmxFlag>
+                        </jvmFlags>
+                        <mainClass>${mainClass}</mainClass>
+                        <ports>
+                            <port>8080</port>
+                        </ports>
+                    </container>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>dockerBuild</goal>
+                        </goals>
+                        <phase>package</phase>
                     </execution>
                 </executions>
             </plugin>

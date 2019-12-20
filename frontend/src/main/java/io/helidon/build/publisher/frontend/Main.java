@@ -67,7 +67,7 @@ public final class Main {
      */
     private static Routing createRouting(Config config) {
         FrontendService frontendService = new FrontendService(
-                config.get("storageLocation").asString().get());
+                config.get("storage.location").asString().get());
         return Routing.builder()
                 .register(JacksonSupport.create())
                 .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))

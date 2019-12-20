@@ -34,22 +34,16 @@ final class FileAppender {
 
     private final ExecutorService executors;
     private final BlockingQueue<WorkItem>[] workQueues;
-    private final Path storagePath;
 
     /**
      * Create a new file appender.
-     * @param storagePath the storage
      * @param nthreads the thread pool size
      */
-    FileAppender(Path storagePath, int nthreads) {
-        this.storagePath = storagePath;
+    FileAppender(int nthreads) {
         this.executors = Executors.newFixedThreadPool(nthreads);
         this.workQueues = new BlockingQueue[nthreads];
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Creating file appender, storagePath={0}, nThreads={1}", new Object[]{
-                storagePath,
-                nthreads
-            });
+            LOGGER.log(Level.FINE, "Creating file appender nThreads={0}", nthreads);
         }
     }
 

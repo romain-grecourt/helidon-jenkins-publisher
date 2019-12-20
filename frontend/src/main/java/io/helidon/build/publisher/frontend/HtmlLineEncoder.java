@@ -15,11 +15,13 @@ final class HtmlLineEncoder extends BaseProcessor<DataChunk, DataChunk> {
 
     private static final Logger LOGGER = Logger.getLogger(HtmlLineEncoder.class.getName());
 
+    static final String PAGE_BEGIN_TEXT = getPageBeginTemplate();
+    static final String PAGE_END_TEXT = " <body>\n</html>\n";
     static final String DIV_TEXT = "  <div class=\"line\">";
     static final String SLASH_DIV_TEXT = "</div>\n";
 
-    private final ByteBuffer PAGE_BEGIN_DATA = ByteBuffer.wrap(getPageBeginTemplate().getBytes());
-    private final ByteBuffer PAGE_END_DATA = ByteBuffer.wrap(" <body>\n</html>\n".getBytes());
+    private final ByteBuffer PAGE_BEGIN_DATA = ByteBuffer.wrap(PAGE_BEGIN_TEXT.getBytes());
+    private final ByteBuffer PAGE_END_DATA = ByteBuffer.wrap(PAGE_END_TEXT.getBytes());
 
     private final ByteBuffer DIV_DATA = ByteBuffer.wrap(DIV_TEXT.getBytes());
     private final ByteBuffer SLASH_DIV_DATA = ByteBuffer.wrap(SLASH_DIV_TEXT.getBytes());

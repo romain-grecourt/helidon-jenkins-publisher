@@ -66,7 +66,7 @@ public final class Main {
      */
     private static Routing createRouting(Config config) {
         BackendService backendService = new BackendService(
-                config.get("storageLocation").asString().get(),
+                config.get("storage.location").asString().get(),
                 config.get("appenderThreads").asInt().orElse(2));
         return Routing.builder()
                 .register(JacksonSupport.create())

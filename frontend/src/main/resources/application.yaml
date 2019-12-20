@@ -1,5 +1,6 @@
 server:
-  port: 9191
+  port: 8080
   host: 0.0.0.0
 
-storageLocation: "../.storage"
+storage:
+  location: "./.storage"

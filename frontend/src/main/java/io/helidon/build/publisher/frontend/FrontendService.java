@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import io.helidon.build.publisher.model.Artifacts;
@@ -26,13 +29,13 @@ import io.helidon.webserver.ServerResponse;
 import io.helidon.webserver.Service;
 
 import static io.helidon.common.http.Http.Status.NOT_FOUND_404;
-import java.util.Comparator;
 
 /**
  * Service that implements the endpoint used by the UI.
  */
 final class FrontendService implements Service {
 
+    private static final Logger LOGGER = Logger.getLogger(FrontendService.class.getName());
     private static final String LINES_HEADERS = "vnd.io.helidon.publisher.lines";
     private static final String REMAINING_HEADER = "vnd.io.helidon.publisher.remaining";
     private static final String POSITION_HEADER = "vnd.io.helidon.publisher.position";
@@ -57,6 +60,7 @@ final class FrontendService implements Service {
         storagePath = dirPath;
         descriptorManager = new DescriptorFileManager(storagePath);
         contentTypeSelector = new ContentTypeSelector(null);
+        LOGGER.log(Level.INFO, "Creating frontend service, storagePath={0}", storagePath);
     }
 
     @Override

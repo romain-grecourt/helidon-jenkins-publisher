@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: build-publisher-backend
+  labels:
+    app: build-publisher-backend
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: build-publisher-backend
+    spec:
+      containers:
+      - image: build-publisher-backend:latest
+        imagePullPolicy: IfNotPresent
+        name: backend
+        ports:
+        - containerPort: 8080
+        env:
+#        - name: storage.location
+#          value: "TODO"
+      restartPolicy: Always

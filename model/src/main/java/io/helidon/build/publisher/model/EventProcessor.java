@@ -35,7 +35,7 @@ public final class EventProcessor {
 
     private static final Logger LOGGER = Logger.getLogger(EventProcessor.class.getName());
 
-    static final String UNKNOWN_ERROR = "Pipeline failed with an unkown error";
+    static final String UNKNOWN_ERROR = "Pipeline failed with an unknown error";
     static final String UNKNOWN_TEST_FAILURES = "Pipeline test failures are unknown";
 
     private final DescriptorManager manager;
@@ -305,10 +305,16 @@ public final class EventProcessor {
         @Override
         public void visitEnd(Pipeline pipeline) {
             if (Result.FAILURE == result && !foundFailure) {
-                LOGGER.log(Level.WARNING, "Pipeline failed with an unkown error, pipelineId={0}", pipeline.info.id);
+                LOGGER.log(Level.WARNING, "{0}, pipelineId={1}", new Object[]{
+                    UNKNOWN_ERROR,
+                    pipeline.info.id
+                });
                 pipeline.error = UNKNOWN_ERROR;
             } else if (Result.UNSTABLE == result && !foundUnstable) {
-                LOGGER.log(Level.WARNING, "Pipeline test failures are unknown, pipelineId={0}", pipeline.info.id);
+                LOGGER.log(Level.WARNING, "{0}, pipelineId={1}", new Object[]{
+                    UNKNOWN_TEST_FAILURES,
+                    pipeline.info.id
+                });
                 pipeline.error = UNKNOWN_TEST_FAILURES;
             } else if (Result.ABORTED == result && error != null) {
                 LOGGER.log(Level.WARNING, "Pipeline aborted, error={0}, pipelineId={1}", new Object[]{
