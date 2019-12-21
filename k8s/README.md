@@ -12,7 +12,7 @@ Setup the controller in your cluster.
 kubectl apply -f ingress-nginx.yaml
 ```
 
-TIP: Look at the logs when troubleshooting or event exec in the pod's container
+TIP: look at the logs when troubleshooting or event exec in the pod's container
 to look at `nginx.conf`
 
 ## NFS storage class provider
@@ -42,14 +42,14 @@ Create a PVC with the NFS storage class provider (testing only):
 kubectl apply -f storage-claim-nfs.yaml
 ```
 
-### Backend
+### Publisher backend
 
 Create a deployment and service:
 ```bash
 kubectl apply -f backend.yaml
 ```
 
-IMPORTANT: The backend is not designed to scale.
+IMPORTANT: the backend is not designed to scale.
 
 This is because the storage is file system based the backend is designed to be
  a single instance in order to avoid dealing with concurrent write access.
@@ -60,16 +60,16 @@ kubectl apply -f backend-ingress-localhost.yaml
 ```
 
 You will need to create your own version of this to match your desired hostname
- and use ingress controller specific annotations for the URL re-write.
+ and use ingress controller specific annotations for URL re-write.
 
-### Frontend
+### Publisher frontend
 
 Create a deployment and service:
 ```bash
 kubectl apply -f frontend.yaml
 ```
 
-NOTE: The frontend can be scaled since it's only doing read access to the storage.
+NOTE: the frontend can be scaled since it's only doing read access to the storage.
 
 Create an ingress resource (testing only):
 ```bash

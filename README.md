@@ -10,3 +10,11 @@ It is composed of the following pieces:
  stores metadata and files
  - frontend-api: a REST application that provides an API for the frontend ui
  - frontend-ui: a single page application to display the builds
+
+## Jenkins plugin
+
+TODO
+
+## Deployment
+
+See [k8s/README.md](./k8s/README.md)
