@@ -30,10 +30,10 @@ import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 public final class JobPublisher {
 
     private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
-    private static final JobPublisher EMPTY_PUBLISHER = new JobPublisher(null);
     private static final Map<Run, WeakReference<JobPublisher>> PUBLISHERS = new WeakHashMap<>();
     private static final ArtifactsProcessor.Factory ARTIFACTS_PROCESSOR_FACTORY = new ArtifactsProcessorFactory();
     private static final TestResultSuiteMatcher TEST_RESULT_SUITE_MATCHER = new TestResultSuiteMatcher();
+    private static final JobPublisher EMPTY_PUBLISHER = new JobPublisher(null);
 
     private final boolean enabled;
     private final BackendClient client;
@@ -155,7 +155,8 @@ public final class JobPublisher {
     @Extension
     public static final class ConsoleLogFilterImpl extends ConsoleLogFilter implements Serializable {
 
-        private final JobPublisher jobPublisher;
+        private final transient JobPublisher jobPublisher;
+        private static final long serialVersionUID = 1L;
 
         public ConsoleLogFilterImpl() {
             super();
@@ -168,7 +169,7 @@ public final class JobPublisher {
 
         @Override
         public OutputStream decorateLogger(Run build, OutputStream outputStream) throws IOException, InterruptedException {
-            if (jobPublisher.enabled) {
+            if (jobPublisher != null && jobPublisher.enabled) {
                 if (LOGGER.isLoggable(Level.FINE)) {
                     LOGGER.log(Level.FINE, "Decorating output, pipelineId={0}, step={1}", new Object[]{
                         jobPublisher.pipelineId,

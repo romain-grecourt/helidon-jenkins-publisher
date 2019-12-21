@@ -84,7 +84,7 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
 
         @Override
         public String getDisplayName() {
-            return Messages.DisplayName();
+            return Messages.displayName();
         }
 
         @Override

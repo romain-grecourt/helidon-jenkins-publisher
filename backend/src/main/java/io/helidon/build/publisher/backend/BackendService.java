@@ -1,6 +1,5 @@
 package io.helidon.build.publisher.backend;
 
-import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -19,6 +18,8 @@ import io.helidon.build.publisher.model.events.PipelineEvents;
 import static io.helidon.common.CollectionsHelper.listOf;
 import static io.helidon.common.http.Http.Status.CREATED_201;
 import static io.helidon.common.http.Http.Status.OK_200;
+import java.io.IOException;
+import java.nio.file.Files;
 
 /**
  * This service implements the endpoints used by the Jenkins plugin.
@@ -35,8 +36,15 @@ final class BackendService implements Service {
      * @param path storage path
      * @param appenderThreads number of threads used for appending data
      */
-    BackendService(String path, int appenderThreads) {
-        this.storagePath = FileSystems.getDefault().getPath(path);
+    BackendService(Path storagePath, int appenderThreads) {
+        this.storagePath = storagePath;
+        if (!Files.exists(storagePath)) {
+            try {
+                Files.createDirectories(storagePath);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        }
         this.appender = new FileAppender(appenderThreads);
         this.eventProcessor = new EventProcessor(new DescriptorFileManager(storagePath), listOf(new GitHubInfoAugmenter()));
         LOGGER.log(Level.INFO, "Creating backend service, storagePath={0}, appender nThreads={1}", new Object[]{

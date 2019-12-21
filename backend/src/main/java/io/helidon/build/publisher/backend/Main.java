@@ -2,7 +2,12 @@ package io.helidon.build.publisher.backend;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.logging.LogManager;
+
 import io.helidon.config.Config;
 import io.helidon.health.HealthSupport;
 import io.helidon.health.checks.HealthChecks;
@@ -11,8 +16,6 @@ import io.helidon.metrics.MetricsSupport;
 import io.helidon.webserver.Routing;
 import io.helidon.webserver.ServerConfiguration;
 import io.helidon.webserver.WebServer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Main class.
@@ -43,8 +46,11 @@ public final class Main {
     static WebServer startServer() throws IOException {
         setupLogging();
         Config config = Config.create();
-        ServerConfiguration serverConfig = ServerConfiguration.create(config.get("server"));
-        WebServer server = WebServer.create(serverConfig, createRouting(config));
+        Path storagePath = FileSystems.getDefault().getPath(config.get("storage.path").asString().get());
+        WebServer server = WebServer.builder(createRouting(config, storagePath))
+                .config(ServerConfiguration.create(config.get("server")))
+                .addNamedRouting("admin", createAdminRouting(storagePath))
+                .build();
         server.start()
             .thenAccept(ws -> {
                 System.out.println( "WEB server is up! http://localhost:" + ws.port());
@@ -58,27 +64,26 @@ public final class Main {
         return server;
     }
 
-    /**
-     * Creates new {@link Routing}.
-     *
-     * @return routing configured with JSON support, a health check, and a service
-     * @param config configuration of this server
-     */
-    private static Routing createRouting(Config config) {
-        BackendService backendService = new BackendService(
-                config.get("storage.location").asString().get(),
-                config.get("appenderThreads").asInt().orElse(2));
+    private static Routing createAdminRouting(Path storagePath) {
         return Routing.builder()
-                .register(JacksonSupport.create())
-                .register(HealthSupport.builder().addLiveness(HealthChecks.healthChecks()))
+                .register(HealthSupport.builder()
+                        .webContext("/live")
+                        .addLiveness(HealthChecks.healthChecks()))
+                .register(HealthSupport.builder()
+                        .webContext("/ready")
+                        .addReadiness(new StorageReadyCheck(storagePath))
+                        .build())
                 .register(MetricsSupport.create())
-                .register(backendService)
                 .build();
     }
 
-    /**
-     * Configure logging from logging.properties file.
-     */
+    private static Routing createRouting(Config config, Path storagePath) {
+        return Routing.builder()
+                .register(JacksonSupport.create())
+                .register(new BackendService(storagePath, config.get("appenderThreads").asInt().orElse(2)))
+                .build();
+    }
+
     private static void setupLogging() throws IOException {
         try (InputStream is = Main.class.getResourceAsStream("/logging.properties")) {
             LogManager.getLogManager().readConfiguration(is);

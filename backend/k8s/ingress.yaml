@@ -1,13 +1,15 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-  name: build-publisher-backend
+  name: helidon-build-publisher-backend
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   rules:
   - host: localhost
     http:
       paths:
-      - path: /backend
+      - path: /backend(/|$)(.*)
         backend:
-          serviceName: build-publisher-backend
-          servicePort: 9090
+          serviceName: helidon-build-publisher-backend
+          servicePort: 9190

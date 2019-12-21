@@ -89,7 +89,7 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
 
         @Override
         public String getDisplayName() {
-            return Messages.DisplayName();
+            return Messages.displayName();
         }
 
         @Override

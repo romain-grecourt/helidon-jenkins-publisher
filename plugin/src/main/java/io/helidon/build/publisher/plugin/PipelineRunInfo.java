@@ -17,6 +17,9 @@ import hudson.model.Run;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.UserRemoteConfig;
 import hudson.scm.SCM;
+import java.io.UnsupportedEncodingException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import jenkins.plugins.git.AbstractGitSCMSource;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMRevision;
@@ -148,7 +151,8 @@ final class PipelineRunInfo {
                 SCM scm = it.next();
                 if (scm instanceof GitSCM) {
                     for (UserRemoteConfig urc : ((GitSCM) scm).getUserRemoteConfigs()) {
-                        if (revAction.getSourceId().equals(urc.getName())) {
+                        String sourceId = revAction.getSourceId();
+                        if (sourceId != null && sourceId.equals(urc.getName())) {
                             remote = urc.getUrl();
                             break;
                         }
@@ -203,12 +207,12 @@ final class PipelineRunInfo {
     @Override
     public String toString() {
         return PipelineRunInfo.class.getSimpleName() + "{"
-                + " id=" + id == null ? "null" : id
+                + " id=" + id
                 + ", title=" + title
                 + ", repositoryUrl=" + repositoryUrl
                 + ", scmIfno=" + scmInfo
-                + ", publisherServerUrl=" + publisherServerUrl == null ? "null" : publisherServerUrl
-                + ", publisherClientThreads=" + publisherClientThreads == null ? "null" : publisherClientThreads
+                + ", publisherServerUrl=" + publisherServerUrl
+                + ", publisherClientThreads=" + publisherClientThreads
                 + ", excludeSyntheticSteps=" + excludeSyntheticSteps
                 + ", excludeMetaSteps=" + excludeMetaSteps
                 + " }";
@@ -227,7 +231,11 @@ final class PipelineRunInfo {
             long startTime) {
 
         String runDesc = title + "/" + repotistoryUrl + "/" + headRef + "/" + buildNumber + "/" + startTime + "/" + commit;
-        return md5sum(runDesc.getBytes());
+        try {
+            return md5sum(runDesc.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException ex) {
+            throw new IllegalStateException(ex.getMessage(), ex);
+        }
     }
 
     /**

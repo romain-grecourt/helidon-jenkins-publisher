@@ -37,15 +37,15 @@ public final class HelidonPublisherGlobalConfiguration extends GlobalConfigurati
     }
 
     private String logServers() {
-        String s = "[";
+        StringBuilder sb = new StringBuilder("[");
         Iterator<HelidonPublisherServer> it = servers.iterator();
         while (it.hasNext()) {
-            s += it.next().toString();
+            sb.append(it.next().toString());
             if (it.hasNext()) {
-                s += ", ";
+                sb.append(", ");
             }
         }
-        return s + "]";
+        return sb.append("]").toString();
     }
 
     @Override
@@ -75,6 +75,6 @@ public final class HelidonPublisherGlobalConfiguration extends GlobalConfigurati
 
     @Override
     public String getDisplayName() {
-        return Messages.DisplayName();
+        return Messages.displayName();
     }
 }

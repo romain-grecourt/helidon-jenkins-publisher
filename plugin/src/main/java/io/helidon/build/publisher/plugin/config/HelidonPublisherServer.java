@@ -201,7 +201,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
 
         @Override
         public String getDisplayName() {
-            return Messages.Server_DisplayName();
+            return Messages.serverDisplayName();
         }
     }
 

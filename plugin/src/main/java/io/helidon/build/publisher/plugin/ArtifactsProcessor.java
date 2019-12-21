@@ -95,10 +95,12 @@ final class ArtifactsProcessor extends StandardArtifactManager {
      * @param factory factory to register
      */
     static void register(Factory factory) {
-        if (factories == null) {
-            factories = new HashSet<>();
+        synchronized (ArtifactsProcessor.class) {
+            if (factories == null) {
+                factories = new HashSet<>();
+            }
+            factories.add(Objects.requireNonNull(factory, "factory is null"));
         }
-        factories.add(Objects.requireNonNull(factory, "factory is null"));
         // make sure the real factory is hooked-in
         DelegateArtifactManagerFactory.getInstance().register(ARTIFACT_MANAGER_FACTORY);
     }

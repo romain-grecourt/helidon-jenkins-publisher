@@ -33,7 +33,7 @@ public final class CustomSCMSourceTrait extends SCMSourceTrait {
 
         @Override
         public String getDisplayName() {
-            return Messages.DisplayName();
+            return Messages.displayName();
         }
 
         @Override

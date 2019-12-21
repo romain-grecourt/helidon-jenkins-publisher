@@ -28,6 +28,7 @@ import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import hudson.model.Actionable;
 import hudson.model.Queue.Executable;
+import java.io.ObjectInputStream;
 import org.jenkinsci.plugins.pipeline.modeldefinition.actions.ExecutionModelAction;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTBranch;
 import org.jenkinsci.plugins.pipeline.modeldefinition.ast.ModelASTStage;
@@ -118,19 +119,19 @@ final class PipelineSignatures {
      * @return the created signature
      */
     private static String createSignature(ScriptedStep step, String sig) {
-        String args = "";
+        StringBuilder args = new StringBuilder();
         if (step.args instanceof Map) {
             for (Object stepArg : ((Map) step.args).values()) {
-                args += stepArg.toString();
+                args.append(stepArg.toString());
             }
         } else if (step.args instanceof List) {
             for (Object stepArg : ((List) step.args)) {
-                args += stepArg.toString();
+                args.append(stepArg.toString());
             }
         } else if (step.args != null) {
-            args = step.args.toString();
+            args.append(step.args.toString());
         }
-        return Step.createPath(sig, step.method, args);
+        return Step.createPath(sig, step.method, args.toString());
     }
 
     /**
@@ -210,11 +211,11 @@ final class PipelineSignatures {
                 List<ScriptedStep> ssteps = eval(shell, script);
                 sigs.addAll(createSignatures(ssteps, sig));
             } else {
-                String stepArgs = "";
+                StringBuilder stepArgs = new StringBuilder();
                 for (Object arg : args.values()) {
-                    stepArgs += arg.toString();
+                    stepArgs.append(arg.toString());
                 }
-                sigs.add(Step.createPath(sig, sid, stepArgs));
+                sigs.add(Step.createPath(sig, sid, stepArgs.toString()));
             }
         }
         return sigs;
@@ -334,9 +335,15 @@ final class PipelineSignatures {
      */
     private static final class ScriptedStepInvoker extends DefaultInvoker {
 
-        private final transient List<ScriptedStep> steps = new LinkedList<>();
-        private final transient Map<Object, List<ScriptedStep>> sequences = new HashMap<>();
+        private static final long serialVersionUID = 1L;
+        private transient List<ScriptedStep> steps = new LinkedList<>();
+        private transient Map<Object, List<ScriptedStep>> sequences = new HashMap<>();
         private volatile boolean resolving;
+
+        private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+            steps = new LinkedList<>();
+            sequences = new HashMap<>();
+        }
 
         @Override
         public Object methodCall(Object receiver, String method, Object[] args) throws Throwable {

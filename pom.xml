@@ -5,15 +5,19 @@
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.helidon.build.publisher</groupId>
-    <artifactId>helidon-builders-publisher-project</artifactId>
+    <artifactId>helidon-build-publisher-project</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <name>Helidon Build Publisher Project</name>
     <packaging>pom</packaging>
 
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <modules>
         <module>plugin</module>
         <module>model</module>
-        <module>frontend</module>
+        <module>frontend/api</module>
         <module>backend</module>
     </modules>
 </project>

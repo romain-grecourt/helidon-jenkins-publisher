@@ -22,18 +22,20 @@ public final class DelegateArtifactManagerFactory extends ArtifactManagerFactory
         if (INSTANCE != null) {
             return INSTANCE;
         }
-        // there may be a deserialized instance in the artifact manager configuration
-        for (ArtifactManagerFactory factory : ArtifactManagerConfiguration.get().getArtifactManagerFactories()) {
-            if (factory instanceof DelegateArtifactManagerFactory) {
-                // found a deserialized instance
-                // set it as the singleton instance
-                INSTANCE = (DelegateArtifactManagerFactory) factory;
-                return INSTANCE;
+        synchronized (DelegateArtifactManagerFactory.class) {
+            // there may be a deserialized instance in the artifact manager configuration
+            for (ArtifactManagerFactory factory : ArtifactManagerConfiguration.get().getArtifactManagerFactories()) {
+                if (factory instanceof DelegateArtifactManagerFactory) {
+                    // found a deserialized instance
+                    // set it as the singleton instance
+                    INSTANCE = (DelegateArtifactManagerFactory) factory;
+                    return INSTANCE;
+                }
             }
+            // create the singleton.
+            INSTANCE = new DelegateArtifactManagerFactory();
+            ArtifactManagerConfiguration.get().getArtifactManagerFactories().add(INSTANCE);
         }
-        // create the singleton.
-        INSTANCE = new DelegateArtifactManagerFactory();
-        ArtifactManagerConfiguration.get().getArtifactManagerFactories().add(INSTANCE);
         return INSTANCE;
     }
 
@@ -46,11 +48,13 @@ public final class DelegateArtifactManagerFactory extends ArtifactManagerFactory
      * Register an {@link ArtifactManagerFactory} delegate.
      * @param delegate the manager to register
      */
-    public synchronized void register(ArtifactManagerFactory delegate) {
-        if (delegates == null) {
-            delegates = new HashSet<>();
+    public void register(ArtifactManagerFactory delegate) {
+        synchronized (DelegateArtifactManagerFactory.class) {
+            if (delegates == null) {
+                delegates = new HashSet<>();
+            }
+            delegates.add(delegate);
         }
-        delegates.add(delegate);
     }
 
     @Override

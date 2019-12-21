@@ -33,6 +33,7 @@ import org.jenkinsci.plugins.workflow.graph.BlockEndNode;
 import org.jenkinsci.plugins.workflow.graph.BlockStartNode;
 import org.jenkinsci.plugins.workflow.graph.FlowNode;
 import org.jenkinsci.plugins.workflow.steps.FlowInterruptedException;
+import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.support.steps.StageStep;
 
 /**
@@ -128,7 +129,8 @@ final class PipelineModelAdapter {
         String name = node.getDisplayFunctionName();
         String stepArgs = ArgumentsAction.getStepArgumentsAsString(node);
         String args = stepArgs != null ? stepArgs : "";
-        boolean meta = node.getDescriptor().isMetaStep();
+        StepDescriptor nodeDesc = node.getDescriptor();
+        boolean meta = nodeDesc != null ? nodeDesc.isMetaStep() : true;
         String sig = Step.createPath(pstage.path(), name, args);
         boolean declared = signatures.contains(sig);
         Steps psteps = getOrCreateSteps((Sequence) pstage);
@@ -208,7 +210,8 @@ final class PipelineModelAdapter {
             throw new IllegalStateException("Not a multi stage");
         }
         Stages pstages = (Stages) pstage;
-        String descId = node.getDescriptor().getId();
+        StepDescriptor nodeDesc = node.getDescriptor();
+        String nodeDescId = nodeDesc != null ? nodeDesc.getId() : null;
         String name = null;
         LabelAction action = node.getAction(LabelAction.class);
         if (action != null) {
@@ -218,7 +221,7 @@ final class PipelineModelAdapter {
                 name = action.getDisplayName();
             }
         }
-        if (STAGE_DESC_ID.equals(descId)) {
+        if (STAGE_DESC_ID.equals(nodeDescId)) {
             if (LOGGER.isLoggable(Level.FINE)) {
                 LOGGER.log(Level.FINE, "Creating sequence stage, pipelineId={0}, parentId={1}", new Object[]{
                     pipelineId,
@@ -229,7 +232,7 @@ final class PipelineModelAdapter {
             pstages.addStage(sequence);
             stages.put(node.getId(), sequence);
             sequence.fireCreated();
-        } else if (PARALLEL_DESC_ID.equals(descId) && node.isBody()) {
+        } else if (PARALLEL_DESC_ID.equals(nodeDescId) && node.isBody()) {
             StepStartNode pnode;
             List<FlowNode> parents = node.getParents();
             if (!parents.isEmpty()) {
@@ -242,7 +245,9 @@ final class PipelineModelAdapter {
             } else {
                 throw new IllegalStateException("Node has no parent");
             }
-            if (PARALLEL_DESC_ID.equals(pnode.getDescriptor().getId()) && !pnode.isBody()) {
+            StepDescriptor pnodeDesc = pnode.getDescriptor();
+            String pnodeDescId = pnodeDesc != null ? pnodeDesc.getId() : null;
+            if (PARALLEL_DESC_ID.equals(pnodeDescId) && !pnode.isBody()) {
                 Parallel parallel;
                 String parentId = pnode.getId();
                 if (stages.containsKey(parentId)) {

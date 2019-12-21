@@ -1,23 +1,53 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: build-publisher-frontend
+  name: helidon-build-publisher-frontend
   labels:
-    app: build-publisher-frontend
+    app: helidon-build-publisher-frontend
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: helidon-build-publisher-frontend
   template:
     metadata:
       labels:
-        app: build-publisher-frontend
+        app: helidon-build-publisher-frontend
     spec:
+      restartPolicy: Always
       containers:
-      - image: build-publisher-frontend:latest
+      - image: helidon-build-publisher-frontend-ui:latest
         imagePullPolicy: IfNotPresent
-        name: frontend
+        name: ui
+        ports:
+        - containerPort: 80
+      - image: helidon-build-publisher-frontend-api:latest
+        imagePullPolicy: IfNotPresent
+        name: api
         ports:
         - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 120
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /live
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
         env:
-#        - name: storage.location
-#          value: "TODO"
-      restartPolicy: Always
+        - name: storage.path
+          value: "/storage"
+        volumeMounts:
+        - name: build-publisher-storage
+          mountPath: "/storage"
+      volumes:
+      - name: build-publisher-storage
+        persistentVolumeClaim:
+          claimName: build-publisher-storage

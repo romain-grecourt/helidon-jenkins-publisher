@@ -53,6 +53,9 @@ final class Helper {
      * @return FlowStatus.Result
      */
     static Status.Result convertResult(Result result) {
+        if (result == null) {
+            return Status.Result.UNKNOWN;
+        }
         switch (result.ordinal) {
             case 4:
                 return Status.Result.ABORTED;

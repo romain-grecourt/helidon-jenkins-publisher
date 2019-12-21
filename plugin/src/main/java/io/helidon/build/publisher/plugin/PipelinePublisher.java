@@ -34,14 +34,15 @@ import org.kohsuke.accmod.restrictions.suppressions.SuppressRestrictedWarnings;
 @SuppressRestrictedWarnings({TaskListenerDecorator.class})
 final class PipelinePublisher extends TaskListenerDecorator implements GraphListener.Synchronous {
 
+    private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = Logger.getLogger(PipelinePublisher.class.getName());
     private static final EmptyPublisher EMPTY_PUBLISHER = new EmptyPublisher();
     private static final Map<FlowExecution, WeakReference<TaskListenerDecorator>> PUBLISHERS = new WeakHashMap<>();
     private static final ArtifactsProcessor.Factory ARTIFACTS_PROCESSOR_FACTORY = new ArtifactsProcessorFactory();
 
-    private final PipelineModelAdapter modelAdapter;
-    private final BackendClient client;
-    private final Pipeline pipeline;
+    private transient PipelineModelAdapter modelAdapter;
+    private transient BackendClient client;
+    private transient Pipeline pipeline;
     private final String pipelineId;
     private final boolean excludeSyntheticSteps;
     private final boolean excludeMetaSteps;
