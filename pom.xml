@@ -17,7 +17,7 @@
     <modules>
         <module>plugin</module>
         <module>model</module>
-        <module>frontend/api</module>
+        <module>frontend-api</module>
         <module>backend</module>
     </modules>
 </project>
