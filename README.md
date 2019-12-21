@@ -13,7 +13,7 @@ It is composed of the following pieces:
 
 ## Jenkins plugin
 
-TODO
+See [plugin/README.md](./plugin/README.md)
 
 ## Deployment
 

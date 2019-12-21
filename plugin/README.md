@@ -46,3 +46,5 @@ Install the [Support Core Plugin](https://wiki.jenkins.io/display/JENKINS/Suppor
 The logs for the recorder will show up under
  `~/.jenkins/logs/custom/io.helidon.build.publisher.log`, they are rotated
  automatically.
+
+See more [here](https://wiki.jenkins.io/display/JENKINS/Logging).
