@@ -2,9 +2,8 @@ apiVersion: "v1"
 kind: "PersistentVolumeClaim"
 metadata: 
   name: "build-publisher-storage"
-  annotations:
-    volume.beta.kubernetes.io/storage-class: "managed-nfs-storage"
-spec: 
+spec:
+  storageClassName: "nfs"
   accessModes:
     - ReadWriteOnce
   resources:

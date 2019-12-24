@@ -1,7 +1,15 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-client-provisioner
+
+---
+
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nfs-client-provisioner
+  namespace: nfs-client-provisioner
 
 ---
 
@@ -9,6 +17,7 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: nfs-client-provisioner-runner
+  namespace: nfs-client-provisioner
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -28,7 +37,8 @@ rules:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: managed-nfs-storage
+  name: nfs
+  namespace: nfs-client-provisioner
 provisioner: fuseim.pri/ifs # or choose another name, must match deployment's env PROVISIONER_NAME'
 
 ---
@@ -37,6 +47,7 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: run-nfs-client-provisioner
+  namespace: nfs-client-provisioner
 subjects:
   - kind: ServiceAccount
     name: nfs-client-provisioner
@@ -52,6 +63,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: nfs-client-provisioner
+  namespace: nfs-client-provisioner
 spec:
   replicas: 1
   selector:
@@ -83,4 +95,3 @@ spec:
           nfs:
             server: your-nfs-host
             path: /your/shared/path
-

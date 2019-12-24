@@ -42,10 +42,12 @@ DESCRIPTION: Push an image tar to a remote registry
 
 USAGE:
 
-$(basename ${SCRIPT}) [--help] [--load] --path=PATH --name=NAME
+$(basename ${SCRIPT}) [OPTIONS] --image=PATH
 
   --image=PATH
           Path to the image tar to be pushed.
+
+OPTIONS:
 
   --user=USERNAME
           Registry username
@@ -118,10 +120,17 @@ if ! type jq > /dev/null 2>&1; then
     exit 1
 fi
 
+if ! type curl > /dev/null 2>&1; then
+    echo "ERROR: curl not found in PATH"
+    exit 1
+fi
+
 if [ -z "${DEBUG}" ] ; then
     exec 2> /dev/null
     readonly DEBUG=false
 fi
+
+echo "INFO: pushing image..."
 
 readonly IMAGE_MANIFEST="$(mktemp -t XXX}).json"
 tar --to-stdout -xf ${IMAGE_TAR} manifest.json > ${IMAGE_MANIFEST}
@@ -199,7 +208,7 @@ tar --to-stdout -xf "${IMAGE_TAR}" $(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) |
 STATUS=$(head -1 ${RESPONSE_HEADERS})
 if ! [[ ${STATUS} =~ .*[201].* ]] ; then
     echo "ERROR: ${status}"
-    return 1
+    exit 1
 fi
 
 blob_size
@@ -255,7 +264,7 @@ curl -v -X PUT --data-binary @${DISTRIBUTION_MANIFEST} \
 STATUS=$(head -1 ${RESPONSE_HEADERS})
 if ! [[ ${STATUS} =~ .*[201].* ]] ; then
     echo "ERROR: ${status}"
-    return 1
+    exit 1
 fi
 
-echo "DONE!"
+echo "INFO: image push completed"

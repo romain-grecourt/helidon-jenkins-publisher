@@ -26,8 +26,9 @@ spec:
             path: /ready
             port: 8081
           initialDelaySeconds: 10
-          periodSeconds: 120
+          periodSeconds: 20
           timeoutSeconds: 3
+          failureThreshold: 10
         livenessProbe:
           httpGet:
             path: /live

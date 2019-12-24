@@ -11,10 +11,14 @@ It is composed of the following pieces:
  - frontend-api: a REST application that provides an API for the frontend ui
  - frontend-ui: a single page application to display the builds
 
-## Jenkins plugin
+## Build and deploy locally
 
-See [plugin/README.md](./plugin/README.md)
-
-## Deployment
-
-See [k8s/README.md](./k8s/README.md)
+```bash
+mvn package
+./etc/scripts/build-images.sh --tag=latest --load
+kubectl apply \
+    -f k8s/backend.yaml \
+    -f k8s/backend-ingress-localhost.yaml \
+    -f k8s/frontend.yaml \
+    -f k8s/frontend-ingress-localhost.yaml
+```
