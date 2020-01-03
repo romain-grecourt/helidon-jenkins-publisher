@@ -18,6 +18,7 @@ import io.helidon.build.publisher.model.events.PipelineCompletedEvent;
 import hudson.Extension;
 import hudson.model.Run;
 import hudson.tasks.junit.SuiteResult;
+import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
 import org.jenkinsci.plugins.workflow.flow.FlowExecution;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionListener;
 import org.jenkinsci.plugins.workflow.flow.FlowExecutionOwner;
@@ -53,7 +54,8 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
         WorkflowRun run = Helper.getRun(execution.getOwner());
         if (run.isBuilding() && runInfo.id != null) {
             enabled = true;
-            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
+            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
             excludeSyntheticSteps = runInfo.excludeSyntheticSteps;
             excludeMetaSteps = runInfo.excludeMetaSteps;
             pipelineId = runInfo.id;
@@ -221,7 +223,8 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                     result
                 });
             }
-            BackendClient client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
+            BackendClient client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
             client.onEvent(new PipelineCompletedEvent(runInfo.id, result, run.getDuration()));
         }
 

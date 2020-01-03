@@ -1,18 +1,18 @@
 package io.helidon.build.publisher.plugin.config;
 
-import com.cloudbees.hudson.plugins.folder.AbstractFolder;
+import java.io.InputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URISyntaxException;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.servlet.ServletException;
 
+import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
-import com.cloudbees.plugins.credentials.common.StandardUsernameListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
 import hudson.Util;
@@ -26,6 +26,7 @@ import hudson.security.AccessControlled;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.plaincredentials.FileCredentials;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.QueryParameter;
@@ -77,21 +78,42 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     }
 
     @CheckForNull
-    private static StandardUsernamePasswordCredentials lookupSystemCredentials(@CheckForNull String credentialsId,
-            @CheckForNull URL url) {
-
+    public static String lookupCredentials(@CheckForNull String credentialsId, @CheckForNull String url) {
         if (credentialsId == null) {
             return null;
         }
-        return CredentialsMatchers.firstOrNull(
+        FileCredentials credentials = CredentialsMatchers.firstOrNull(
                 CredentialsProvider.lookupCredentials(
-                        StandardUsernamePasswordCredentials.class,
+                        FileCredentials.class,
                         Jenkins.get(),
                         ACL.SYSTEM,
-                        URIRequirementBuilder.fromUri(url != null ? url.toExternalForm() : null).build()
+                        URIRequirementBuilder.fromUri(url).build()
                 ),
                 CredentialsMatchers.withId(credentialsId)
         );
+        if (credentials == null) {
+            return null;
+        }
+        try {
+            InputStream is = credentials.getContent();
+            byte[] pkey = new byte[2048];
+            int i=0;
+            for (; i < 2048; i++) {
+                int b = is.read();
+                if (b > 0) {
+                    pkey[i] = (byte) b;
+                } else {
+                    break;
+                }
+            }
+            return new String(pkey)
+                    .substring(0, i)
+                    .replaceAll("\\n", "")
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "");
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     /**
@@ -173,12 +195,22 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
                 if (serverUrl == null) {
                     return FormValidation.error("No URL given");
                 }
-                URL url = new URL(serverUrl);
-                if (lookupSystemCredentials(Util.fixEmpty(credentialsId), url) == null) {
-                    FormValidation.error("Credentials not found");
+                String pkey = lookupCredentials(Util.fixEmpty(credentialsId), serverUrl);
+                if (pkey == null) {
+                    return FormValidation.error("Credentials not found");
                 }
-            } catch (MalformedURLException e) {
-                return FormValidation.error(String.format("Malformed URL (%s)", serverUrl), e);
+                int code = HttpSignatureHelper.test(new URL(serverUrl), pkey);
+                if (code == 401) {
+                    return FormValidation.error("Unauthorized");
+                } else if (code == 404) {
+                    return FormValidation.error("Not found");
+                } else if (code != 200) {
+                    return FormValidation.error("Unexpected response code: " + code);
+                }
+            } catch (MalformedURLException ex) {
+                return FormValidation.error(String.format("Malformed URL (%s)", serverUrl), ex);
+            } catch (URISyntaxException | IOException ex) {
+                return FormValidation.error(ex.getMessage(), ex);
             }
             return FormValidation.ok("Success");
         }
@@ -187,16 +219,16 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
         public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context, @QueryParameter String url) {
             AccessControlled _context = (context instanceof AccessControlled ? (AccessControlled) context : Jenkins.get());
             if (context == null || !_context.hasPermission(Jenkins.ADMINISTER)) {
-                return new StandardUsernameListBoxModel();
+                return new StandardListBoxModel();
             }
-            return new StandardUsernameListBoxModel()
+            return new StandardListBoxModel()
                     .includeEmptyValue()
                     .includeMatchingAs(
                             context instanceof Queue.Task ? ((Queue.Task) context).getDefaultAuthentication() : ACL.SYSTEM,
                             context,
-                            StandardUsernameCredentials.class,
+                            FileCredentials.class,
                             URIRequirementBuilder.create().withScheme("http://").withScheme("https://").build(),
-                            CredentialsMatchers.anyOf(CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class)));
+                            CredentialsMatchers.anyOf(CredentialsMatchers.instanceOf(FileCredentials.class)));
         }
 
         @Override

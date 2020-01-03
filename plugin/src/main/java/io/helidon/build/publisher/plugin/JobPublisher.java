@@ -21,6 +21,7 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
 import hudson.tasks.junit.SuiteResult;
+import io.helidon.build.publisher.plugin.config.HelidonPublisherServer;
 import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 
 /**
@@ -55,7 +56,8 @@ public final class JobPublisher {
             }
             enabled = true;
             pipelineId = runInfo.id;
-            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
+            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
             GlobalStatus status = new GlobalStatus(run);
             GlobalTimings timings = new GlobalTimings(run);
             pipeline = new Pipeline(runInfo.toPipelineInfo(status, timings));

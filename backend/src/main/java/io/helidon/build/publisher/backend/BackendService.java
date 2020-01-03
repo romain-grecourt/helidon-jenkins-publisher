@@ -1,5 +1,7 @@
 package io.helidon.build.publisher.backend;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -18,8 +20,6 @@ import io.helidon.build.publisher.model.events.PipelineEvents;
 import static io.helidon.common.CollectionsHelper.listOf;
 import static io.helidon.common.http.Http.Status.CREATED_201;
 import static io.helidon.common.http.Http.Status.OK_200;
-import java.io.IOException;
-import java.nio.file.Files;
 
 /**
  * This service implements the endpoints used by the Jenkins plugin.
@@ -55,9 +55,14 @@ final class BackendService implements Service {
 
     @Override
     public void update(Routing.Rules rules) {
-        rules.put("/events", this::processEvents)
+        rules.get("/ping", this::ping)
+             .put("/events", this::processEvents)
              .put("/output/{pipelineId}/{stepId}", this::appendOutput)
              .post("/files/{pipelineId}/{filepath:.+}", this::uploadFile);
+    }
+
+    private void ping(ServerRequest req, ServerResponse res) {
+        res.status(OK_200).send();
     }
 
     private void processEvents(ServerRequest req, ServerResponse res) {

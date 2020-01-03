@@ -1,5 +1,6 @@
 package io.helidon.build.publisher.plugin;
 
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
@@ -17,9 +18,6 @@ import hudson.model.Run;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.UserRemoteConfig;
 import hudson.scm.SCM;
-import java.io.UnsupportedEncodingException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import jenkins.plugins.git.AbstractGitSCMSource;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMRevision;
@@ -45,6 +43,7 @@ final class PipelineRunInfo {
     final SCMInfo scmInfo;
     final String repositoryUrl;
     final String publisherServerUrl;
+    final String credentialsId;
     final int publisherClientThreads;
     final long startTime;
 
@@ -57,6 +56,7 @@ final class PipelineRunInfo {
         repositoryUrl = null;
         scmInfo = null;
         publisherServerUrl = null;
+        credentialsId = null;
         startTime = 0;
     }
 
@@ -123,14 +123,17 @@ final class PipelineRunInfo {
             HelidonPublisherServer server = prop.getServer();
             if (server != null) {
                 publisherServerUrl = server.getServerUrl();
+                credentialsId = server.getCredentialsId();
                 publisherClientThreads = server.getNthread();
             } else {
                 publisherServerUrl = null;
+                credentialsId = null;
                 publisherClientThreads = 5;
             }
             id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
+            credentialsId = null;
             publisherServerUrl = null;
             publisherClientThreads = 0;
             excludeSyntheticSteps = true;
@@ -170,14 +173,17 @@ final class PipelineRunInfo {
             HelidonPublisherServer server = prop.getServer();
             if (server != null) {
                 publisherServerUrl = server.getServerUrl();
+                credentialsId = server.getCredentialsId();
                 publisherClientThreads = server.getNthread();
             } else {
                 publisherServerUrl = null;
                 publisherClientThreads = 5;
+                credentialsId = null;
             }
             id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
         } else {
             id = null;
+            credentialsId = null;
             publisherServerUrl = null;
             publisherClientThreads = 0;
             excludeSyntheticSteps = true;

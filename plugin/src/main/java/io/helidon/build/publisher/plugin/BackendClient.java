@@ -31,6 +31,7 @@ import io.helidon.build.publisher.model.events.PipelineEventListener;
 import io.helidon.build.publisher.model.events.PipelineEventType;
 import io.helidon.build.publisher.model.events.StepOutputDataEvent;
 import io.helidon.build.publisher.model.events.TestSuiteResultEvent;
+import io.helidon.build.publisher.plugin.config.HttpSignatureHelper;
 
 /**
  * Publisher client.
@@ -47,21 +48,24 @@ final class BackendClient implements PipelineEventListener {
 
     private final BlockingQueue<PipelineEvent>[] queues;
     private final ExecutorService executor;
-    private final String serverUrl;
+    private final URI serverUri;
     private final int nThreads;
+    private final String signatureHeader;
 
     /**
      * Get or create the client for the given server URL.
      * @param serverUrl the publisher server URL
+     * @param key the private key used to authenticate, may be {@code null}
      * @return HelidonPublisherClient
      */
-    static BackendClient getOrCreate(String serverUrl, int nThreads) {
+    static BackendClient getOrCreate(String serverUrl, int nThreads, String key) {
         if (serverUrl == null || serverUrl.isEmpty()) {
             throw new IllegalArgumentException("server url is null or empty");
         }
         if (nThreads <= 0) {
             throw new IllegalArgumentException("invalid thread size: " + nThreads);
         }
+        URI uri = URI.create(serverUrl);
         synchronized(CLIENTS) {
             BackendClient client = CLIENTS.get(serverUrl);
             if (client != null) {
@@ -74,7 +78,7 @@ final class BackendClient implements PipelineEventListener {
                 nThreads
             });
         }
-        BackendClient client = new BackendClient(serverUrl, nThreads);
+        BackendClient client = new BackendClient(uri, nThreads, key);
         synchronized(CLIENTS) {
             CLIENTS.put(serverUrl, client);
             return client;
@@ -83,17 +87,20 @@ final class BackendClient implements PipelineEventListener {
 
     /**
      * Create a new publisher client.
-     * @param serverUrl publisher server URL
+     * @param serverUri publisher server URI
      * @param nThreads number of threads
+     * @param keyPath path to the private key path
      */
-    private BackendClient(String serverUrl, int nThreads) {
+    private BackendClient(URI serverUri, int nThreads, String key) {
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Creating client, serverUrl={0}, nThreads={1}", new Object[]{
-                serverUrl,
+            LOGGER.log(Level.FINE, "Creating client, serverUri={0}, nThreads={1}", new Object[]{
+                serverUri,
                 nThreads
             });
         }
-        this.serverUrl = serverUrl;
+        this.serverUri = serverUri;
+        String signature = HttpSignatureHelper.sign("Host: " + serverUri.getAuthority()+ "\n", key);
+        this.signatureHeader = HttpSignatureHelper.signatureHeader(signature);
         this.nThreads = nThreads;
         this.queues = new BlockingQueue[nThreads];
         this.executor = Executors.newFixedThreadPool(nThreads);
@@ -108,26 +115,26 @@ final class BackendClient implements PipelineEventListener {
             queue = new LinkedBlockingQueue<>(EVENT_QUEUE_SIZE);
             queues[queueId] = queue;
             if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Creating client thread, serverUrl={0}, queueId={1}", new Object[]{
-                    serverUrl,
+                LOGGER.log(Level.FINE, "Creating client thread, serverUri={0}, queueId={1}", new Object[]{
+                    serverUri,
                     queueId
                 });
             }
-            executor.submit(new ClientThread(serverUrl, queueId, queue));
+            executor.submit(new ClientThread(serverUri, signatureHeader, queueId, queue));
         }
         if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.log(Level.FINE, "Adding event to queue, serverUrl={0}, queueId={1}, queueSize={2}, event={3}",
+            LOGGER.log(Level.FINE, "Adding event to queue, serverUri={0}, queueId={1}, queueSize={2}, event={3}",
                     new Object[]{
-                        serverUrl,
+                        serverUri,
                         queueId,
                         queue.size(),
                         event
                     });
         }
         if (!queue.offer(event)) {
-            LOGGER.log(Level.WARNING, "Queue is full, dropping pipeline events, serverUrl={0}, queueId={1}, pipelineId={2}",
+            LOGGER.log(Level.WARNING, "Queue is full, dropping pipeline events, serverUri={0}, queueId={1}, pipelineId={2}",
                     new Object[]{
-                        serverUrl,
+                        serverUri,
                         queueId,
                         pipelineId
                     });
@@ -150,19 +157,21 @@ final class BackendClient implements PipelineEventListener {
 
         private static final Logger LOGGER = Logger.getLogger(ClientThread.class.getName());
         private final BlockingQueue<PipelineEvent> queue;
-        private final String serverUrl;
+        private final URI serverUri;
+        private final String signatureHeader;
         private final int queueId;
 
         /**
          * Create a new client thread bound to the given queue.
-         * @param serverUrl the serverUrl
+         * @param serverUri the server URI
          * @param queue the queue that this thread processes
          */
-        ClientThread(String serverUrl, int queueId, BlockingQueue<PipelineEvent> queue) {
+        ClientThread(URI serverUri, String signatureHeader, int queueId, BlockingQueue<PipelineEvent> queue) {
             Objects.requireNonNull(queue, "queue is null");
             this.queue = queue;
             this.queueId = queueId;
-            this.serverUrl = serverUrl;
+            this.serverUri = serverUri;
+            this.signatureHeader = signatureHeader;
         }
 
         @Override
@@ -270,7 +279,7 @@ final class BackendClient implements PipelineEventListener {
                 events.add(error);
             }
 
-            URL url = URI.create(serverUrl + "/events/").toURL();
+            URL url = serverUri.resolve("/events/").toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending events, queueId={0}, url={1}, events={2}", new Object[]{
@@ -286,6 +295,9 @@ final class BackendClient implements PipelineEventListener {
             }
             HttpURLConnection hcon = (HttpURLConnection) con;
             hcon.addRequestProperty("Content-Type", "application/json");
+            if (signatureHeader != null) {
+                hcon.addRequestProperty("Signature", signatureHeader);
+            }
             hcon.setRequestMethod("PUT");
             hcon.setDoOutput(true);
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
@@ -307,8 +319,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event to process
          */
         private void processOutputEvent(StepOutputDataEvent event) throws IOException {
-            URL url = URI.create(serverUrl
-                    + "/output/"
+            URL url = serverUri.resolve("/output/"
                     + event.pipelineId()
                     + "/"
                     + event.stepId())
@@ -330,6 +341,9 @@ final class BackendClient implements PipelineEventListener {
             hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "text/plain");
             hcon.addRequestProperty("Content-Encoding", "gzip");
+            if (signatureHeader != null) {
+                hcon.addRequestProperty("Signature", signatureHeader);
+            }
             hcon.setRequestMethod("PUT");
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
@@ -369,8 +383,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event
          */
         private void processTestSuiteEvent(TestSuiteResultEvent event) throws IOException {
-            URL url = URI.create(serverUrl
-                    + "/files/"
+            URL url = serverUri.resolve("/files/"
                     + event.pipelineId()
                     + "/"
                     + event.stepsId()
@@ -393,6 +406,9 @@ final class BackendClient implements PipelineEventListener {
             HttpURLConnection hcon = (HttpURLConnection) con;
             hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "application/json");
+            if (signatureHeader != null) {
+                hcon.addRequestProperty("Signature", signatureHeader);
+            }
             hcon.setRequestMethod("POST");
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
@@ -414,8 +430,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event to process
          */
         private void processArtifactEvent(ArtifactDataEvent event) throws IOException {
-            URL url = URI.create(serverUrl
-                    + "/files/"
+            URL url = serverUri.resolve("/files/"
                     + event.pipelineId()
                     + "/"
                     + event.stepsId()
@@ -438,6 +453,9 @@ final class BackendClient implements PipelineEventListener {
             hcon.setDoOutput(true);
             hcon.addRequestProperty("Content-Type", "text/plain");
             hcon.addRequestProperty("Content-Encoding", "gzip");
+            if (signatureHeader != null) {
+                hcon.addRequestProperty("Signature", signatureHeader);
+            }
             hcon.setRequestMethod("POST");
             hcon.setConnectTimeout(CONNECT_TIMEOUT);
             hcon.setReadTimeout(READ_TIMEOUT);
