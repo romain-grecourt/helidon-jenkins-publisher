@@ -22,8 +22,13 @@ set -o errexit || true  # exit the script if any statement returns a non-true re
 on_error(){
     CODE="${?}" && \
     set +x && \
-    printf "[ERROR] Error(code=%s) occurred at %s:%s command: %s\n" \
+    printf "ERROR: code=%s occurred at %s:%s command: %s\n" \
         "${CODE}" "${BASH_SOURCE}" "${LINENO}" "${BASH_COMMAND}"
+    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
+        echo "---------------------------------------"
+        tail -100 ${STDERR}
+        echo "---------------------------------------"
+    fi
 }
 trap on_error ERR
 
@@ -33,6 +38,7 @@ if [ -h "${0}" ] ; then
 else
     readonly SCRIPT_PATH="${0}"
 fi
+readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
 
 usage(){
@@ -42,7 +48,10 @@ DESCRIPTION: Pull an image from a remote registry
 
 USAGE:
 
-$(basename ${SCRIPT}) [OPTIONS] --name=NAME
+$(basename ${SCRIPT}) [OPTIONS] --name=NAME --registry-url=URL
+
+  --registry-url=URL
+          URL of the registry to pull from.
 
   --name=NAME
           Name of the image to be pulled.
@@ -52,8 +61,17 @@ OPTIONS:
   --ouput-dir=DIR
           Path of the output directory.
 
-  --debug
+  --user=USERNAME
+          Registry user.
+
+  --password=PASSWORD
+          Registry password
+
+  --v
           Print debug output.
+
+  --vv
+          Print debug output and set -x
 
   --help
           Prints the usage and exits.
@@ -71,8 +89,14 @@ for ((i=0;i<${#ARGS[@]};i++))
         usage
         exit 0
         ;;
-    "--debug")
+    "--v")
         readonly DEBUG=true
+        ;;
+    "--vv")
+        readonly DEBUG2=true
+        ;;
+    "--registry-url="*)
+        readonly REGISTRY_URL=${ARG#*=}
         ;;
     "--name="*)
         readonly IMAGE_FULL_NAME=${ARG#*=}
@@ -80,8 +104,14 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--output-dir="*)
         readonly OUTPUT_DIR=${ARG#*=}
         ;;
+    "--user="*)
+        readonly UNAME=${ARG#*=}
+        ;;
+    "--password="*)
+        readonly UPASSWD=${ARG#*=}
+        ;;
     *)
-        echo "ERROR: unkown option: ${ARG}"
+        echo "ERROR: unknown option: ${ARG}"
         usage
         exit 1
         ;;
@@ -90,6 +120,10 @@ for ((i=0;i<${#ARGS[@]};i++))
 
 if [ -z "${IMAGE_FULL_NAME}" ] ; then
     echo "ERROR: --name option is required"
+    usage
+    exit 1
+elif [ -z "${REGISTRY_URL}" ] ; then
+    echo "ERROR: --registry-url option is required"
     usage
     exit 1
 elif [ -z "${OUTPUT_DIR}" ] ; then
@@ -109,30 +143,46 @@ if ! type curl > /dev/null 2>&1; then
     exit 1
 fi
 
+readonly STDERR=$(mktemp -t XXX-stderr)
+
 if [ -z "${DEBUG}" ] ; then
-    exec 2> /dev/null
+    if [ -z "${DEBUG2}" ] ; then
+        exec 2> ${STDERR}
+    fi
     readonly DEBUG=false
+fi
+
+if [ ! -z "${DEBUG2}" ] ; then
+    set -x
+else
+    exec 2> ${STDERR}
+    readonly DEBUG2=false
 fi
 
 readonly IMAGE_NAME=${IMAGE_FULL_NAME%%:*}
 readonly IMAGE_TAG=${IMAGE_FULL_NAME##*:}
+readonly API_URL_BASE="${REGISTRY_URL}/${IMAGE_NAME}"
 
 echo "INFO: pulling image ${IMAGE_NAME}:${IMAGE_TAG} ..."
 echo "INFO: outputdir=${OUTPUT_DIR}"
 
-readonly AUTH_DOMAIN="auth.docker.io"
-readonly AUTH_SERVICE="registry.docker.io"
-readonly API_URL_BASE="https://registry-1.docker.io/v2/${IMAGE_NAME}"
+echo "INFO: authenticating..."
+if ${DEBUG} ; then
+    AUTH_EXTRA_OPTS="--v"
+elif ${DEBUG2} ; then
+    AUTH_EXTRA_OPTS="--vv"
+fi
+if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
+    AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
+fi
+readonly TOKEN_FILE=$(mktemp -t XXX-token})
+bash ${BASH_OPTS} ${SCRIPT_DIR}/registry-auth.sh ${AUTH_EXTRA_OPTS} \
+    --registry-url=${REGISTRY_URL} \
+    --repository=${IMAGE_NAME} \
+    --scopes="pull" \
+    --output-file=${TOKEN_FILE}
 
-get_token(){
-    local tokenOps="service=${AUTH_SERVICE}"
-    tokenOps="${tokenOps}&scope=repository:${IMAGE_NAME}:pull"
-    tokenOps="${tokenOps}&client_id=${SCRIPT}"
-    curl -X GET "https://${AUTH_DOMAIN}/token?${tokenOps}" | jq -r '.token'
-}
-
-echo "INFO: retrieving auth token"
-readonly TOKEN=$(get_token)
+readonly TOKEN=$(cat ${TOKEN_FILE})
 readonly AUTH_HEADER="Authorization: Bearer ${TOKEN}"
 
 readonly IMAGE_MANIFEST="${OUTPUT_DIR}/manifest.json"
@@ -146,9 +196,9 @@ curl -v -X GET \
     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
     "${API_URL_BASE}/manifests/${IMAGE_TAG}"
 
-STATUS=$(head -1 ${RESPONSE_HEADERS})
-if ! [[ ${STATUS} =~ .*[200].* ]] ; then
-    echo "ERROR: ${status}"
+STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
+if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
+    echo "ERROR: ${STATUS}"
     exit 1
 fi
 
@@ -160,9 +210,9 @@ curl -v -L -X GET \
     -H "${AUTH_HEADER}" \
     -H "Accept: $(cat ${IMAGE_MANIFEST} | jq -r '.config.mediaType')" \
     "${API_URL_BASE}/blobs/$(cat ${IMAGE_MANIFEST} | jq -r '.config.digest')"
-STATUS=$(head -1 ${RESPONSE_HEADERS})
-if ! [[ ${STATUS} =~ .*[200].* ]] ; then
-    echo "ERROR: ${status}"
+STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
+if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
+    echo "ERROR: ${STATUS}"
     exit 1
 fi
 
@@ -177,9 +227,9 @@ get_layer() {
         -H "${AUTH_HEADER}" \
         -H "Accept: ${media_type}" \
         "${API_URL_BASE}/blobs/${digest}"
-    STATUS=$(head -1 ${RESPONSE_HEADERS})
-    if ! [[ ${STATUS} =~ .*[200].* ]] ; then
-        echo "ERROR: ${status}"
+    STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
+    if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
+        echo "ERROR: ${STATUS}"
         return 1
     fi
     gunzip ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz

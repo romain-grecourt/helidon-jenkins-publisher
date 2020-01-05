@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright (c) 2019 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2020 Oracle and/or its affiliates. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,12 @@ set -o errexit || true  # exit the script if any statement returns a non-true re
 on_error(){
     CODE="${?}" && \
     set +x && \
-    printf "[ERROR] Error(code=%s) occurred at %s:%s command: %s\n" \
+    printf "ERROR: code=%s occurred at %s:%s command: %s\n" \
         "${CODE}" "${BASH_SOURCE}" "${LINENO}" "${BASH_COMMAND}"
+    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
+        echo ""
+        tail -100 ${STDERR}
+    fi
 }
 trap on_error ERR
 
@@ -60,25 +64,37 @@ OPTIONS:
           Comment text to include in the metatada.
 
   --includes=INCLUDES
-          List of relative include paths patterns
+          List of relative include paths patterns.
 
   --target=PATH
-          Target path of the included files in the created layer
+          Target path of the included files in the created layer.
 
   --base=BASE_IMAGE
-          Base image
+          Base image.
+
+  --base-registry-url=URL
+          Registry URL to pull the base image from.
+
+  --base-registry-user=USERNAME
+          Base registry user.
+
+  --base-registry-password=PASSWORD
+          Base registry password.
 
   --cmd=CMD
-          Image command
+          Image command.
 
   --end=KEY=VAL
-          Image environment variable
+          Image environment variable.
 
   --load
           Load the created image to the Docker daemon.
 
-  --debug
+  --v
           Print debug output.
+
+  --vv
+          Print debug output and set -x
 
   --help
           Prints the usage and exits.
@@ -111,8 +127,11 @@ for ((i=0;i<${#ARGS[@]};i++))
         usage
         exit 0
         ;;
-    "--debug")
+    "--v")
         readonly DEBUG=true
+        ;;
+    "--vv")
+        readonly DEBUG2=true
         ;;
     "--path="*)
         readonly SOURCE_PATH=$(cd ${ARG#*=} ; pwd -P)
@@ -135,6 +154,15 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--base="*)
         readonly BASE_IMAGE=${ARG#*=}
         ;;
+    "--base-registry-url="*)
+        readonly BASE_REGISTRY_URL=${ARG#*=}
+        ;;
+    "--base-registry-user="*)
+        readonly BASE_REGISTRY_UNAME=${ARG#*=}
+        ;;
+    "--base-registry-password="*)
+        readonly BASE_REGISTRY_UPASSWD=${ARG#*=}
+        ;;
     "--env="*)
         ENV_ARRAY[${#ENV_ARRAY[*]}]=${ARG#*=}
         ;;
@@ -148,7 +176,7 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly OUTPUT_FILE=${ARG#*=}
         ;;
     *)
-        echo "ERROR: unkown option: ${ARG}"
+        echo "ERROR: unknown option: ${ARG}"
         usage
         exit 1
         ;;
@@ -175,9 +203,20 @@ if [ -z "${COMMENT}" ] ; then
     readonly COMMENT="created by ${SCRIPT}"
 fi
 
+readonly STDERR=$(mktemp -t XXX-stderr)
+
 if [ -z "${DEBUG}" ] ; then
-    exec 2> /dev/null
+    if [ -z "${DEBUG2}" ] ; then
+        exec 2> ${STDERR}
+    fi
     readonly DEBUG=false
+fi
+
+if [ ! -z "${DEBUG2}" ] ; then
+    set -x
+else
+    exec 2> ${STDERR}
+    readonly DEBUG2=false
 fi
 
 if ! type sha256sum > /dev/null 2>&1; then
@@ -217,14 +256,6 @@ is_shell_attribute_set() { # attribute, like "e"
     *)    return 1 ;;
   esac
 }
-
-if is_shell_attribute_set x ; then
-    BASH_OPTS="-x"
-fi
-
-if is_shell_attribute_set e ; then
-    BASH_OPTS="${BASH_OPTS} -e"
-fi
 
 echo "INFO: building ${IMAGE_NAME} ..."
 
@@ -302,11 +333,17 @@ if [ ! -z "${BASE_IMAGE}" ] ; then
     readonly CACHEDIR="${SCRIPT_DIR}/.imagecache"
     readonly BASE_IMGDIR="${CACHEDIR}/$(echo ${BASE_IMAGE} | ${SHASUM} | cut -d ' ' -f1)"
     if ${DEBUG} ; then
-        PULL_EXTRA_OPTS="--debug"
+        PULL_EXTRA_OPTS="--v"
+    elif ${DEBUG2} ; then
+        PULL_EXTRA_OPTS="--vv"
+    fi
+    if [ ! -z "${BASE_REGISTRY_UNAME}" ] && [ ! -z "${BASE_REGISTRY_UPASSWD}" ] ; then
+        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --user=${BASE_REGISTRY_UNAME} --password=${BASE_REGISTRY_UPASSWD}"
     fi
     if [ ! -e ${BASE_IMGDIR} ] ; then
         mkdir -p ${BASE_IMGDIR}
-        bash ${BASH_OPTS} ${SCRIPT_DIR}/pull-image.sh ${PULL_EXTRA_OPTS} \
+        bash ${SCRIPT_DIR}/pull-image.sh ${PULL_EXTRA_OPTS} \
+            --registry-url=${BASE_REGISTRY_URL} \
             --output-dir=${BASE_IMGDIR} \
             --name=${BASE_IMAGE}
     fi
@@ -343,7 +380,7 @@ else
         if [ -e "${SOURCE_PATH}/${include}" ] ; then
             find ${SOURCE_PATH}/${include} -type f | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
         else
-            for elt in `ls ${SOURCE_PATH}/${include} 2> /dev/null` ; do
+            for elt in `ls ${SOURCE_PATH}/${include} 2> /dev/null || echo ""` ; do
                 if [ -f ${elt} ] ; then
                     echo ${elt} | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
                 else
@@ -463,7 +500,7 @@ tar -cvf ${IMAGE_TAR} -C ${WORKDIR} .
 # load the image
 if ${LOAD} ; then
     echo "INFO: loading the image to Docker"
-    if ${DEBUG} ; then
+    if ${DEBUG} || ${DEBUG2}; then
         docker load -i ${IMAGE_TAR}
     else
         docker load -i ${IMAGE_TAR} 1> /dev/null

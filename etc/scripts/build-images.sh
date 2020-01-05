@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright (c) 2019 Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2020 Oracle and/or its affiliates. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,13 @@ set -o errexit || true  # exit the script if any statement returns a non-true re
 on_error(){
     CODE="${?}" && \
     set +x && \
-    printf "[ERROR] Error(code=%s) occurred at %s:%s command: %s\n" \
+    printf "ERROR: code=%s occurred at %s:%s command: %s\n" \
         "${CODE}" "${BASH_SOURCE}" "${LINENO}" "${BASH_COMMAND}"
+    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
+        echo "---------------------------------------"
+        tail -100 ${STDERR}
+        echo "---------------------------------------"
+    fi
 }
 trap on_error ERR
 
@@ -50,16 +55,41 @@ $(basename ${SCRIPT}) [OPTIONS] --tag=TAG
 
 OPTIONS:
 
+  --namespace
+          Image namespace (prefix)
+
   --load
           Load the created image to the Docker daemon.
 
-  --debug
+  --push
+          Push the images
+
+  --user=USERNAME
+          Registry username
+
+  --password=PASSWORD
+          Registry password
+
+  --registry-url=URL
+          Registry URL to push to.
+
+  --v
           Print debug output.
+
+  --vv
+          Print debug output and set -x
 
   --help
           Prints the usage and exits.
 
 EOF
+}
+
+remove_trailing_slashes() {
+    local input=${1}
+    local len=${#input} ; input=${input%%/}
+    while [ ${#input} -lt ${len} ] ; do len=${#input} ; input=${input%%/} ; done
+    echo ${input}
 }
 
 # parse command line args
@@ -73,17 +103,35 @@ for ((i=0;i<${#ARGS[@]};i++))
         usage
         exit 0
         ;;
+    "--namespace="*)
+        readonly IMAGES_NAMESPACE=$(remove_trailing_slashes ${ARG#*=})/
+        ;;
     "--tag="*)
         readonly IMAGES_TAG=${ARG#*=}
         ;;
-    "--debug")
+    "--push"*)
+        readonly PUSH=true
+        ;;
+    "--user="*)
+        readonly UNAME=${ARG#*=}
+        ;;
+    "--password="*)
+        readonly UPASSWD=${ARG#*=}
+        ;;
+    "--registry-url="*)
+        readonly REGISTRY_URL=${ARG#*=}
+        ;;
+    "--v")
         readonly DEBUG=true
+        ;;
+    "--vv")
+        readonly DEBUG2=true
         ;;
     "--load")
         readonly LOAD=true
         ;;
     *)
-        echo "ERROR: unkown option: ${ARG}"
+        echo "ERROR: unknown option: ${ARG}"
         usage
         exit 1
         ;;
@@ -96,47 +144,61 @@ if [ -z "${IMAGES_TAG}" ] ; then
     exit 1
 fi
 
+if [ -z "${PUSH}" ] ; then
+    readonly PUSH=false
+fi
+
+if ${PUSH} && [ -z "${REGISTRY_URL}" ] ; then
+    echo "ERROR: --registry-url option is required with --push"
+    usage
+    exit 1
+fi
+
 if [ -z "${LOAD}" ] ; then
     readonly LOAD=false
 fi
 
+readonly STDERR=$(mktemp -t XXX-stderr)
+
 if [ -z "${DEBUG}" ] ; then
-    exec 2> /dev/null
+    if [ -z "${DEBUG2}" ] ; then
+        exec 2> ${STDERR}
+    fi
     readonly DEBUG=false
 fi
 
-is_shell_attribute_set() { # attribute, like "e"
-  case "$-" in
-    *"$1"*) return 0 ;;
-    *)    return 1 ;;
-  esac
-}
-
-if is_shell_attribute_set x ; then
-    BASH_OPTS="-x"
-fi
-
-if is_shell_attribute_set e ; then
-    BASH_OPTS="${BASH_OPTS} -e"
+if [ ! -z "${DEBUG2}" ] ; then
+    set -x
+else
+    exec 2> ${STDERR}
+    readonly DEBUG2=false
 fi
 
 if ${LOAD} ; then
-    EXTRA_OPTS="--load"
+    BUILD_OPTS="--load"
 fi
 
 if ${DEBUG} ; then
-    EXTRA_OPTS="${EXTRA_OPTS} --debug"
+    EXTRA_OPTS="${EXTRA_OPTS} --v"
+elif ${DEBUG2} ; then
+    EXTRA_OPTS="${EXTRA_OPTS} --vv"
 fi
 
 # base image versions
 readonly NGINX_VERSION="1.17.6-alpine"
 readonly OPENJDK_VERSION="8-jre-slim"
 
+readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
+mkdir -p ${WORKDIR}
+echo "INFO: workdir = ${WORKDIR}"
+
 echo "INFO: building frontend-ui image"
-bash ${BASH_OPTS} ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} \
+bash ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} ${BUILD_OPTS} \
+    --output-file=${WORKDIR}/frontend-ui-image.tar \
     --path=frontend-ui/dist \
     --target=/usr/share/nginx/html \
-    --name=helidon-build-publisher-frontend-ui:${IMAGES_TAG} \
+    --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG} \
+    --base-registry-url="https://registry-1.docker.io/v2" \
     --base=library/nginx:${NGINX_VERSION}
 
 readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout
@@ -151,19 +213,50 @@ readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout
 EOF`
 
 echo "INFO: building frontend-api image"
-bash ${BASH_OPTS} ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} \
+bash ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} ${BUILD_OPTS} \
+    --output-file=${WORKDIR}/frontend-api-image.tar \
     --path=frontend-api/target \
     --target=/app \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-frontend-api.jar" \
-    --name=helidon-build-publisher-frontend-api:${IMAGES_TAG} \
+    --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG} \
+    --base-registry-url="https://registry-1.docker.io/v2" \
     --base=library/openjdk:${OPENJDK_VERSION}
 
 echo "INFO: building backend image"
-bash ${BASH_OPTS} ${BASH_OPTS} ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} \
+bash ${SCRIPT_DIR}/build-image.sh ${EXTRA_OPTS} ${BUILD_OPTS} \
+    --output-file=${WORKDIR}/backend-image.tar \
     --path=backend/target \
     --target=/app \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-backend.jar" \
-    --name=helidon-build-publisher-backend:${IMAGES_TAG} \
+    --name=${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG} \
+    --base-registry-url="https://registry-1.docker.io/v2" \
     --base=library/openjdk:${OPENJDK_VERSION}
+
+if ${PUSH} ; then
+    PUSH_OPTS="--registry-url=${REGISTRY_URL}"
+    if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
+        PUSH_OPTS="${PUSH_OPTS} --user=${UNAME} --password=${UPASSWD}"
+    fi
+    echo ${PUSH_OPTS}
+
+#    echo "INFO: pushing frontend-ui image"
+#    bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
+#        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui \
+#        --tag=${IMAGES_TAG} \
+#        --image=${WORKDIR}/frontend-ui-image.tar
+
+    echo "INFO: pushing frontend-api image"
+    bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
+        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api \
+        --tag=${IMAGES_TAG} \
+        --image=${WORKDIR}/frontend-api-image.tar
+
+    echo "INFO: pushing backend image"
+    bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
+        --name=${IMAGES_NAMESPACE}helidon-build-publisher-backend \
+        --tag=${IMAGES_TAG} \
+        --image=${WORKDIR}/backend-image.tar
+fi
+rm -rf ${WORKDIR}
