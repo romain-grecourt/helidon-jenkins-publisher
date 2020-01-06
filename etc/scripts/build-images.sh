@@ -196,4 +196,3 @@ if ${PUSH} ; then
         --tag="${IMAGES_TAG}" \
         --image="${WORKDIR}/backend-image.tar"
 fi
-rm -rf ${WORKDIR}
