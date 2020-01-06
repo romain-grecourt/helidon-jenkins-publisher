@@ -105,6 +105,7 @@ if [ -z "${LOAD}" ] ; then
 fi
 
 common_init
+export PATH=${PATH}:${SCRIPT_DIR}/../imagetool
 
 if ${LOAD} ; then
     BUILD_OPTS="--load"
@@ -125,7 +126,7 @@ mkdir -p ${WORKDIR}
 echo "INFO: workdir = ${WORKDIR}"
 
 echo "INFO: building frontend-ui image"
-bash ${SCRIPT_DIR}/build ${EXTRA_OPTS} ${BUILD_OPTS} \
+build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --output-file=${WORKDIR}/frontend-ui-image.tar \
     --path=frontend-ui/dist \
     --target=/usr/share/nginx/html \
@@ -145,7 +146,7 @@ readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout
 EOF`
 
 echo "INFO: building frontend-api image"
-bash ${SCRIPT_DIR}/build ${EXTRA_OPTS} ${BUILD_OPTS} \
+build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --output-file=${WORKDIR}/frontend-api-image.tar \
     --path=frontend-api/target \
     --target=/app \
@@ -156,7 +157,7 @@ bash ${SCRIPT_DIR}/build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --base=library/openjdk:${OPENJDK_VERSION}
 
 echo "INFO: building backend image"
-bash ${SCRIPT_DIR}/build ${EXTRA_OPTS} ${BUILD_OPTS} \
+build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --output-file=${WORKDIR}/backend-image.tar \
     --path=backend/target \
     --target=/app \
@@ -174,19 +175,19 @@ if ${PUSH} ; then
     echo ${PUSH_OPTS}
 
     echo "INFO: pushing frontend-ui image"
-    bash ${SCRIPT_DIR}/push ${EXTRA_OPTS} ${PUSH_OPTS} \
+    push ${EXTRA_OPTS} ${PUSH_OPTS} \
         --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui \
         --tag=${IMAGES_TAG} \
         --image=${WORKDIR}/frontend-ui-image.tar
 
     echo "INFO: pushing frontend-api image"
-    bash ${SCRIPT_DIR}/push ${EXTRA_OPTS} ${PUSH_OPTS} \
+    push ${EXTRA_OPTS} ${PUSH_OPTS} \
         --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api \
         --tag=${IMAGES_TAG} \
         --image=${WORKDIR}/frontend-api-image.tar
 
     echo "INFO: pushing backend image"
-    bash ${SCRIPT_DIR}/push ${EXTRA_OPTS} ${PUSH_OPTS} \
+    push ${EXTRA_OPTS} ${PUSH_OPTS} \
         --name=${IMAGES_NAMESPACE}helidon-build-publisher-backend \
         --tag=${IMAGES_TAG} \
         --image=${WORKDIR}/backend-image.tar
