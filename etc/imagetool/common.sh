@@ -91,6 +91,20 @@ EOF
 }
 
 common_init(){
+    STDERR=$(mktemp -t XXX-stderr)
+    if [ -z "${DEBUG}" ] ; then
+        if [ -z "${DEBUG2}" ] ; then
+            exec 2> ${STDERR}
+        fi
+        DEBUG=false
+    fi
+    if [ ! -z "${DEBUG2}" ] ; then
+        set -x
+    else
+        exec 2> ${STDERR}
+        DEBUG2=false
+    fi
+
     BINDIR="${SCRIPT_DIR}/.bin"
     export PATH=${PATH}:${BINDIR}
     if ! type jq > /dev/null 2>&1; then
@@ -123,22 +137,6 @@ common_init(){
     else
         # Linux
         SHASUM="sha256sum"
-    fi
-
-    STDERR=$(mktemp -t XXX-stderr)
-
-    if [ -z "${DEBUG}" ] ; then
-        if [ -z "${DEBUG2}" ] ; then
-            exec 2> ${STDERR}
-        fi
-        DEBUG=false
-    fi
-
-    if [ ! -z "${DEBUG2}" ] ; then
-        set -x
-    else
-        exec 2> ${STDERR}
-        DEBUG2=false
     fi
 }
 
