@@ -177,7 +177,6 @@ if ${PUSH} ; then
     if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
         PUSH_OPTS="${PUSH_OPTS} --user=${UNAME} --password=${UPASSWD}"
     fi
-    echo ${PUSH_OPTS}
 
     echo "INFO: pushing frontend-ui image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
