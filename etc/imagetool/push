@@ -165,28 +165,35 @@ tar --to-stdout -xf ${IMAGE_TAR} ./${IMAGE_CONFIG_ENTRY} > ${IMAGE_CONFIG}
 echo "INFO: image_config=${IMAGE_CONFIG}"
 
 readonly IMAGE_CONFIG_DIGEST="sha256:${IMAGE_CONFIG_ENTRY%%.json}"
-readonly LAYER_DIGEST=$(jq -r '.rootfs.diff_ids[0]' ${IMAGE_CONFIG})
-readonly LAYER_SIZE=$(tar --to-stdout -xf "${IMAGE_TAR}" ./$(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) | wc -c)
 echo "INFO: image_config_digest=${IMAGE_CONFIG_DIGEST}"
-echo "INFO: layer_digest=${LAYER_DIGEST}"
-echo "INFO: layer_size=${LAYER_SIZE}"
 
 RESPONSE_HEADERS=$(mktemp -t XXX})
 
-# upload layer
-create_blob
-if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
-    UPLOAD_URL="${UPLOAD_LOCATION}&digest=${LAYER_DIGEST}"
-else
-    UPLOAD_URL="${UPLOAD_LOCATION}?digest=${LAYER_DIGEST}"
-fi
-tar --to-stdout -xf "${IMAGE_TAR}" ./$(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) | \
-    curl -v -X PUT --data-binary @- \
-        -D ${RESPONSE_HEADERS} \
-        -H "${AUTH_HEADER}" \
-        -H "Content-Type: application/octet-stream" \
-        "${UPLOAD_URL}"
-is_http_status_or_die ${RESPONSE_HEADERS} 201
+# upload layers
+readonly NUM_LAYERS=$(jq -r '.[0].Layers|length' ${IMAGE_MANIFEST})
+DIGESTS=( )
+DIGEST_SIZES=( )
+for ((i=0;i<${NUM_LAYERS};i++))
+{
+    LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
+    DIGEST="sha256:$(dirname ${LAYERS[${i}]})"
+    DIGESTS[${#DIGESTS[*]}]=${DIGEST}
+    create_blob
+    if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
+        UPLOAD_URL="${UPLOAD_LOCATION}&digest=${DIGEST}"
+    else
+        UPLOAD_URL="${UPLOAD_LOCATION}?digest=${DIGEST}"
+    fi
+    tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} | \
+        curl -v -X PUT --data-binary @- \
+            -D ${RESPONSE_HEADERS} \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/octet-stream" \
+            "${UPLOAD_URL}"
+    blob_size
+    DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
+    is_http_status_or_die ${RESPONSE_HEADERS} 201
+}
 
 # upload image config
 create_blob
@@ -206,13 +213,6 @@ blob_size
 readonly CONFIG_SIZE=${BLOB_SIZE}
 echo "INFO: config_size=${CONFIG_SIZE}"
 
-readonly NUM_LAYERS=$(jq -r '.[0].Layers|length' ${IMAGE_MANIFEST})
-REMAINING_LAYERS=( )
-for ((i=1;i<${NUM_LAYERS};i++))
-{
-    REMAINING_LAYERS[${#REMAINING_LAYERS[*]}]=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
-}
-
 # create distribution manifest
 readonly DISTRIBUTION_MANIFEST="$(mktemp -t XXX}).json"
 echo "INFO: distribution_manifest=${DISTRIBUTION_MANIFEST}"
@@ -226,18 +226,13 @@ cat << EOF > ${DISTRIBUTION_MANIFEST}
         "digest": "${IMAGE_CONFIG_DIGEST}"
     },
     "layers": [
-        {
-            "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-            "size": ${LAYER_SIZE},
-            "digest": "${LAYER_DIGEST}"
-        }
-$(for ((i=0;i<${#REMAINING_LAYERS[@]};i++))
+$(for ((i=0;i<${#DIGESTS[@]};i++))
 {
-    if [ "${i}" = "0" ] ; then printf "        ,{\n" ; else printf "        {\n" ; fi
-    printf "        \"mediaType\": \"application/vnd.docker.container.image.v1+json\",\n"
-    printf "        \"size\": %i,\n" $(tar --to-stdout -xf "${IMAGE_TAR}" ./${REMAINING_LAYERS[${i}]} | wc -c)
-    printf "        \"digest\": \"sha256:%s\"\n" $(dirname ${REMAINING_LAYERS[${i}]})
-    if [ "${i}" = "$((${#REMAINING_LAYERS[@]}-1))" ] ; then printf "        }\n" ; else printf "        },\n" ; fi
+    printf "        {\n"
+    printf "            \"mediaType\": \"application/vnd.docker.image.rootfs.diff.tar.gzip\",\n"
+    printf "            \"size\": %i,\n" ${DIGEST_SIZES[${i}]}
+    printf "            \"digest\": \"%s\"\n" ${DIGESTS[${i}]}
+    if [ "${i}" = "$((${#LAYERS[@]}-1))" ] ; then printf "        }\n" ; else printf "        },\n" ; fi
 })
     ]
 }
