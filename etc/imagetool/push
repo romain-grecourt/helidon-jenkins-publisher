@@ -149,6 +149,12 @@ create_blob(){
     UPLOAD_LOCATION=$(get_location ${RESPONSE_HEADERS})
 }
 
+blob_size(){
+    local blobLocation=$(get_location ${RESPONSE_HEADERS})
+    curl -v -L --head -H "${AUTH_HEADER}" "${blobLocation}" > ${RESPONSE_HEADERS}
+    BLOB_SIZE=$(get_header "Content-Length" ${RESPONSE_HEADERS})
+}
+
 readonly IMAGE_MANIFEST="$(mktemp -t XXX}).json"
 tar --to-stdout -xf ${IMAGE_TAR} ./manifest.json > ${IMAGE_MANIFEST}
 echo "INFO: image_manifest=${IMAGE_MANIFEST}"
