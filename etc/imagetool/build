@@ -276,11 +276,11 @@ mkdir -p ${WORKDIR}/${LAYER_ID}
 readonly TAR_MANIFEST=$(mktemp -t "XXXtar-manifest")
 echo "INFO: tar_manifest = ${TAR_MANIFEST}"
 if [ -z "${INCLUDES}" ] ; then
-    find ${SOURCE_PATH} | sed s@"${SOURCE_PATH}/"@@g > ${TAR_MANIFEST}
+    find ${SOURCE_PATH} | sed s@"${SOURCE_PATH}\(/\?\)"@@g > ${TAR_MANIFEST}
 else
     for include in ${INCLUDES} ; do
         if [ -e "${SOURCE_PATH}/${include}" ] ; then
-            find ${SOURCE_PATH} | sed s@"${SOURCE_PATH}\(/\?\)"@@g > ${TAR_MANIFEST}
+            find ${SOURCE_PATH}/${include} | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
         else
             for elt in `ls ${SOURCE_PATH}/${include} 2> /dev/null || echo ""` ; do
                 if [ -f ${elt} ] ; then
