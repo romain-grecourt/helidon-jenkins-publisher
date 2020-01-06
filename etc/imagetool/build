@@ -318,7 +318,7 @@ else
 fi
 
 while read f ; do
-    echo "${TARGET_PATH_PREFIX}${f}"
+    if [ ! -z "${f}" ] ; then echo "${TARGET_PATH_PREFIX}${f}" ; fi
 done < ${TAR_MANIFEST} | tar -cvpf ${LAYER_TAR} --files-from - ${TAR_OPTS} >&2
 
 # Add layer metadata
