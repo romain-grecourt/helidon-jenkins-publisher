@@ -213,6 +213,8 @@ for ((i=1;i<${NUM_LAYERS};i++))
     REMAINING_LAYERS[{${i}]=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
 }
 
+echo ${REMAINING_LAYERS[*]}
+
 # create distribution manifest
 readonly DISTRIBUTION_MANIFEST="$(mktemp -t XXX}).json"
 echo "INFO: distribution_manifest=${DISTRIBUTION_MANIFEST}"

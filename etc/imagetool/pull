@@ -42,6 +42,9 @@ $(basename ${SCRIPT}) [OPTIONS] --name=NAME --registry-url=URL
 
 OPTIONS:
 
+  --download-layers
+          Download the layers.
+
   --ouput-dir=DIR
           Path of the output directory.
 
@@ -56,9 +59,8 @@ for ((i=0;i<${#ARGS[@]};i++))
 {
     ARG=${ARGS[${i}]}
     case ${ARG} in
-    "--help")
-        usage
-        exit 0
+    "--download-layers")
+        readonly DOWNLOAD_LAYERS=true
         ;;
     "--registry-url="*)
         readonly REGISTRY_URL=${ARG#*=}
@@ -86,6 +88,10 @@ elif [ -z "${OUTPUT_DIR}" ] ; then
 elif [ ! -d "${OUTPUT_DIR}" ] ; then
     echo "ERROR: ${OUTPUT_DIR} is not a valid directory"
     exit 1
+fi
+
+if [ -z "${DOWNLOAD_LAYERS}" ] ; then
+    DOWNLOAD_LAYERS=false
 fi
 
 common_init
@@ -160,10 +166,13 @@ get_layer() {
 }
 
 # download layers
-for i in `cat ${IMAGE_MANIFEST} | jq '.layers | to_entries | .[].key'`
-do
-    get_layer $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].digest") \
-              $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].mediaType")
-done
+if ${DOWNLOAD_LAYERS} ; then
+    echo "INFO: downloading layers..."
+    for i in `cat ${IMAGE_MANIFEST} | jq '.layers | to_entries | .[].key'`
+    do
+        get_layer $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].digest") \
+                  $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].mediaType")
+    done
+fi
 
 echo "INFO: image pull completed"
