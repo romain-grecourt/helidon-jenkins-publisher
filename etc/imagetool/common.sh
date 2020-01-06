@@ -122,10 +122,10 @@ common_init(){
         echo "INFO: installing jq.."
         mkdir -p ${BINDIR}
         if [ `uname` = "Darwin" ] ; then
-            curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
+            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
             chmod +x ${BINDIR}/jq
         elif [ `uname` = "Linux" ] ; then
-            curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
             chmod +x ${BINDIR}/jq
         fi
         if ! type jq > /dev/null 2>&1; then
