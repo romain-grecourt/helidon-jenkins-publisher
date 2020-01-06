@@ -21,9 +21,9 @@ set -o errexit || true  # exit the script if any statement returns a non-true re
 
 on_error(){
     if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
-        echo "---------------------------------------"
+        echo "------------------ERROR--------------------"
         tail -100 ${STDERR}
-        echo "---------------------------------------"
+        echo "------------------ERROR--------------------"
     fi
 }
 trap on_error ERR
