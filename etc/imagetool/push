@@ -146,7 +146,7 @@ create_blob(){
         -H "${AUTH_HEADER}" \
        "${API_URL_BASE}/blobs/uploads/"
     is_http_status_or_die ${RESPONSE_HEADERS} 202
-    UPLOAD_LOCATION=$(get_location ${responseHeaders})
+    UPLOAD_LOCATION=$(get_location ${RESPONSE_HEADERS})
 }
 
 blob_size(){
