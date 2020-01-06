@@ -72,31 +72,25 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly IMAGE_TAR=${ARG#*=}
         ;;
     *)
-        common_process_user_password_args || common_process_args
+        common_process_user_password_args ${ARG} || common_process_args ${ARG}
         ;;
   esac
 }
 
 if [ -z "${IMAGE_TAR}" ] ; then
     echo "ERROR: --image option is required"
-    usage
     exit 1
 elif [ -z "${IMAGE_NAME}" ] ; then
     echo "ERROR: --name option is required"
-    usage
     exit 1
 elif [ -z "${IMAGE_TAG}" ] ; then
     echo "ERROR: --tag option is required"
-    usage
     exit 1
 elif [ ! -f "${IMAGE_TAR}" ] ; then
     echo "ERROR: ${IMAGE_TAR} is not a valid file"
     exit 1
-fi
-
-if [ -z "${REGISTRY_URL}" ] ; then
+elif [ -z "${REGISTRY_URL}" ] ; then
     echo "ERROR: --registry-url option is required"
-    usage
     exit 1
 fi
 

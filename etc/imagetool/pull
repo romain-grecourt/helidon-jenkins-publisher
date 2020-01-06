@@ -70,18 +70,16 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly OUTPUT_DIR=${ARG#*=}
         ;;
     *)
-        common_process_user_password_args || common_process_args
+        common_process_user_password_args ${ARG} || common_process_args ${ARG}
         ;;
   esac
 }
 
 if [ -z "${IMAGE_FULL_NAME}" ] ; then
     echo "ERROR: --name option is required"
-    usage
     exit 1
 elif [ -z "${REGISTRY_URL}" ] ; then
     echo "ERROR: --registry-url option is required"
-    usage
     exit 1
 elif [ -z "${OUTPUT_DIR}" ] ; then
     readonly OUTPUT_DIR=$(mktemp -d -t "XXX${SCRIPT}")

@@ -80,14 +80,13 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly LOAD=true
         ;;
     *)
-        common_process_user_password_args || common_process_args
+        common_process_user_password_args ${ARG} || common_process_args ${ARG}
         ;;
   esac
 }
 
 if [ -z "${IMAGES_TAG}" ] ; then
     echo "ERROR: --tag option is required"
-    usage
     exit 1
 fi
 
@@ -97,7 +96,6 @@ fi
 
 if ${PUSH} && [ -z "${REGISTRY_URL}" ] ; then
     echo "ERROR: --registry-url option is required with --push"
-    usage
     exit 1
 fi
 

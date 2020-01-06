@@ -30,29 +30,20 @@ trap on_error ERR
 
 common_process_args(){
     case ${1} in
-    "--help")
+    "--help"|"-help"|"-h"|"--h")
         usage
         exit 0
         ;;
-    "--v")
+    "--v"|"-v")
         DEBUG=true
         return 0
         ;;
-    "--vv")
-        DEBUG2=true
-        return 0
-        ;;
-    "-v")
-        DEBUG=true
-        return 0
-        ;;
-    "-vv")
+    "--vv"|"--vvv"|"-v"|"-vv"|"-vvv")
         DEBUG2=true
         return 0
         ;;
     *)
         echo "ERROR: unknown option: ${ARG}"
-        usage
         exit 1
         ;;
     esac
@@ -165,9 +156,9 @@ remove_trailing_slashes() {
 
 trim() {
     local var="$*"
-    # remove leading whitespace characters
+    # remove leading white space characters
     var="${var#"${var%%[![:space:]]*}"}"
-    # remove trailing whitespace characters
+    # remove trailing white space characters
     var="${var%"${var##*[![:space:]]}"}"
     echo -n "$var"
 }

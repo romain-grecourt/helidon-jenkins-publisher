@@ -129,20 +129,16 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly OUTPUT_FILE=${ARG#*=}
         ;;
     *)
-        common_process_args
+        common_process_args ${ARG}
         ;;
   esac
 }
 
 if [ -z "${IMAGE_NAME}" ] ; then
     echo "ERROR: --name option is required"
-    usage
     exit 1
-fi
-
-if [ -z "${SOURCE_PATH}" ] ; then
+elif [ -z "${SOURCE_PATH}" ] ; then
     echo "ERROR: --path option is required"
-    usage
     exit 1
 fi
 
