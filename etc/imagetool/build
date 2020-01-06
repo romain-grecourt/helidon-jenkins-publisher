@@ -236,6 +236,9 @@ if [ ! -z "${BASE_IMAGE}" ] ; then
     elif ${DEBUG2} ; then
         PULL_EXTRA_OPTS="--vv"
     fi
+    if [ ! -z "${STDERR}" ] ; then
+        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --stderr-file=${STDERR}"
+    fi
     if [ ! -z "${BASE_REGISTRY_UNAME}" ] && [ ! -z "${BASE_REGISTRY_UPASSWD}" ] ; then
         PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --user=${BASE_REGISTRY_UNAME} --password=${BASE_REGISTRY_UPASSWD}"
     fi
@@ -315,7 +318,7 @@ fi
 
 while read f ; do
     echo "${TARGET_PATH_PREFIX}${f}"
-done < ${TAR_MANIFEST} | tar -cvf ${LAYER_TAR} --files-from - ${TAR_OPTS}
+done < ${TAR_MANIFEST} | tar -cvf ${LAYER_TAR} --files-from - ${TAR_OPTS} >&2
 
 # Add layer metadata
 echo "1.0" > ${WORKDIR}/${LAYER_ID}/VERSION

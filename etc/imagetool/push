@@ -108,11 +108,14 @@ if ${DEBUG} ; then
 elif ${DEBUG2} ; then
     AUTH_EXTRA_OPTS="--vv"
 fi
+if [ ! -z "${STDERR}" ] ; then
+    AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --stderr-file=${STDERR}"
+fi
 if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
     AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
 fi
 readonly TOKEN_FILE=$(mktemp -t XXX-token})
-bash ${BASH_OPTS} ${SCRIPT_DIR}/auth ${AUTH_EXTRA_OPTS} \
+${SCRIPT_DIR}/auth ${AUTH_EXTRA_OPTS} \
     --registry-url=${REGISTRY_URL} \
     --repository=${IMAGE_NAME} \
     --scopes="push,pull" \

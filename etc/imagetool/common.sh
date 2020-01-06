@@ -99,12 +99,12 @@ EOF
 
 common_init(){
     if [ -z "${STDERR}" ] ; then
+        echo "INFO: redirecting stderr to ${STDERR}"
         STDERR=$(mktemp -t XXX-stderr)
     fi
     if [ -z "${DEBUG}" ] ; then
         if [ -z "${DEBUG2}" ] ; then
             exec 2> ${STDERR}
-            echo "INFO: redirecting stderr to ${STDERR}"
         fi
         DEBUG=false
     fi
@@ -112,7 +112,6 @@ common_init(){
         set -x
     else
         exec 2> ${STDERR}
-        echo "INFO: redirecting stderr to ${STDERR}"
         DEBUG2=false
     fi
 

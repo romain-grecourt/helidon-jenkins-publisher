@@ -115,6 +115,9 @@ if ${DEBUG} ; then
 elif ${DEBUG2} ; then
     EXTRA_OPTS="${EXTRA_OPTS} --vv"
 fi
+if [ ! -z "${STDERR}" ] ; then
+    EXTRA_OPTS="${EXTRA_OPTS} --stderr-file=${STDERR}"
+fi
 
 # base image versions
 readonly NGINX_VERSION="1.17.6-alpine"
@@ -168,6 +171,9 @@ build ${EXTRA_OPTS} ${BUILD_OPTS} \
 
 if ${PUSH} ; then
     PUSH_OPTS="--registry-url=${REGISTRY_URL}"
+    if [ ! -z "${STDERR}" ] ; then
+        PUSH_OPTS="${PUSH_OPTS} --stderr-file=${STDERR}"
+    fi
     if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
         PUSH_OPTS="${PUSH_OPTS} --user=${UNAME} --password=${UPASSWD}"
     fi
