@@ -233,13 +233,11 @@ cat << EOF > ${DISTRIBUTION_MANIFEST}
         }
 $(for ((i=0;i<${#REMAINING_LAYERS[@]};i++))
 {
-    if [ "${i}" = "0" ] ; then printf "        ,\n" ; fi
-    printf "        {\n"
+    if [ "${i}" = "0" ] ; then printf "        ,{\n" ; else printf "        {\n" ; fi
     printf "        \"mediaType\": \"application/vnd.docker.container.image.v1+json\",\n"
     printf "        \"size\": %i,\n" $(tar --to-stdout -xf "${IMAGE_TAR}" ./${REMAINING_LAYERS[${i}]} | wc -c)
-    printf "        \"digest\": \"%s\"" $(dirname ${REMAINING_LAYERS[${i}]})
-    printf "        }\n"
-    if [ "${i}" = "$((${#REMAINING_LAYERS[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
+    printf "        \"digest\": \"sha256:%s\"\n" $(dirname ${REMAINING_LAYERS[${i}]})
+    if [ "${i}" = "$((${#REMAINING_LAYERS[@]}-1))" ] ; then printf "        }\n" ; else printf "        },\n" ; fi
 })
     ]
 }
