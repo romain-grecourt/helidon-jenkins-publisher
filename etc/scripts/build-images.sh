@@ -23,6 +23,7 @@ else
 fi
 readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
+readonly WS_DIR=$(cd ${SCRIPT_DIR}/../.. ; pwd -P)
 source ${SCRIPT_DIR}/../imagetool/common.sh
 
 usage(){
@@ -127,12 +128,12 @@ echo "INFO: workdir = ${WORKDIR}"
 
 echo "INFO: building frontend-ui image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file=${WORKDIR}/frontend-ui-image.tar \
-    --path=frontend-ui/dist \
-    --target=/usr/share/nginx/html \
-    --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG} \
+    --output-file="${WORKDIR}/frontend-ui-image.tar" \
+    --path="${WS_DIR}/frontend-ui/dist" \
+    --target="/usr/share/nginx/html" \
+    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
-    --base=library/nginx:${NGINX_VERSION}
+    --base="library/nginx:${NGINX_VERSION}"
 
 readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout
     -server \
@@ -147,25 +148,25 @@ EOF`
 
 echo "INFO: building frontend-api image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file=${WORKDIR}/frontend-api-image.tar \
-    --path=frontend-api/target \
-    --target=/app \
+    --output-file="${WORKDIR}/frontend-api-image.tar" \
+    --path="${WS_DIR}/frontend-api/target" \
+    --target="/app" \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-frontend-api.jar" \
-    --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG} \
+    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
-    --base=library/openjdk:${OPENJDK_VERSION}
+    --base="library/openjdk:${OPENJDK_VERSION}"
 
 echo "INFO: building backend image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file=${WORKDIR}/backend-image.tar \
-    --path=backend/target \
-    --target=/app \
+    --output-file="${WORKDIR}/backend-image.tar" \
+    --path="${WS_DIR}/backend/target" \
+    --target="/app" \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-backend.jar" \
-    --name=${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG} \
+    --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
-    --base=library/openjdk:${OPENJDK_VERSION}
+    --base="library/openjdk:${OPENJDK_VERSION}"
 
 if ${PUSH} ; then
     PUSH_OPTS="--registry-url=${REGISTRY_URL}"
@@ -176,20 +177,20 @@ if ${PUSH} ; then
 
     echo "INFO: pushing frontend-ui image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui \
-        --tag=${IMAGES_TAG} \
-        --image=${WORKDIR}/frontend-ui-image.tar
+        --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui" \
+        --tag="${IMAGES_TAG}" \
+        --image="${WORKDIR}/frontend-ui-image.tar"
 
     echo "INFO: pushing frontend-api image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api \
-        --tag=${IMAGES_TAG} \
-        --image=${WORKDIR}/frontend-api-image.tar
+        --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api" \
+        --tag="${IMAGES_TAG}" \
+        --image="${WORKDIR}/frontend-api-image.tar"
 
     echo "INFO: pushing backend image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name=${IMAGES_NAMESPACE}helidon-build-publisher-backend \
-        --tag=${IMAGES_TAG} \
-        --image=${WORKDIR}/backend-image.tar
+        --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend" \
+        --tag="${IMAGES_TAG}" \
+        --image="${WORKDIR}/backend-image.tar"
 fi
 rm -rf ${WORKDIR}
