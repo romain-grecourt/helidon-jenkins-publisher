@@ -5,6 +5,7 @@ import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -66,7 +67,7 @@ public class HttpSignatureHelper {
         if (key == null) {
             return null;
         }
-        return new String(Base64.getEncoder().encode(signRsaSha256(payload, key)));
+        return new String(Base64.getEncoder().encode(signRsaSha256(payload, key)), StandardCharsets.UTF_8);
     }
 
     private static byte[] signRsaSha256(String payload, String pkey) {
@@ -76,7 +77,7 @@ public class HttpSignatureHelper {
                     .getInstance("RSA")
                     .generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pkey)));
             signature.initSign(key);
-            signature.update(payload.getBytes());
+            signature.update(payload.getBytes(StandardCharsets.UTF_8));
             return signature.sign();
         } catch (InvalidKeySpecException | NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
             throw new IllegalStateException(e);

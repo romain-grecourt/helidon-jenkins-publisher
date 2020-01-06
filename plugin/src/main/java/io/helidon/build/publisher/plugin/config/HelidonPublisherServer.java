@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.servlet.ServletException;
@@ -106,7 +107,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
                     break;
                 }
             }
-            return new String(pkey)
+            return new String(pkey, StandardCharsets.UTF_8)
                     .substring(0, i)
                     .replaceAll("\\n", "")
                     .replace("-----BEGIN PRIVATE KEY-----", "")
