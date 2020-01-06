@@ -100,9 +100,20 @@ EOF
 }
 
 common_init(){
+    BINDIR="${SCRIPT_DIR}/.bin"
+    export PATH=${PATH}:${BINDIR}
     if ! type jq > /dev/null 2>&1; then
-        echo "ERROR: jq not found in PATH"
-        exit 1
+        echo "INFO: installing jq.."
+        mkdir -p ${BINDIR}
+        if [ `uname` = "Darwin" ] ; then
+            curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
+        elif [ `uname` = "Linux" ] ; then
+            curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+        fi
+        if ! type jq > /dev/null 2>&1; then
+            echo "ERROR: jq not found in PATH"
+            exit 1
+        fi
     fi
     if ! type curl > /dev/null 2>&1; then
         echo "ERROR: curl not found in PATH"
