@@ -24,7 +24,7 @@ fi
 readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
 readonly WS_DIR=$(cd ${SCRIPT_DIR}/../.. ; pwd -P)
-source ${SCRIPT_DIR}/../imagetool/common.sh
+source ${SCRIPT_DIR}/../imagetool/_common.sh
 
 usage(){
   cat <<EOF
