@@ -98,8 +98,10 @@ common_init(){
         mkdir -p ${BINDIR}
         if [ `uname` = "Darwin" ] ; then
             curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
+            chmod +x ${BINDIR}/jq
         elif [ `uname` = "Linux" ] ; then
             curl -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+            chmod +x ${BINDIR}/jq
         fi
         if ! type jq > /dev/null 2>&1; then
             echo "ERROR: jq not found in PATH"
