@@ -52,11 +52,11 @@ common_process_args(){
 common_process_user_password_args(){
     case ${1} in
     "--user="*)
-        readonly UNAME=${ARG#*=}
+        UNAME=${ARG#*=}
         return 0
         ;;
     "--password="*)
-        readonly UPASSWD=${ARG#*=}
+        UPASSWD=${ARG#*=}
         return 0
         ;;
     *)
@@ -116,11 +116,11 @@ common_init(){
             exit 1
         else
             # MacOS
-            readonly SHASUM="shasum -a 256"
+            SHASUM="shasum -a 256"
         fi
     else
         # Linux
-        readonly SHASUM="sha256sum"
+        SHASUM="sha256sum"
     fi
 
     STDERR=$(mktemp -t XXX-stderr)
@@ -179,4 +179,12 @@ random_id(){
         printf '%02x' $B
     fi
   done
+}
+
+is_http_status_or_die() {
+    local status=$(grep 'HTTP/1.1 ' ${1} | tail -1)
+    if ! [[ "${status}" =~ ^HTTP/1.1\ "${2}" ]] ; then
+        echo "ERROR: Unexpected response: ${status}"
+        exit 1
+    fi
 }

@@ -152,19 +152,6 @@ fi
 
 common_init
 
-if ! type sha256sum > /dev/null 2>&1; then
-    if ! type shasum > /dev/null 2>&1; then
-        echo "ERROR: none of sha256sum shasum found in PATH"
-        exit 1
-    else
-        # MacOS
-        readonly SHASUM="shasum -a 256"
-    fi
-else
-    # Linux
-    readonly SHASUM="sha256sum"
-fi
-
 echo "INFO: building ${IMAGE_NAME} ..."
 
 readonly IMAGE_REPO=$(echo ${IMAGE_NAME} | cut -d ':' -f1)

@@ -98,11 +98,7 @@ touch ${OUTPUT_FILE} || exit 1
 # get auth challenge
 readonly RESPONSE_HEADERS=$(mktemp -t XXX-headers)
 curl -v -L -D ${RESPONSE_HEADERS} "${REGISTRY_URL}" 1> /dev/null
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 401 ]] ; then
-    echo "ERROR: Unexpected response: ${STATUS}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 401
 
 # parse challenge header
 readonly CHALLENGE_HEADER_PREFIX="Www-Authenticate: bearer "
@@ -132,8 +128,4 @@ if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
 else
     curl -D ${RESPONSE_HEADERS} "${REALM}?${TOKEN_OPTS}" | jq -r '.token' > ${OUTPUT_FILE}
 fi
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
-    echo "ERROR: Unexpected response: ${STATUS2}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 200

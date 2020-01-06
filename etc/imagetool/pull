@@ -126,12 +126,7 @@ curl -v -X GET \
     -H "${AUTH_HEADER}" \
     -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
     "${API_URL_BASE}/manifests/${IMAGE_TAG}"
-
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
-    echo "ERROR: ${STATUS}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 200
 
 # download image config
 readonly IMAGE_CONFIG="$(cat ${IMAGE_MANIFEST} | jq -r '.config.digest' | cut -d ':' -f2).json"
@@ -141,11 +136,7 @@ curl -v -L -X GET \
     -H "${AUTH_HEADER}" \
     -H "Accept: $(cat ${IMAGE_MANIFEST} | jq -r '.config.mediaType')" \
     "${API_URL_BASE}/blobs/$(cat ${IMAGE_MANIFEST} | jq -r '.config.digest')"
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
-    echo "ERROR: ${STATUS}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 200
 
 get_layer() {
     local digest=${1}
@@ -158,11 +149,7 @@ get_layer() {
         -H "${AUTH_HEADER}" \
         -H "Accept: ${media_type}" \
         "${API_URL_BASE}/blobs/${digest}"
-    STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-    if ! [[ ${STATUS} =~ ^HTTP/1.1\ 200 ]] ; then
-        echo "ERROR: ${STATUS}"
-        return 1
-    fi
+    is_http_status_or_die ${RESPONSE_HEADERS} 200
     gunzip ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz
 }
 

@@ -143,13 +143,8 @@ create_blob(){
         -D ${responseHeaders} \
         -H "${AUTH_HEADER}" \
        "${API_URL_BASE}/blobs/uploads/"
-    local status=$(head -1 ${responseHeaders})
-    if [[ ${status} =~ ^HTTP/1.1\ 202 ]] ; then
-        UPLOAD_LOCATION=$(get_location ${responseHeaders})
-    else
-        echo "ERROR: ${status}"
-        return 1
-    fi
+    is_http_status_or_die ${RESPONSE_HEADERS} 202
+    UPLOAD_LOCATION=$(get_location ${responseHeaders})
 }
 
 blob_size(){
@@ -187,12 +182,7 @@ tar --to-stdout -xf "${IMAGE_TAR}" $(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) |
         -H "${AUTH_HEADER}" \
         -H "Content-Type: application/octet-stream" \
         "${UPLOAD_URL}"
-
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 201 ]] ; then
-    echo "ERROR: ${status}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 201
 
 blob_size
 readonly LAYER_SIZE=${BLOB_SIZE}
@@ -210,12 +200,7 @@ curl -v -X PUT --data-binary @${IMAGE_CONFIG} \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/vnd.docker.container.image.v1+json" \
     "${UPLOAD_URL}"
-
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 201 ]] ; then
-    echo "ERROR: ${status}"
-    return 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 201
 
 blob_size
 readonly CONFIG_SIZE=${BLOB_SIZE}
@@ -248,10 +233,6 @@ curl -v -X PUT --data-binary @${DISTRIBUTION_MANIFEST} \
     -D ${RESPONSE_HEADERS} \
     -H "Content-Type: application/vnd.docker.distribution.manifest.v2+json" \
     "${API_URL_BASE}/manifests/${IMAGE_TAG}"
-STATUS=$(grep 'HTTP/1.1 ' ${RESPONSE_HEADERS} | tail -1)
-if ! [[ ${STATUS} =~ ^HTTP/1.1\ 201 ]] ; then
-    echo "ERROR: ${status}"
-    exit 1
-fi
+is_http_status_or_die ${RESPONSE_HEADERS} 201
 
 echo "INFO: image push completed"
