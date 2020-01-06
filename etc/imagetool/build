@@ -313,7 +313,7 @@ if [ "${TAR_IMPL}" = "bsd" ] ; then
     fi
 else
     # GNU tar
-    TAR_OPTS="--transform=s@${SOURCE_PATH}@${TARGET_PATH}@g --owner=101 --group=101"
+    TAR_OPTS="--transform=s@$(remove_leading_slashes ${SOURCE_PATH})/@${TARGET_PATH}@g --owner=101 --group=101 --no-recursion"
     TARGET_PATH_PREFIX="${SOURCE_PATH}/"
 fi
 
