@@ -200,7 +200,7 @@ random_id(){
 
 is_http_status_or_die() {
     local status=$(grep 'HTTP/1.1 ' ${1} | tail -1)
-    if ! [[ "${status}" =~ ^HTTP/1.1\ "${2}" ]] ; then
+    if ! [[ "${status}" =~ ^HTTP/1.(0|1)\ "${2}" ]] ; then
         echo "ERROR: Unexpected response: ${status}"
         exit 1
     fi

@@ -35,7 +35,7 @@ USAGE:
 $(basename ${SCRIPT}) [OPTIONS] --name=NAME --registry-url=URL
 
   --registry-url=URL
-          URL of the registry to pull from.
+          Registry URL. (e.g. https://registry.docker.io/v2)
 
   --name=NAME
           Name of the image to be pulled.
