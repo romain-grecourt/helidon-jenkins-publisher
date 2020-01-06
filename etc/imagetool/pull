@@ -15,19 +15,6 @@
 # limitations under the License.
 #
 
-set -o pipefail || true  # trace ERR through pipes
-set -o errtrace || true # trace ERR through commands and functions
-set -o errexit || true  # exit the script if any statement returns a non-true return value
-
-on_error(){
-    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
-        echo "---------------------------------------"
-        tail -100 ${STDERR}
-        echo "---------------------------------------"
-    fi
-}
-trap on_error ERR
-
 # Path to this script
 if [ -h "${0}" ] ; then
     readonly SCRIPT_PATH="$(readlink "${0}")"
@@ -36,6 +23,7 @@ else
 fi
 readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
+source ${SCRIPT_DIR}/common.sh
 
 usage(){
   cat <<EOF
@@ -57,22 +45,9 @@ OPTIONS:
   --ouput-dir=DIR
           Path of the output directory.
 
-  --user=USERNAME
-          Registry user.
-
-  --password=PASSWORD
-          Registry password
-
-  --v
-          Print debug output.
-
-  --vv
-          Print debug output and set -x
-
-  --help
-          Prints the usage and exits.
-
 EOF
+  common_user_password_usage
+  common_usage
 }
 
 # parse command line args
@@ -85,12 +60,6 @@ for ((i=0;i<${#ARGS[@]};i++))
         usage
         exit 0
         ;;
-    "--v")
-        readonly DEBUG=true
-        ;;
-    "--vv")
-        readonly DEBUG2=true
-        ;;
     "--registry-url="*)
         readonly REGISTRY_URL=${ARG#*=}
         ;;
@@ -100,16 +69,8 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--output-dir="*)
         readonly OUTPUT_DIR=${ARG#*=}
         ;;
-    "--user="*)
-        readonly UNAME=${ARG#*=}
-        ;;
-    "--password="*)
-        readonly UPASSWD=${ARG#*=}
-        ;;
     *)
-        echo "ERROR: unknown option: ${ARG}"
-        usage
-        exit 1
+        common_process_user_password_args || common_process_args
         ;;
   esac
 }
@@ -129,31 +90,7 @@ elif [ ! -d "${OUTPUT_DIR}" ] ; then
     exit 1
 fi
 
-if ! type jq > /dev/null 2>&1; then
-    echo "ERROR: jq not found in PATH"
-    exit 1
-fi
-
-if ! type curl > /dev/null 2>&1; then
-    echo "ERROR: curl not found in PATH"
-    exit 1
-fi
-
-readonly STDERR=$(mktemp -t XXX-stderr)
-
-if [ -z "${DEBUG}" ] ; then
-    if [ -z "${DEBUG2}" ] ; then
-        exec 2> ${STDERR}
-    fi
-    readonly DEBUG=false
-fi
-
-if [ ! -z "${DEBUG2}" ] ; then
-    set -x
-else
-    exec 2> ${STDERR}
-    readonly DEBUG2=false
-fi
+common_init
 
 readonly IMAGE_NAME=${IMAGE_FULL_NAME%%:*}
 readonly IMAGE_TAG=${IMAGE_FULL_NAME##*:}
@@ -172,7 +109,7 @@ if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
     AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
 fi
 readonly TOKEN_FILE=$(mktemp -t XXX-token})
-bash ${BASH_OPTS} ${SCRIPT_DIR}/registry-auth.sh ${AUTH_EXTRA_OPTS} \
+bash ${BASH_OPTS} ${SCRIPT_DIR}/auth ${AUTH_EXTRA_OPTS} \
     --registry-url=${REGISTRY_URL} \
     --repository=${IMAGE_NAME} \
     --scopes="pull" \

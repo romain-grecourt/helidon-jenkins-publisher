@@ -15,19 +15,6 @@
 # limitations under the License.
 #
 
-set -o pipefail || true  # trace ERR through pipes
-set -o errtrace || true # trace ERR through commands and functions
-set -o errexit || true  # exit the script if any statement returns a non-true return value
-
-on_error(){
-    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
-        echo "---------------------------------------"
-        tail -100 ${STDERR}
-        echo "---------------------------------------"
-    fi
-}
-trap on_error ERR
-
 # Path to this script
 if [ -h "${0}" ] ; then
     readonly SCRIPT_PATH="$(readlink "${0}")"
@@ -36,6 +23,7 @@ else
 fi
 readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
+source ${SCRIPT_DIR}/../imagetool/common.sh
 
 usage(){
   cat <<EOF
@@ -60,32 +48,12 @@ OPTIONS:
   --push
           Push the images
 
-  --user=USERNAME
-          Registry username
-
-  --password=PASSWORD
-          Registry password
-
   --registry-url=URL
           Registry URL to push to.
 
-  --v
-          Print debug output.
-
-  --vv
-          Print debug output and set -x
-
-  --help
-          Prints the usage and exits.
-
 EOF
-}
-
-remove_trailing_slashes() {
-    local input=${1}
-    local len=${#input} ; input=${input%%/}
-    while [ ${#input} -lt ${len} ] ; do len=${#input} ; input=${input%%/} ; done
-    echo ${input}
+  common_user_password_usage
+  common_usage
 }
 
 # parse command line args
@@ -95,10 +63,6 @@ for ((i=0;i<${#ARGS[@]};i++))
 {
     ARG=${ARGS[${i}]}
     case ${ARG} in
-    "--help")
-        usage
-        exit 0
-        ;;
     "--namespace="*)
         readonly IMAGES_NAMESPACE=$(remove_trailing_slashes ${ARG#*=})/
         ;;
@@ -108,28 +72,14 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--push"*)
         readonly PUSH=true
         ;;
-    "--user="*)
-        readonly UNAME=${ARG#*=}
-        ;;
-    "--password="*)
-        readonly UPASSWD=${ARG#*=}
-        ;;
     "--registry-url="*)
         readonly REGISTRY_URL=${ARG#*=}
-        ;;
-    "--v")
-        readonly DEBUG=true
-        ;;
-    "--vv")
-        readonly DEBUG2=true
         ;;
     "--load")
         readonly LOAD=true
         ;;
     *)
-        echo "ERROR: unknown option: ${ARG}"
-        usage
-        exit 1
+        common_process_user_password_args || common_process_args
         ;;
   esac
 }
@@ -154,21 +104,7 @@ if [ -z "${LOAD}" ] ; then
     readonly LOAD=false
 fi
 
-readonly STDERR=$(mktemp -t XXX-stderr)
-
-if [ -z "${DEBUG}" ] ; then
-    if [ -z "${DEBUG2}" ] ; then
-        exec 2> ${STDERR}
-    fi
-    readonly DEBUG=false
-fi
-
-if [ ! -z "${DEBUG2}" ] ; then
-    set -x
-else
-    exec 2> ${STDERR}
-    readonly DEBUG2=false
-fi
+common_init
 
 if ${LOAD} ; then
     BUILD_OPTS="--load"
@@ -237,11 +173,11 @@ if ${PUSH} ; then
     fi
     echo ${PUSH_OPTS}
 
-#    echo "INFO: pushing frontend-ui image"
-#    bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
-#        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui \
-#        --tag=${IMAGES_TAG} \
-#        --image=${WORKDIR}/frontend-ui-image.tar
+    echo "INFO: pushing frontend-ui image"
+    bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
+        --name=${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui \
+        --tag=${IMAGES_TAG} \
+        --image=${WORKDIR}/frontend-ui-image.tar
 
     echo "INFO: pushing frontend-api image"
     bash ${SCRIPT_DIR}/push-image.sh ${EXTRA_OPTS} ${PUSH_OPTS} \
