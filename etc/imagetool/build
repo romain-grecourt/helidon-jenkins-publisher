@@ -406,7 +406,7 @@ else
 fi
 
 echo "INFO: creating ${IMAGE_TAR}"
-tar -cvf ${IMAGE_TAR} -C ${WORKDIR} .
+tar -cvf ${IMAGE_TAR} -C ${WORKDIR} . >&2
 
 # load the image
 if ${LOAD} ; then
