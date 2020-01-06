@@ -160,7 +160,7 @@ echo "INFO: image_config=${IMAGE_CONFIG}"
 
 readonly IMAGE_CONFIG_DIGEST="sha256:${IMAGE_CONFIG_ENTRY%%.json}"
 readonly LAYER_DIGEST=$(jq -r '.rootfs.diff_ids[0]' ${IMAGE_CONFIG})
-readonly LAYER_SIZE=$(tar --to-stdout -xf "${IMAGE_TAR}" ./$(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST} | wc -c)
+readonly LAYER_SIZE=$(tar --to-stdout -xf "${IMAGE_TAR}" ./$(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) | wc -c)
 echo "INFO: image_config_digest=${IMAGE_CONFIG_DIGEST}"
 echo "INFO: layer_digest=${LAYER_DIGEST}"
 echo "INFO: layer_size=${LAYER_SIZE}"
