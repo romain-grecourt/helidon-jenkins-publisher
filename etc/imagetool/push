@@ -176,7 +176,7 @@ DIGEST_SIZES=( )
 for ((i=0;i<${NUM_LAYERS};i++))
 {
     LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
-    DIGEST="sha256:$(dirname ${LAYERS[${i}]})"
+    DIGEST="sha256:$(dirname ${LAYER})"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
     create_blob
     if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
