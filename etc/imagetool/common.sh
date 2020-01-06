@@ -95,6 +95,7 @@ common_init(){
     if [ -z "${DEBUG}" ] ; then
         if [ -z "${DEBUG2}" ] ; then
             exec 2> ${STDERR}
+            echo "INFO: redirecting stderr to ${STDERR}"
         fi
         DEBUG=false
     fi
@@ -102,6 +103,7 @@ common_init(){
         set -x
     else
         exec 2> ${STDERR}
+        echo "INFO: redirecting stderr to ${STDERR}"
         DEBUG2=false
     fi
 
