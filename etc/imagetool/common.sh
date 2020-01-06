@@ -149,6 +149,13 @@ common_init(){
         # Linux
         SHASUM="sha256sum"
     fi
+    if [[ `tar --version` =~ .*GNU\ tar.* ]]
+    then
+        TAR_IMPL="gnu"
+    elif [[ `tar --version` =~ .*bsdtar.* ]]
+    then
+        TAR_IMPL="bsd"
+    fi
 }
 
 remove_leading_slashes() {

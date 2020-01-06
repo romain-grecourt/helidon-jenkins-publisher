@@ -151,6 +151,10 @@ if [ -z "${COMMENT}" ] ; then
 fi
 
 common_init
+if [ -z "${TAR_IMPL}" ] ; then
+    echo "ERROR: unsupported tar implementation"
+    exit 1
+fi
 
 echo "INFO: building ${IMAGE_NAME} ..."
 
@@ -291,18 +295,27 @@ readonly LAYER_TAR="${WORKDIR}/${LAYER_ID}/layer.tar"
 echo "INFO: creating ${LAYER_TAR}"
 readonly TARVIEW=$(mktemp -d -t "XXX${SCRIPT}")/view
 mkdir -p $(dirname ${TARVIEW}/${TARGET_PATH})
+
 if [ -z "${TARGET_PATH}" ] ; then
     ln -fs ${SOURCE_PATH} ${TARVIEW}
 else 
     ln -fs ${SOURCE_PATH} ${TARVIEW}/${TARGET_PATH}
 fi
+
+if [ "${TAR_IMPL}" = "bsd" ] ; then
+    TAR_OPTS="-C ${TARVIEW}"
+else
+    TAR_OPTS="--transform=s@^.*/view/@@g"
+    TARGET_PATH_PREFIX="${TARVIEW}/"
+fi
+
+if ! [ -z "${TARGET_PATH}" ] ; then
+    TARGET_PATH_PREFIX="${TARGET_PATH_PREFIX}${TARGET_PATH}/"
+fi
+
 while read f ; do
-    if [ -z "${TARGET_PATH}" ] ; then
-        echo "${f}"
-    else
-        echo "${TARGET_PATH}/${f}"
-    fi
-done < ${TAR_MANIFEST} | tar -cvf ${LAYER_TAR} --files-from - -C ${TARVIEW}
+    echo "${TARGET_PATH_PREFIX}${f}"
+done < ${TAR_MANIFEST} | tar -cvf ${LAYER_TAR} --files-from - ${TAR_OPTS}
 
 # Add layer metadata
 echo "1.0" > ${WORKDIR}/${LAYER_ID}/VERSION
