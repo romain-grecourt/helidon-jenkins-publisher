@@ -124,8 +124,8 @@ fi
 # TODO set offline_token=1 ?
 readonly TOKEN_OPTS="service=${SERVICE}&scope=repository:${REPOSITORY}:${SCOPES}"
 if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
-    curl -u "${UNAME}:${UPASSWD}" -D ${RESPONSE_HEADERS} "${REALM}?${TOKEN_OPTS}" | jq -r '.token' > ${OUTPUT_FILE}
+    curl -L -u "${UNAME}:${UPASSWD}" -D ${RESPONSE_HEADERS} "${REALM}?${TOKEN_OPTS}" | jq -r '.token' > ${OUTPUT_FILE}
 else
-    curl -D ${RESPONSE_HEADERS} "${REALM}?${TOKEN_OPTS}" | jq -r '.token' > ${OUTPUT_FILE}
+    curl -L -D ${RESPONSE_HEADERS} "${REALM}?${TOKEN_OPTS}" | jq -r '.token' > ${OUTPUT_FILE}
 fi
 is_http_status_or_die ${RESPONSE_HEADERS} 200
