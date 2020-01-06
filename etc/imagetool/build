@@ -237,7 +237,7 @@ if [ ! -z "${BASE_IMAGE}" ] ; then
     fi
     if [ ! -e ${BASE_IMGDIR} ] ; then
         mkdir -p ${BASE_IMGDIR}
-        bash ${SCRIPT_DIR}/pull.sh ${PULL_EXTRA_OPTS} \
+        bash ${SCRIPT_DIR}/pull ${PULL_EXTRA_OPTS} \
             --registry-url=${BASE_REGISTRY_URL} \
             --output-dir=${BASE_IMGDIR} \
             --name=${BASE_IMAGE}
