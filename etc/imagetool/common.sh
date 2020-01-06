@@ -42,6 +42,10 @@ common_process_args(){
         DEBUG2=true
         return 0
         ;;
+    "--stderr-file="*)
+        STDERR=${ARG#*=}
+        return 0
+        ;;
     *)
         echo "ERROR: unknown option: ${ARG}"
         exit 1
@@ -68,10 +72,13 @@ common_process_user_password_args(){
 common_usage(){
   cat <<EOF
   --v
-          Print debug output.
+          Print stderr output.
 
   --vv
-          Print debug output and set -x
+          Print stderr output and set -x
+
+  --stderr-file
+          File to capture stderr when not in debug mode.
 
   --help
           Prints the usage and exits.
@@ -91,7 +98,9 @@ EOF
 }
 
 common_init(){
-    STDERR=$(mktemp -t XXX-stderr)
+    if [ -z "${STDERR}" ] ; then
+        STDERR=$(mktemp -t XXX-stderr)
+    fi
     if [ -z "${DEBUG}" ] ; then
         if [ -z "${DEBUG2}" ] ; then
             exec 2> ${STDERR}
