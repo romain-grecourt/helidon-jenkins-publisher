@@ -141,9 +141,8 @@ get_location() {
 }
 
 create_blob(){
-    local responseHeaders=$(mktemp -t XXX})
     curl -v -X POST \
-        -D ${responseHeaders} \
+        -D ${RESPONSE_HEADERS} \
         -H "${AUTH_HEADER}" \
        "${API_URL_BASE}/blobs/uploads/"
     is_http_status_or_die ${RESPONSE_HEADERS} 202
@@ -162,7 +161,7 @@ echo "INFO: image_manifest=${IMAGE_MANIFEST}"
 
 readonly IMAGE_CONFIG="$(mktemp -t XXX}).json"
 readonly IMAGE_CONFIG_ENTRY=$(jq -r '.[0].Config' ${IMAGE_MANIFEST})
-tar --to-stdout -xf ${IMAGE_TAR} ${IMAGE_CONFIG_ENTRY} > ${IMAGE_CONFIG}
+tar --to-stdout -xf ${IMAGE_TAR} ./${IMAGE_CONFIG_ENTRY} > ${IMAGE_CONFIG}
 echo "INFO: image_config=${IMAGE_CONFIG}"
 
 readonly IMAGE_CONFIG_DIGEST="sha256:${IMAGE_CONFIG_ENTRY%%.json}"
@@ -179,7 +178,7 @@ if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
 else
     UPLOAD_URL="${UPLOAD_LOCATION}?digest=${LAYER_DIGEST}"
 fi
-tar --to-stdout -xf "${IMAGE_TAR}" $(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) | \
+tar --to-stdout -xf "${IMAGE_TAR}" ./$(jq -r '.[0].Layers[0]' ${IMAGE_MANIFEST}) | \
     curl -v -X PUT --data-binary @- \
         -D ${RESPONSE_HEADERS} \
         -H "${AUTH_HEADER}" \
