@@ -147,13 +147,16 @@ get_layer() {
     local layer_dir=${digest##*:}
     mkdir ${OUTPUT_DIR}/${layer_dir}
     curl -v -L -X GET \
-        -o ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz \
+        -o ${OUTPUT_DIR}/${layer_dir}/layer.tar \
         -D ${RESPONSE_HEADERS} \
         -H "${AUTH_HEADER}" \
         -H "Accept: ${media_type}" \
         "${API_URL_BASE}/blobs/${digest}"
     is_http_status_or_die ${RESPONSE_HEADERS} 200
-    gunzip ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz
+    if [[ `file -b --mime ${OUTPUT_DIR}/${layer_dir}/layer.tar` =~ ^application/x-gzip ]] ; then
+        mv ${OUTPUT_DIR}/${layer_dir}/layer.tar ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz
+        gunzip ${OUTPUT_DIR}/${layer_dir}/layer.tar.gz
+    fi
 }
 
 # download layers
