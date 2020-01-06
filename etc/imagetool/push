@@ -167,7 +167,8 @@ echo "INFO: image_config=${IMAGE_CONFIG}"
 readonly IMAGE_CONFIG_DIGEST="sha256:${IMAGE_CONFIG_ENTRY%%.json}"
 echo "INFO: image_config_digest=${IMAGE_CONFIG_DIGEST}"
 
-RESPONSE_HEADERS=$(mktemp -t XXX})
+readonly RESPONSE_HEADERS=$(mktemp -t XXX})
+readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
 
 # upload layers
 readonly NUM_LAYERS=$(jq -r '.[0].Layers|length' ${IMAGE_MANIFEST})
@@ -176,7 +177,8 @@ DIGEST_SIZES=( )
 for ((i=0;i<${NUM_LAYERS};i++))
 {
     LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
-    DIGEST="sha256:$(dirname ${LAYER})"
+    tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
+    DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
     create_blob
     if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
@@ -184,12 +186,11 @@ for ((i=0;i<${NUM_LAYERS};i++))
     else
         UPLOAD_URL="${UPLOAD_LOCATION}?digest=${DIGEST}"
     fi
-    tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} | \
-        curl -v -X PUT --data-binary @- \
-            -D ${RESPONSE_HEADERS} \
-            -H "${AUTH_HEADER}" \
-            -H "Content-Type: application/octet-stream" \
-            "${UPLOAD_URL}"
+    curl -v -X PUT --data-binary @${WORKDIR}/layer.tar \
+        -D ${RESPONSE_HEADERS} \
+        -H "${AUTH_HEADER}" \
+        -H "Content-Type: application/octet-stream" \
+        "${UPLOAD_URL}"
     blob_size
     DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
     is_http_status_or_die ${RESPONSE_HEADERS} 201
