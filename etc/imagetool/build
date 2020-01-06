@@ -276,17 +276,17 @@ mkdir -p ${WORKDIR}/${LAYER_ID}
 readonly TAR_MANIFEST=$(mktemp -t "XXXtar-manifest")
 echo "INFO: tar_manifest = ${TAR_MANIFEST}"
 if [ -z "${INCLUDES}" ] ; then
-    find ${SOURCE_PATH} -type f | sed s@"${SOURCE_PATH}/"@@g > ${TAR_MANIFEST}
+    find ${SOURCE_PATH} | sed s@"${SOURCE_PATH}/"@@g > ${TAR_MANIFEST}
 else
     for include in ${INCLUDES} ; do
         if [ -e "${SOURCE_PATH}/${include}" ] ; then
-            find ${SOURCE_PATH}/${include} -type f | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
+            find ${SOURCE_PATH} | sed s@"${SOURCE_PATH}\(/\?\)"@@g > ${TAR_MANIFEST}
         else
             for elt in `ls ${SOURCE_PATH}/${include} 2> /dev/null || echo ""` ; do
                 if [ -f ${elt} ] ; then
                     echo ${elt} | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
                 else
-                    find ${SOURCE_PATH}/${elt} -type f | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
+                    find ${SOURCE_PATH}/${elt} | sed s@"${SOURCE_PATH}/"@@g >> ${TAR_MANIFEST}
                 fi
             done
         fi
@@ -296,29 +296,30 @@ fi
 # Create the layer.tar file
 readonly LAYER_TAR="${WORKDIR}/${LAYER_ID}/layer.tar"
 echo "INFO: creating ${LAYER_TAR}"
-readonly TARVIEW=$(mktemp -d -t "XXX${SCRIPT}")/view
-mkdir -p $(dirname ${TARVIEW}/${TARGET_PATH})
-
-if [ -z "${TARGET_PATH}" ] ; then
-    ln -fs ${SOURCE_PATH} ${TARVIEW}
-else 
-    ln -fs ${SOURCE_PATH} ${TARVIEW}/${TARGET_PATH}
-fi
 
 if [ "${TAR_IMPL}" = "bsd" ] ; then
+    # BSD tar does not have the --transform option
+    # create a 'view' directory with a symbolic link to 'transform' the path
     TAR_OPTS="-C ${TARVIEW}"
+    readonly TARVIEW=$(mktemp -d -t "XXX${SCRIPT}")/view
+    mkdir -p $(dirname ${TARVIEW}/${TARGET_PATH})
+    if [ -z "${TARGET_PATH}" ] ; then
+        ln -fs ${SOURCE_PATH} ${TARVIEW}
+    else
+        ln -fs ${SOURCE_PATH} ${TARVIEW}/${TARGET_PATH}
+    fi
+    if ! [ -z "${TARGET_PATH}" ] ; then
+        TARGET_PATH_PREFIX="${TARGET_PATH}/"
+    fi
 else
-    TAR_OPTS="--transform=s@^.*/view/@@g"
-    TARGET_PATH_PREFIX="${TARVIEW}/"
-fi
-
-if ! [ -z "${TARGET_PATH}" ] ; then
-    TARGET_PATH_PREFIX="${TARGET_PATH_PREFIX}${TARGET_PATH}/"
+    # GNU tar
+    TAR_OPTS="--transform=s@${SOURCE_PATH}@${TARGET_PATH}@g --owner=101 --group=101"
+    TARGET_PATH_PREFIX="${SOURCE_PATH}/"
 fi
 
 while read f ; do
     echo "${TARGET_PATH_PREFIX}${f}"
-done < ${TAR_MANIFEST} | tar -cvf ${LAYER_TAR} --files-from - ${TAR_OPTS} >&2
+done < ${TAR_MANIFEST} | tar -cvpf ${LAYER_TAR} --files-from - ${TAR_OPTS} >&2
 
 # Add layer metadata
 echo "1.0" > ${WORKDIR}/${LAYER_ID}/VERSION

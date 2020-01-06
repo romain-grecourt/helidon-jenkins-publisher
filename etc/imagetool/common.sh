@@ -104,14 +104,14 @@ common_init(){
     fi
     if [ -z "${DEBUG}" ] ; then
         if [ -z "${DEBUG2}" ] ; then
-            exec 2> ${STDERR}
+            exec 2>> ${STDERR}
         fi
         DEBUG=false
     fi
     if [ ! -z "${DEBUG2}" ] ; then
         set -x
     else
-        exec 2> ${STDERR}
+        exec 2>> ${STDERR}
         DEBUG2=false
     fi
 
