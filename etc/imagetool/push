@@ -207,13 +207,11 @@ readonly CONFIG_SIZE=${BLOB_SIZE}
 echo "INFO: config_size=${CONFIG_SIZE}"
 
 readonly NUM_LAYERS=$(jq -r '.[0].Layers|length' ${IMAGE_MANIFEST})
-readonly REMAINING_LAYERS=( )
+REMAINING_LAYERS=( )
 for ((i=1;i<${NUM_LAYERS};i++))
 {
-    REMAINING_LAYERS[{${i}]=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
+    REMAINING_LAYERS[${#REMAINING_LAYERS[*]}]=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
 }
-
-echo ${REMAINING_LAYERS[*]}
 
 # create distribution manifest
 readonly DISTRIBUTION_MANIFEST="$(mktemp -t XXX}).json"
@@ -241,7 +239,7 @@ $(for ((i=0;i<${#REMAINING_LAYERS[@]};i++))
     printf "        \"size\": %i,\n" $(tar --to-stdout -xf "${IMAGE_TAR}" ./${REMAINING_LAYERS[${i}]} | wc -c)
     printf "        \"digest\": \"%s\"" $(dirname ${REMAINING_LAYERS[${i}]})
     printf "        }\n"
-    if [ "${i}" = "$((${#LAYERS[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
+    if [ "${i}" = "$((${#REMAINING_LAYERS[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
     ]
 }
