@@ -23,7 +23,6 @@ else
 fi
 readonly SCRIPT_DIR=$(dirname ${SCRIPT_PATH})
 readonly SCRIPT=$(basename ${SCRIPT_PATH})
-readonly WS_DIR=$(cd ${SCRIPT_DIR}/../.. ; pwd -P)
 source ${SCRIPT_DIR}/../imagetool/_common.sh
 
 usage(){
@@ -104,7 +103,6 @@ if [ -z "${LOAD}" ] ; then
 fi
 
 common_init
-export PATH=${PATH}:${SCRIPT_DIR}/../imagetool
 
 if ${LOAD} ; then
     BUILD_OPTS="--load"
@@ -124,10 +122,6 @@ fi
 readonly NGINX_VERSION="1.17.6-alpine"
 readonly OPENJDK_VERSION="8-jre-slim"
 
-readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
-mkdir -p ${WORKDIR}
-echo "INFO: workdir = ${WORKDIR}"
-
 echo "INFO: building frontend-ui image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG}" \
@@ -135,6 +129,8 @@ build ${EXTRA_OPTS} ${BUILD_OPTS} \
     --base="library/nginx:${NGINX_VERSION}" \
     --path="${WS_DIR}/frontend-ui/dist" \
     --target="/usr/share/nginx/html" \
+    --path="frontend-ui/nginx.conf" \
+    --target="/etc/nginx/conf.d/default.conf" \
     --output-file="${WORKDIR}/frontend-ui-image.tar"
 
 readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout

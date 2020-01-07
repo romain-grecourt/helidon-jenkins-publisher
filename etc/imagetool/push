@@ -15,6 +15,13 @@
 # limitations under the License.
 #
 
+# TODO:
+# Support cross posting of blobs
+# Add options to pass base registry credentials to push base image
+
+# TODO:
+# Check blobs don't exist before upload
+
 # Path to this script
 if [ -h "${0}" ] ; then
     readonly SCRIPT_PATH="$(readlink "${0}")"

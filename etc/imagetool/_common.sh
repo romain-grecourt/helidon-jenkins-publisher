@@ -24,6 +24,11 @@ on_error(){
 }
 trap on_error ERR
 
+IMAGETOOL_DIR=$(cd $(dirname ${BASH_SOURCE}); pwd -P)
+export PATH=${IMAGETOOL_DIR}:${IMAGETOOL_DIR}/bin:${PATH}
+
+readonly WS_DIR=$(cd ${IMAGETOOL_DIR}/../..; pwd -P)
+
 common_process_args(){
     case ${1} in
     "--help"|"-help"|"-h"|"--h")
@@ -121,8 +126,7 @@ common_init(){
         exec 2>> ${STDERR}
         DEBUG2=false
     fi
-    BINDIR="${SCRIPT_DIR}/.bin"
-    export PATH=${SCRIPT_DIR}:${BINDIR}:${PATH}
+
     if ! type jq > /dev/null 2>&1; then
         echo "INFO: installing jq.."
         mkdir -p ${BINDIR}

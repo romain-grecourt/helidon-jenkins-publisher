@@ -34,10 +34,16 @@ See https://github.com/moby/moby/blob/master/image/spec/v1.2.md
 
 USAGE:
 
-$(basename ${SCRIPT}) [OPTIONS] --path=PATH --name=NAME
+$(basename ${SCRIPT}) [OPTIONS] (--path=PATH [--includes=INCLUDES] [--target=PATH])+ --name=NAME
 
   --path=PATH
           Path to the source directory to create the image.
+
+  --includes=INCLUDES
+          List of relative include paths patterns.
+
+  --target=PATH
+          Target path of the included files in the created layer.
 
   --name=NAME
           Image name of the form repository:tag.
@@ -49,12 +55,6 @@ OPTIONS:
 
   --comment=TEXT
           Comment text to include in the metatada.
-
-  --includes=INCLUDES
-          List of relative include paths patterns.
-
-  --target=PATH
-          Target path of the included files in the created layer.
 
   --base=BASE_IMAGE
           Base image.
@@ -84,12 +84,29 @@ EOF
 # parse command line args
 ARGS=( "${@}" )
 ENV_ARRAY=( )
+SOURCE_PATH_ARRAY=( )
+INCLUDES_ARRAY=( )
+TARGET_PATH_ARRAY=( )
 for ((i=0;i<${#ARGS[@]};i++))
 {
     ARG=${ARGS[${i}]}
     case ${ARG} in
     "--path="*)
-        readonly SOURCE_PATH=$(cd ${ARG#*=} ; pwd -P)
+        SOURCE_PATH=${ARG#*=}
+        if [ -d ${SOURCE_PATH} ] ; then
+            SOURCE_PATH=$(cd ${SOURCE_PATH} ; pwd -P)
+        else
+            SOURCE_PATH=$(cd $(dirname ${SOURCE_PATH}) ; pwd -P)/$(basename ${SOURCE_PATH})
+        fi
+        SOURCE_PATH_ARRAY[${#SOURCE_PATH_ARRAY[*]}]=${SOURCE_PATH}
+        # populate default values for corresponding includes and target
+        SOURCE_PATH_ARRAY_LEN=${#SOURCE_PATH_ARRAY[*]}
+        if [ -z "${INCLUDES_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]}" ] ; then
+            INCLUDES_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]="."
+        fi
+        if [ -z "${TARGET_PATH_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]}" ] ; then
+            TARGET_PATH_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]="/"
+        fi
         ;;
     "--name="*)
         readonly IMAGE_NAME=${ARG#*=}
@@ -98,13 +115,15 @@ for ((i=0;i<${#ARGS[@]};i++))
         readonly COMMENT=${ARG#*=}
         ;;
     "--includes="*)
-        readonly INCLUDES=${ARG#*=}
+        SOURCE_PATH_ARRAY_LEN=${#SOURCE_PATH_ARRAY[*]}
+        INCLUDES_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]=${ARG#*=}
         ;;
     "--target="*)
         TPATH=${ARG#*=}
         TPATH=$(remove_leading_slashes ${TPATH})
         TPATH=$(remove_trailing_slashes ${TPATH})
-        TARGET_PATH=${TPATH}
+        SOURCE_PATH_ARRAY_LEN=${#SOURCE_PATH_ARRAY[*]}
+        TARGET_PATH_ARRAY[$((SOURCE_PATH_ARRAY_LEN-1))]=${TPATH}
         ;;
     "--base="*)
         readonly BASE_IMAGE=${ARG#*=}
@@ -139,7 +158,7 @@ for ((i=0;i<${#ARGS[@]};i++))
 if [ -z "${IMAGE_NAME}" ] ; then
     echo "ERROR: --name option is required"
     exit 1
-elif [ -z "${SOURCE_PATH}" ] ; then
+elif [ ${#SOURCE_PATH_ARRAY} -eq 0 ] ; then
     echo "ERROR: --path option is required"
     exit 1
 fi
@@ -162,10 +181,6 @@ echo "INFO: building ${IMAGE_NAME} ..."
 
 readonly IMAGE_REPO=$(echo ${IMAGE_NAME} | cut -d ':' -f1)
 readonly IMAGE_TAG=$(echo ${IMAGE_NAME} | cut -d ':' -f2)
-echo "INFO: source = ${SOURCE_PATH}"
-if [ ! -z "${TARGET_PATH}" ] ; then
-    echo "INFO: target_path = ${TARGET_PATH}"
-fi
 echo "INFO: name = ${IMAGE_NAME}"
 echo "INFO: image_repo = ${IMAGE_REPO}"
 echo "INFO: image_tag = ${IMAGE_TAG}"
@@ -266,58 +281,87 @@ if [ ! -z "${IMAGE_CMD}" ] ; then
     done
 fi
 
+layer_tar_files(){
+    local layer_tar=${1}
+    local source_path=${2}
+    local includes=${3}
+    local target_path=${4}
+    echo "INFO: processing source path = ${source_path}"
+    if [ "${target_path}" != "/" ] ; then
+        echo "INFO: target_path = ${target_path}"
+    fi
+    if [ "${includes}" != "." ] && [ ! -f "${source_path}" ] ; then
+        echo "INFO: includes = ${includes}"
+    fi
+
+    # List all files to include
+    local tar_manifest=$(mktemp ${WORKDIR}/tarmanifest.XXX)
+    echo "INFO: tar_manifest = ${tar_manifest}"
+    if [ -f "${source_path}" ] ; then
+        echo ${source_path} > ${tar_manifest}
+    else
+        for include in ${includes} ; do
+            include_elt=${source_path}/${include}
+            include_elt=$(echo ${include_elt} | sed s@'\/\.\/'@'/'@g | sed s@'\/\.$'@@g)
+            if [ -e "${include_elt}" ] ; then
+                find ${include_elt} >> ${tar_manifest}
+            else
+                for elt in `ls ${source_path}/${include} 2> /dev/null || echo ""` ; do
+                    if [ -f ${elt} ] ; then
+                        echo ${elt} >> ${tar_manifest}
+                    else
+                        include_elt2=${source_path}/${elt}
+                        include_elt2=$(echo ${include_elt2} | sed s@'\/\.\/'@'/'@g | sed s@'\/\.$'@@g)
+                        find ${include_elt2} >> ${tar_manifest}
+                    fi
+                done
+            fi
+        done
+    fi
+
+    local tar_opts
+    if [ -f ${layer_tar} ] ; then
+        tar_opts="-r"
+    else
+        tar_opts="-c"
+    fi
+
+    if [ "${TAR_IMPL}" = "bsd" ] ; then
+        # BSD tar: use a view directory with a symbolic link
+        # i.e macOS
+        local tarview=$(mktemp -d ${WORKDIR}/tarview.XXX)/view
+        mkdir -p $(dirname ${tarview}/${target_path})
+        if [ -z "${target_path}" ] ; then
+            ln -fs ${source_path} ${tarview}
+        else
+            ln -fs ${source_path} ${tarview}/${target_path}
+        fi
+        while read f ; do
+            if [ ! -z "${f}" ] && [ -f "${f}" ] ; then
+                echo "${f}" | sed s@${source_path}@${target_path}@g
+            fi
+        done < ${tar_manifest} | tar  -H ${tar_opts} -vHpf ${layer_tar} --files-from - -C ${tarview} >&2
+    else
+        # GNU tar: use the transform no-recursion options
+        # i.e Linux
+        tar ${tar_opts} -vpf ${layer_tar} \
+            --files-from ${tar_manifest} \
+            --transform=s@$(remove_leading_slashes ${source_path})@${target_path}@g \
+            --no-recursion >&2
+    fi
+}
+
 # Create a layer
 readonly LAYER_ID=$(random_id)
 LAYERS[${#LAYERS[*]}]=${LAYER_ID}
 mkdir -p ${IMAGE_DIR}/${LAYER_ID}
-
-# List all files to include
-readonly TAR_MANIFEST=$(mktemp ${WORKDIR}/tarmanifest.XXX)
-echo "INFO: tar_manifest = ${TAR_MANIFEST}"
-if [ -z "${INCLUDES}" ] ; then
-    find ${SOURCE_PATH} | sed "1d" > ${TAR_MANIFEST}
-else
-    for include in ${INCLUDES} ; do
-        if [ -e "${SOURCE_PATH}/${include}" ] ; then
-            find ${SOURCE_PATH}/${include} >> ${TAR_MANIFEST}
-        else
-            for elt in `ls ${SOURCE_PATH}/${include} 2> /dev/null || echo ""` ; do
-                if [ -f ${elt} ] ; then
-                    echo ${elt} >> ${TAR_MANIFEST}
-                else
-                    find ${SOURCE_PATH}/${elt} >> ${TAR_MANIFEST}
-                fi
-            done
-        fi
-    done
-fi
-
-# Create the layer.tar file
 readonly LAYER_TAR="${IMAGE_DIR}/${LAYER_ID}/layer.tar"
 echo "INFO: creating ${LAYER_TAR}"
 
-if [ "${TAR_IMPL}" = "bsd" ] ; then
-    # BSD tar: use a view directory with a symbolic link
-    readonly TARVIEW=$(mktemp -d ${WORKDIR}/tarview.XXX)/view
-    mkdir -p $(dirname ${TARVIEW}/${TARGET_PATH})
-    if [ -z "${TARGET_PATH}" ] ; then
-        ln -fs ${SOURCE_PATH} ${TARVIEW}
-    else
-        ln -fs ${SOURCE_PATH} ${TARVIEW}/${TARGET_PATH}
-        TARGET_PATH_PREFIX="${TARGET_PATH}/"
-    fi
-    while read f ; do
-        if [ ! -z "${f}" ] && [ -f "${f}" ] ; then
-            echo "${f}" | sed s@${SOURCE_PATH}/@${TARGET_PATH_PREFIX}@g
-        fi
-    done < ${TAR_MANIFEST} | tar -cvpf ${LAYER_TAR} --files-from - -C ${TARVIEW} >&2
-else
-    # GNU tar: use the transform no-recursion options
-    tar -cvpf ${LAYER_TAR} \
-        --files-from ${TAR_MANIFEST} \
-        --transform=s@$(remove_leading_slashes ${SOURCE_PATH})@${TARGET_PATH}@g \
-        --no-recursion >&2
-fi
+for ((i=0;i<${#SOURCE_PATH_ARRAY[@]};i++))
+{
+    layer_tar_files ${LAYER_TAR} "${SOURCE_PATH_ARRAY[${i}]}" "${INCLUDES_ARRAY[${i}]}" "${TARGET_PATH_ARRAY[${i}]}"
+}
 
 gen_layer_metadata ${IMAGE_DIR} ${LAYER_ID}
 
