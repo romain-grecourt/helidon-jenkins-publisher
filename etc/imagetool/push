@@ -191,9 +191,9 @@ for ((i=0;i<${NUM_LAYERS};i++))
         -H "${AUTH_HEADER}" \
         -H "Content-Type: application/octet-stream" \
         "${UPLOAD_URL}"
+    is_http_status_or_die ${RESPONSE_HEADERS} 201
     blob_size
     DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
-    is_http_status_or_die ${RESPONSE_HEADERS} 201
 }
 
 # upload image config
