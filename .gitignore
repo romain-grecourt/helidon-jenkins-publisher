@@ -2,4 +2,6 @@ target
 .storage
 .cache
 .bin
+backend.pem.pub
+backend.pem
 nbproject
