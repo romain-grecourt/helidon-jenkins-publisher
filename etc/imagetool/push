@@ -183,7 +183,7 @@ for ((i=0;i<${NUM_LAYERS};i++))
     tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
     DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
-    echo "INFO: uploading_layer ${1}"
+    echo "INFO: uploading_layer ${DIGEST}"
     create_blob
     if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
         UPLOAD_URL="${UPLOAD_LOCATION}&digest=${DIGEST}"
