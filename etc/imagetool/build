@@ -28,7 +28,9 @@ source ${SCRIPT_DIR}/_common.sh
 usage(){
   cat <<EOF
 
-DESCRIPTION: Build a single layer image from a directory
+DESCRIPTION: Build a single layer image from a directory in the docker export format.
+
+See https://github.com/moby/moby/blob/master/image/spec/v1.2.md
 
 USAGE:
 
@@ -102,7 +104,7 @@ for ((i=0;i<${#ARGS[@]};i++))
         TPATH=${ARG#*=}
         TPATH=$(remove_leading_slashes ${TPATH})
         TPATH=$(remove_trailing_slashes ${TPATH})
-        readonly TARGET_PATH=${TPATH}
+        TARGET_PATH=${TPATH}
         ;;
     "--base="*)
         readonly BASE_IMAGE=${ARG#*=}
@@ -160,7 +162,6 @@ echo "INFO: building ${IMAGE_NAME} ..."
 
 readonly IMAGE_REPO=$(echo ${IMAGE_NAME} | cut -d ':' -f1)
 readonly IMAGE_TAG=$(echo ${IMAGE_NAME} | cut -d ':' -f2)
-readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
 echo "INFO: source = ${SOURCE_PATH}"
 if [ ! -z "${TARGET_PATH}" ] ; then
     echo "INFO: target_path = ${TARGET_PATH}"
@@ -168,40 +169,53 @@ fi
 echo "INFO: name = ${IMAGE_NAME}"
 echo "INFO: image_repo = ${IMAGE_REPO}"
 echo "INFO: image_tag = ${IMAGE_TAG}"
-echo "INFO: workdir = ${WORKDIR}"
 
-# contains all layer cache ids
+readonly IMAGE_DIR=$(mktemp -d ${WORKDIR}/imagedir.XXX)
+echo "INFO: image_dir = ${IMAGE_DIR}"
+
 LAYERS=( )
-# contains all layer digests
 DIGESTS=( )
-
-# contains the command
 CMD_ARRAY=( )
 
-process_base_layer() {
-    local image_dir=${1}
-    local digest=${2}
-
-    # copy layer tar
-    local layer_id=$(random_id)
-    mkdir ${WORKDIR}/${layer_id}
-    cp ${image_dir}/${digest##*:}/layer.tar ${WORKDIR}/${layer_id}/layer.tar
-    DIGESTS[${#DIGESTS[*]}]="sha256:$(${SHASUM} ${WORKDIR}/${layer_id}/layer.tar | cut -d ' ' -f1)"
-
-    # Add layer metadata
-    echo "1.0" > ${WORKDIR}/${layer_id}/VERSION
-    cat << EOF > ${WORKDIR}/${layer_id}/json
+gen_layer_metadata(){
+    echo "1.0" > ${1}/${2}/VERSION
+    cat << EOF > ${1}/${2}/json
 {
-  "id": "${layer_id}",
+  "id": "${2}",
   "architecture": "amd64",
   "os": "linux"
 }
 EOF
-    LAYERS[${#LAYERS[*]}]=${layer_id}
+}
+
+# Process base image
+if [ ! -z "${BASE_IMAGE}" ] ; then
+    readonly CACHEDIR="${SCRIPT_DIR}/.cache"
+    readonly BASE_IMGDIR="${CACHEDIR}/$(echo ${BASE_IMAGE} | ${SHASUM} | cut -d ' ' -f1)"
+    if ${DEBUG} ; then
+        PULL_EXTRA_OPTS="--v"
+    elif ${DEBUG2} ; then
+        PULL_EXTRA_OPTS="--vv"
+    fi
+    if [ ! -z "${STDERR}" ] ; then
+        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --stderr-file=${STDERR}"
+    fi
+    if [ ! -z "${BASE_REGISTRY_UNAME}" ] && [ ! -z "${BASE_REGISTRY_UPASSWD}" ] ; then
+        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --user=${BASE_REGISTRY_UNAME} --password=${BASE_REGISTRY_UPASSWD}"
+    fi
+    if [ ! -e ${BASE_IMGDIR} ] ; then
+        mkdir -p ${BASE_IMGDIR}
+        pull ${PULL_EXTRA_OPTS} \
+            --workdir=${WORKDIR} \
+            --registry-url=${BASE_REGISTRY_URL} \
+            --output-dir=${BASE_IMGDIR} \
+            --name=${BASE_IMAGE}
+    fi
+    readonly BASE_IMAGE_ID=$(jq -r '.config.digest' ${BASE_IMGDIR}/manifest.json | cut -d ':' -f2)
+    readonly BASE_CONFIG=${BASE_IMGDIR}/${BASE_IMAGE_ID}.json
 
     # get ENV from base image
-    local base_config="${image_dir}/$(cat ${image_dir}/manifest.json | jq -r '.config.digest' | cut -d ':' -f2).json"
-    for env in $(cat ${base_config} | jq -r '(.config.Env // [])[]')
+    for env in $(jq -r '(.config.Env // [])[]' ${BASE_CONFIG})
     do
         found=false
         for ((i=0;i<${#ENV_ARRAY[@]};i++))
@@ -221,39 +235,24 @@ EOF
     if [ ${#CMD_ARRAY[*]} -gt 0 ] ; then
         CMD_ARRAY=( )
     fi
-    for i in $(cat ${base_config} | jq -r '(.config.Cmd // [])|to_entries | .[].key')
+    for i in $(jq -r '(.config.Cmd // [])|to_entries | .[].key' ${BASE_CONFIG})
     do
-        CMD_ARRAY[${#CMD_ARRAY[*]}]=$(cat ${base_config} | jq -r ".config.Cmd[${i}]")
+        CMD_ARRAY[${#CMD_ARRAY[*]}]=$(jq -r ".config.Cmd[${i}]" ${BASE_CONFIG})
     done
-}
 
-# Process base image
-if [ ! -z "${BASE_IMAGE}" ] ; then
-    readonly CACHEDIR="${SCRIPT_DIR}/.cache"
-    readonly BASE_IMGDIR="${CACHEDIR}/$(echo ${BASE_IMAGE} | base64)"
-    if ${DEBUG} ; then
-        PULL_EXTRA_OPTS="--v"
-    elif ${DEBUG2} ; then
-        PULL_EXTRA_OPTS="--vv"
+    if ${LOAD} ; then
+        for i in $(jq '.layers | to_entries | .[].key' ${BASE_IMGDIR}/manifest.json)
+        do
+            BASE_LAYER_ID=$(jq -r ".layers[${i}].digest" ${BASE_IMGDIR}/manifest.json | cut -d ':' -f2)
+            BASE_LAYER_DIGEST=$(jq -r ".rootfs.diff_ids[${i}]" ${BASE_CONFIG})
+            LAYERS[${#LAYERS[*]}]=${BASE_LAYER_ID}
+            DIGESTS[${#DIGESTS[*]}]=${BASE_LAYER_DIGEST}
+
+            mkdir ${IMAGE_DIR}/${BASE_LAYER_ID}
+            cp ${BASE_IMGDIR}/${BASE_LAYER_ID}/layer.tar ${IMAGE_DIR}/${BASE_LAYER_ID}/layer.tar
+            gen_layer_metadata ${IMAGE_DIR} ${BASE_LAYER_ID}
+        done
     fi
-    if [ ! -z "${STDERR}" ] ; then
-        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --stderr-file=${STDERR}"
-    fi
-    if [ ! -z "${BASE_REGISTRY_UNAME}" ] && [ ! -z "${BASE_REGISTRY_UPASSWD}" ] ; then
-        PULL_EXTRA_OPTS="${PULL_EXTRA_OPTS} --user=${BASE_REGISTRY_UNAME} --password=${BASE_REGISTRY_UPASSWD}"
-    fi
-    if [ ! -e ${BASE_IMGDIR} ] ; then
-        mkdir -p ${BASE_IMGDIR}
-        bash ${SCRIPT_DIR}/pull ${PULL_EXTRA_OPTS} \
-            --registry-url=${BASE_REGISTRY_URL} \
-            --output-dir=${BASE_IMGDIR} \
-            --name=${BASE_IMAGE}
-    fi
-    readonly BASE_MANIFEST
-    for i in `cat ${BASE_IMGDIR}/manifest.json | jq '.layers | to_entries | .[].key'`
-    do
-        process_base_layer ${BASE_IMGDIR} $(cat ${BASE_IMGDIR}/manifest.json | jq -r ".layers[${i}].digest")
-    done
 fi
 
 # Add image cmd
@@ -270,10 +269,11 @@ fi
 
 # Create a layer
 readonly LAYER_ID=$(random_id)
-mkdir -p ${WORKDIR}/${LAYER_ID}
+LAYERS[${#LAYERS[*]}]=${LAYER_ID}
+mkdir -p ${IMAGE_DIR}/${LAYER_ID}
 
 # List all files to include
-readonly TAR_MANIFEST=$(mktemp -t "XXXtar-manifest")
+readonly TAR_MANIFEST=$(mktemp ${WORKDIR}/tarmanifest.XXX)
 echo "INFO: tar_manifest = ${TAR_MANIFEST}"
 if [ -z "${INCLUDES}" ] ; then
     find ${SOURCE_PATH} | sed "1d" > ${TAR_MANIFEST}
@@ -294,12 +294,12 @@ else
 fi
 
 # Create the layer.tar file
-readonly LAYER_TAR="${WORKDIR}/${LAYER_ID}/layer.tar"
+readonly LAYER_TAR="${IMAGE_DIR}/${LAYER_ID}/layer.tar"
 echo "INFO: creating ${LAYER_TAR}"
 
 if [ "${TAR_IMPL}" = "bsd" ] ; then
     # BSD tar: use a view directory with a symbolic link
-    readonly TARVIEW=$(mktemp -d -t "XXX${SCRIPT}")/view
+    readonly TARVIEW=$(mktemp -d ${WORKDIR}/tarview.XXX)/view
     mkdir -p $(dirname ${TARVIEW}/${TARGET_PATH})
     if [ -z "${TARGET_PATH}" ] ; then
         ln -fs ${SOURCE_PATH} ${TARVIEW}
@@ -320,22 +320,13 @@ else
         --no-recursion >&2
 fi
 
-# Add layer metadata
-echo "1.0" > ${WORKDIR}/${LAYER_ID}/VERSION
-cat << EOF > ${WORKDIR}/${LAYER_ID}/json
-{
-  "id": "${LAYER_ID}",
-  "architecture": "amd64",
-  "os": "linux"
-}
-EOF
+gen_layer_metadata ${IMAGE_DIR} ${LAYER_ID}
 
 readonly CREATED_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-readonly LAYER_DIGEST=$(${SHASUM} ${WORKDIR}/${LAYER_ID}/layer.tar | cut -d ' ' -f1)
-LAYERS[${#LAYERS[*]}]=${LAYER_ID}
+readonly LAYER_DIGEST=$(${SHASUM} ${IMAGE_DIR}/${LAYER_ID}/layer.tar | cut -d ' ' -f1)
 DIGESTS[${#DIGESTS[*]}]="sha256:${LAYER_DIGEST}"
 
-cat << EOF > ${WORKDIR}/config.json
+cat << EOF > ${IMAGE_DIR}/config.json
 {
   "architecture": "amd64",
   "created": "${CREATED_DATE}",
@@ -370,10 +361,10 @@ $(for ((i=0;i<${#DIGESTS[@]};i++))
 }
 EOF
 
-readonly IMAGE_ID=$(${SHASUM} ${WORKDIR}/config.json | cut -d ' ' -f1)
-mv ${WORKDIR}/config.json ${WORKDIR}/${IMAGE_ID}.json
+readonly IMAGE_ID=$(${SHASUM} ${IMAGE_DIR}/config.json | cut -d ' ' -f1)
+mv ${IMAGE_DIR}/config.json ${IMAGE_DIR}/${IMAGE_ID}.json
 
-cat << EOF > ${WORKDIR}/repositories
+cat << EOF > ${IMAGE_DIR}/repositories
 {
   "${IMAGE_REPO}": {
     "${IMAGE_TAG}": "${CACHE_ID}"
@@ -381,7 +372,7 @@ cat << EOF > ${WORKDIR}/repositories
 }
 EOF
 
-cat << EOF > ${WORKDIR}/manifest.json
+cat << EOF > ${IMAGE_DIR}/manifest.json
 [
   {
     "Config": "${IMAGE_ID}.json",
@@ -402,20 +393,16 @@ EOF
 if [ ! -z "${OUTPUT_FILE}" ] ; then
     readonly IMAGE_TAR="${OUTPUT_FILE}"
 else
-    readonly IMAGE_TAR="$(mktemp -t XXX${SCRIPT}).tar"
+    readonly IMAGE_TAR=$(mktemp ${WORKDIR}/imagetar.XXX).tar
 fi
 
 echo "INFO: creating ${IMAGE_TAR}"
-tar -cvf ${IMAGE_TAR} -C ${WORKDIR} . >&2
+tar -cvf ${IMAGE_TAR} -C ${IMAGE_DIR} . >&2
 
 # load the image
 if ${LOAD} ; then
     echo "INFO: loading the image to Docker"
-    if ${DEBUG} || ${DEBUG2}; then
-        docker load -i ${IMAGE_TAR}
-    else
-        docker load -i ${IMAGE_TAR} 1> /dev/null
-    fi
+    docker load -i ${IMAGE_TAR} 1>&2
 fi
 
 if ${LOAD} && [ -z "${OUTPUT_FILE}" ] ; then

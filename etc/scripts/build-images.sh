@@ -110,6 +110,7 @@ if ${LOAD} ; then
     BUILD_OPTS="--load"
 fi
 
+EXTRA_OPTS="--workdir=${WORKDIR}"
 if ${DEBUG} ; then
     EXTRA_OPTS="${EXTRA_OPTS} --v"
 elif ${DEBUG2} ; then
@@ -129,12 +130,12 @@ echo "INFO: workdir = ${WORKDIR}"
 
 echo "INFO: building frontend-ui image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file="${WORKDIR}/frontend-ui-image.tar" \
-    --path="${WS_DIR}/frontend-ui/dist" \
-    --target="/usr/share/nginx/html" \
     --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
-    --base="library/nginx:${NGINX_VERSION}"
+    --base="library/nginx:${NGINX_VERSION}" \
+    --path="${WS_DIR}/frontend-ui/dist" \
+    --target="/usr/share/nginx/html" \
+    --output-file="${WORKDIR}/frontend-ui-image.tar"
 
 readonly JAVA_CMD_OPTS=`cat << EOF > /dev/stdout
     -server \
@@ -149,25 +150,25 @@ EOF`
 
 echo "INFO: building frontend-api image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file="${WORKDIR}/frontend-api-image.tar" \
+    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG}" \
+    --base-registry-url="https://registry-1.docker.io/v2" \
+    --base="library/openjdk:${OPENJDK_VERSION}" \
     --path="${WS_DIR}/frontend-api/target" \
     --target="/app" \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-frontend-api.jar" \
-    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG}" \
-    --base-registry-url="https://registry-1.docker.io/v2" \
-    --base="library/openjdk:${OPENJDK_VERSION}"
+    --output-file="${WORKDIR}/frontend-api-image.tar"
 
 echo "INFO: building backend image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --output-file="${WORKDIR}/backend-image.tar" \
+    --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG}" \
+    --base-registry-url="https://registry-1.docker.io/v2" \
+    --base="library/openjdk:${OPENJDK_VERSION}" \
     --path="${WS_DIR}/backend/target" \
     --target="/app" \
     --includes="*.jar libs" \
     --cmd="java ${JAVA_CMD_OPTS} -jar /app/helidon-build-publisher-backend.jar" \
-    --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG}" \
-    --base-registry-url="https://registry-1.docker.io/v2" \
-    --base="library/openjdk:${OPENJDK_VERSION}"
+    --output-file="${WORKDIR}/backend-image.tar"
 
 if ${PUSH} ; then
     PUSH_OPTS="--registry-url=${REGISTRY_URL}"

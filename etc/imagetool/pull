@@ -28,7 +28,9 @@ source ${SCRIPT_DIR}/_common.sh
 usage(){
   cat <<EOF
 
-DESCRIPTION: Pull an image from a remote registry
+DESCRIPTION: Pull an image from a remote registry.
+
+https://docs.docker.com/registry/spec/api
 
 USAGE:
 
@@ -71,6 +73,8 @@ for ((i=0;i<${#ARGS[@]};i++))
   esac
 }
 
+common_init
+
 if [ -z "${IMAGE_FULL_NAME}" ] ; then
     echo "ERROR: --name option is required"
     exit 1
@@ -78,13 +82,11 @@ elif [ -z "${REGISTRY_URL}" ] ; then
     echo "ERROR: --registry-url option is required"
     exit 1
 elif [ -z "${OUTPUT_DIR}" ] ; then
-    readonly OUTPUT_DIR=$(mktemp -d -t "XXX${SCRIPT}")
+    readonly OUTPUT_DIR=$(mktemp -d ${WORKDIR}/outputdir.XXX)
 elif [ ! -d "${OUTPUT_DIR}" ] ; then
     echo "ERROR: ${OUTPUT_DIR} is not a valid directory"
     exit 1
 fi
-
-common_init
 
 readonly IMAGE_NAME=${IMAGE_FULL_NAME%%:*}
 readonly IMAGE_TAG=${IMAGE_FULL_NAME##*:}
@@ -105,8 +107,9 @@ fi
 if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
     AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
 fi
-readonly TOKEN_FILE=$(mktemp -t XXX-token})
-${SCRIPT_DIR}/auth ${AUTH_EXTRA_OPTS} \
+readonly TOKEN_FILE=$(mktemp ${WORKDIR}/accesstoken.XXX)
+auth ${AUTH_EXTRA_OPTS} \
+    --workdir=${WORKDIR} \
     --registry-url=${REGISTRY_URL} \
     --repository=${IMAGE_NAME} \
     --scopes="pull" \
@@ -116,10 +119,10 @@ readonly TOKEN=$(cat ${TOKEN_FILE})
 readonly AUTH_HEADER="Authorization: Bearer ${TOKEN}"
 
 readonly IMAGE_MANIFEST="${OUTPUT_DIR}/manifest.json"
-RESPONSE_HEADERS=$(mktemp -t XXX})
+RESPONSE_HEADERS=$(mktemp ${WORKDIR}/responseheaders.XXX)
 
 # download manifest
-curl -v -X GET \
+curl -v -L -X GET \
     -o ${IMAGE_MANIFEST} \
     -D ${RESPONSE_HEADERS} \
     -H "${AUTH_HEADER}" \
@@ -128,14 +131,17 @@ curl -v -X GET \
 is_http_status_or_die ${RESPONSE_HEADERS} 200
 
 # download image config
-readonly IMAGE_CONFIG="$(cat ${IMAGE_MANIFEST} | jq -r '.config.digest' | cut -d ':' -f2).json"
+readonly IMAGE_CONFIG="$(jq -r '.config.digest' ${IMAGE_MANIFEST} | cut -d ':' -f2).json"
 curl -v -L -X GET \
     -o ${OUTPUT_DIR}/${IMAGE_CONFIG} \
     -D ${RESPONSE_HEADERS} \
     -H "${AUTH_HEADER}" \
-    -H "Accept: $(cat ${IMAGE_MANIFEST} | jq -r '.config.mediaType')" \
-    "${API_URL_BASE}/blobs/$(cat ${IMAGE_MANIFEST} | jq -r '.config.digest')"
+    -H "Accept: $(jq -r '.config.mediaType' ${IMAGE_MANIFEST})" \
+    "${API_URL_BASE}/blobs/$(jq -r '.config.digest' ${IMAGE_MANIFEST})"
 is_http_status_or_die ${RESPONSE_HEADERS} 200
+
+echo ${IMAGE_NAME} > ${OUTPUT_DIR}/IMAGE_NAME
+echo ${IMAGE_TAG} > ${OUTPUT_DIR}/IMAGE_TAG
 
 get_layer() {
     local digest=${1}
@@ -157,10 +163,10 @@ get_layer() {
 
 # download layers
 echo "INFO: downloading layers..."
-for i in `cat ${IMAGE_MANIFEST} | jq '.layers | to_entries | .[].key'`
+for i in $(jq '.layers | to_entries | .[].key' ${IMAGE_MANIFEST})
 do
-    get_layer $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].digest") \
-              $(cat ${IMAGE_MANIFEST} | jq -r ".layers[${i}].mediaType")
+    get_layer $(jq -r ".layers[${i}].digest" ${IMAGE_MANIFEST}) \
+              $(jq -r ".layers[${i}].mediaType" ${IMAGE_MANIFEST})
 done
 
 echo "INFO: image pull completed"

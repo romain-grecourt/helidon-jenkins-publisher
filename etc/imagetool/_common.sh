@@ -20,11 +20,7 @@ set -o errtrace || true # trace ERR through commands and functions
 set -o errexit || true  # exit the script if any statement returns a non-true return value
 
 on_error(){
-    if [ ! -z "${STDERR}" ] && [ -e ${STDERR} ] && [ $(wc -l ${STDERR} | awk '{print $1}') -gt 0 ] ; then
-        echo "----------------------ERROR------------------------"
-        tail -100 ${STDERR}
-        echo "----------------------ERROR------------------------"
-    fi
+    echo "ERROR: command: ${BASH_COMMAND}"
 }
 trap on_error ERR
 
@@ -44,6 +40,10 @@ common_process_args(){
         ;;
     "--stderr-file="*)
         STDERR=${ARG#*=}
+        return 0
+        ;;
+    "--workdir="*)
+        WORKDIR=${ARG#*=}
         return 0
         ;;
     *)
@@ -77,8 +77,11 @@ common_usage(){
   --vv
           Print stderr output and set -x
 
-  --stderr-file
+  --stderr-file=FILE
           File to capture stderr when not in debug mode.
+
+  --workdir=DIR
+          Parent directory where to create all files.
 
   --help
           Prints the usage and exits.
@@ -98,8 +101,12 @@ EOF
 }
 
 common_init(){
+    if [ -z "${WORKDIR}" ] ; then
+        WORKDIR=$(mktemp -d -t ${SCRIPT}.XXX)
+        echo "INFO: workdir = ${WORKDIR}"
+    fi
     if [ -z "${STDERR}" ] ; then
-        STDERR=$(mktemp -t XXX-stderr)
+        STDERR=$(mktemp ${WORKDIR}/stderr.XXX)
         echo "INFO: redirecting stderr to ${STDERR}"
     fi
     if [ -z "${DEBUG}" ] ; then
@@ -114,9 +121,8 @@ common_init(){
         exec 2>> ${STDERR}
         DEBUG2=false
     fi
-
     BINDIR="${SCRIPT_DIR}/.bin"
-    export PATH=${PATH}:${BINDIR}
+    export PATH=${SCRIPT_DIR}:${BINDIR}:${PATH}
     if ! type jq > /dev/null 2>&1; then
         echo "INFO: installing jq.."
         mkdir -p ${BINDIR}
@@ -203,8 +209,8 @@ random_id(){
 }
 
 is_http_status_or_die() {
-    local status=$(grep 'HTTP/1.1 ' ${1} | tail -1)
-    if ! [[ "${status}" =~ ^HTTP/1.(0|1)\ "${2}" ]] ; then
+    local status=$(egrep "^HTTP/" ${1} | tail -1)
+    if ! [[ "${status}" =~ ^HTTP/(1|2)(\.)?(0|1)?\ "${2}" ]] ; then
         echo "ERROR: Unexpected response: ${status}"
         exit 1
     fi

@@ -28,7 +28,9 @@ source ${SCRIPT_DIR}/_common.sh
 usage(){
   cat <<EOF
 
-DESCRIPTION: Push an image tar to a remote registry
+DESCRIPTION: Push an image tar to a remote registry.
+
+See https://docs.docker.com/registry/spec/api
 
 USAGE:
 
@@ -114,8 +116,9 @@ fi
 if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
     AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
 fi
-readonly TOKEN_FILE=$(mktemp -t XXX-token})
-${SCRIPT_DIR}/auth ${AUTH_EXTRA_OPTS} \
+readonly TOKEN_FILE=$(mktemp ${WORKDIR}/accesstoken.XXX)
+auth ${AUTH_EXTRA_OPTS} \
+    --workdir=${WORKDIR} \
     --registry-url=${REGISTRY_URL} \
     --repository=${IMAGE_NAME} \
     --scopes="push,pull" \
@@ -155,11 +158,11 @@ blob_size(){
     BLOB_SIZE=$(get_header "Content-Length" ${RESPONSE_HEADERS})
 }
 
-readonly IMAGE_MANIFEST="$(mktemp -t XXX}).json"
+readonly IMAGE_MANIFEST=$(mktemp ${WORKDIR}/imagemanifest.XXX).json
 tar --to-stdout -xf ${IMAGE_TAR} ./manifest.json > ${IMAGE_MANIFEST}
 echo "INFO: image_manifest=${IMAGE_MANIFEST}"
 
-readonly IMAGE_CONFIG="$(mktemp -t XXX}).json"
+readonly IMAGE_CONFIG=$(mktemp ${WORKDIR}/imageconfig.XXX).json
 readonly IMAGE_CONFIG_ENTRY=$(jq -r '.[0].Config' ${IMAGE_MANIFEST})
 tar --to-stdout -xf ${IMAGE_TAR} ./${IMAGE_CONFIG_ENTRY} > ${IMAGE_CONFIG}
 echo "INFO: image_config=${IMAGE_CONFIG}"
@@ -167,8 +170,7 @@ echo "INFO: image_config=${IMAGE_CONFIG}"
 readonly IMAGE_CONFIG_DIGEST="sha256:${IMAGE_CONFIG_ENTRY%%.json}"
 echo "INFO: image_config_digest=${IMAGE_CONFIG_DIGEST}"
 
-readonly RESPONSE_HEADERS=$(mktemp -t XXX})
-readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
+readonly RESPONSE_HEADERS=$(mktemp ${WORKDIR}/responseheaders.XXX)
 readonly CACHEDIR="${SCRIPT_DIR}/.cache"
 
 # upload layers
@@ -178,30 +180,36 @@ DIGEST_SIZES=( )
 for ((i=0;i<${NUM_LAYERS};i++))
 {
     LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
-    # TODO cross post the blob for layers > 0
-    # search for layer in cache
-    # SEARCH_RESULT=$(grep ${LAYER} -r ${CACHEDIR} --include '*.json' | cut -d ':' -f1)
-    # CACHED_IMAGE_NAME=$(basename $(dirname ${SEARCH_RESULT}) | base64 --decode)
-    # POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
-
     tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
     DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
-    echo "INFO: uploading_layer ${DIGEST}"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
-    create_blob
-    if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
-        UPLOAD_URL="${UPLOAD_LOCATION}&digest=${DIGEST}"
+    SEARCH_RESULT=$(grep ${LAYER} -r ${CACHEDIR} --include '*.json' | cut -d ':' -f1 | head -1)
+    if [ -z "${SEARCH_RESULT}" ] ; then
+        echo "INFO: uploading_layer ${DIGEST}"
+        create_blob
+        if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
+            UPLOAD_URL="${UPLOAD_LOCATION}&digest=${DIGEST}"
+        else
+            UPLOAD_URL="${UPLOAD_LOCATION}?digest=${DIGEST}"
+        fi
+        curl -v -X PUT --data-binary @${WORKDIR}/layer.tar \
+            -D ${RESPONSE_HEADERS} \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/octet-stream" \
+            "${UPLOAD_URL}"
+        is_http_status_or_die ${RESPONSE_HEADERS} 201
+        blob_size
+        DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
     else
-        UPLOAD_URL="${UPLOAD_LOCATION}?digest=${DIGEST}"
+        echo "INFO: cross_posting ${DIGEST}"
+        CACHED_IMAGE_DIR=$(dirname ${SEARCH_RESULT})
+        CACHED_IMAGE_NAME="$(cat ${CACHED_IMAGE_DIR}/IMAGE_NAME)"
+        curl -v -X POST \
+            -D ${RESPONSE_HEADERS} \
+            -H "${AUTH_HEADER}" \
+            "${API_URL_BASE}/blobs/uploads/?mount=${DIGEST}&from=${CACHED_IMAGE_NAME}"
+        is_http_status_or_die ${RESPONSE_HEADERS} 201
     fi
-    curl -v -X PUT --data-binary @${WORKDIR}/layer.tar \
-        -D ${RESPONSE_HEADERS} \
-        -H "${AUTH_HEADER}" \
-        -H "Content-Type: application/octet-stream" \
-        "${UPLOAD_URL}"
-    is_http_status_or_die ${RESPONSE_HEADERS} 201
-    blob_size
-    DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
 }
 
 # upload image config
@@ -223,7 +231,7 @@ readonly CONFIG_SIZE=${BLOB_SIZE}
 echo "INFO: config_size=${CONFIG_SIZE}"
 
 # create distribution manifest
-readonly DISTRIBUTION_MANIFEST="$(mktemp -t XXX}).json"
+readonly DISTRIBUTION_MANIFEST=$(mktemp ${WORKDIR}/distributionmanifest.XXX).json
 echo "INFO: distribution_manifest=${DISTRIBUTION_MANIFEST}"
 cat << EOF > ${DISTRIBUTION_MANIFEST}
 {
