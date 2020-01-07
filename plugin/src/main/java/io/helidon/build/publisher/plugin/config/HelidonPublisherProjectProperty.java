@@ -25,10 +25,10 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
     private final boolean excludeSyntheticSteps;
 
     @DataBoundConstructor
-    public HelidonPublisherProjectProperty(String serverUrl, String branchExcludes, boolean excludeMetaSteps,
+    public HelidonPublisherProjectProperty(String serverName, String branchExcludes, boolean excludeMetaSteps,
             boolean excludeSyntheticSteps) {
 
-        this.server = HelidonPublisherServer.validate(serverUrl);
+        this.server = HelidonPublisherServer.validate(serverName);
         this.branchExcludes = branchExcludes;
         this.excludeMetaSteps = excludeMetaSteps;
         this.excludeSyntheticSteps = excludeMetaSteps;
@@ -74,10 +74,10 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
         public static final String PROJECT_BLOCK_NAME = "helidonProjectPublisher";
 
         @SuppressWarnings("unused") // used by stapler
-        public ListBoxModel doFillServerUrlItems(@AncestorInPath AbstractFolder<?> folder) {
+        public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
-                items.add(server.getServerUrl());
+                items.add(server.getName());
             }
             return items;
         }

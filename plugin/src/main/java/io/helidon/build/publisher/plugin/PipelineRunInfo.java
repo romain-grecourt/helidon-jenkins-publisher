@@ -42,7 +42,7 @@ final class PipelineRunInfo {
     final String title;
     final SCMInfo scmInfo;
     final String repositoryUrl;
-    final String publisherServerUrl;
+    final String publisherApiUrl;
     final String credentialsId;
     final int publisherClientThreads;
     final long startTime;
@@ -55,7 +55,7 @@ final class PipelineRunInfo {
         title = null;
         repositoryUrl = null;
         scmInfo = null;
-        publisherServerUrl = null;
+        publisherApiUrl = null;
         credentialsId = null;
         startTime = 0;
     }
@@ -122,11 +122,11 @@ final class PipelineRunInfo {
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
             if (server != null) {
-                publisherServerUrl = server.getServerUrl();
+                publisherApiUrl = server.getApiUrl();
                 credentialsId = server.getCredentialsId();
                 publisherClientThreads = server.getNthread();
             } else {
-                publisherServerUrl = null;
+                publisherApiUrl = null;
                 credentialsId = null;
                 publisherClientThreads = 5;
             }
@@ -134,7 +134,7 @@ final class PipelineRunInfo {
         } else {
             id = null;
             credentialsId = null;
-            publisherServerUrl = null;
+            publisherApiUrl = null;
             publisherClientThreads = 0;
             excludeSyntheticSteps = true;
             excludeMetaSteps = true;
@@ -172,11 +172,11 @@ final class PipelineRunInfo {
             excludeMetaSteps = prop.isExcludeMetaSteps();
             HelidonPublisherServer server = prop.getServer();
             if (server != null) {
-                publisherServerUrl = server.getServerUrl();
+                publisherApiUrl = server.getApiUrl();
                 credentialsId = server.getCredentialsId();
                 publisherClientThreads = server.getNthread();
             } else {
-                publisherServerUrl = null;
+                publisherApiUrl = null;
                 publisherClientThreads = 5;
                 credentialsId = null;
             }
@@ -184,7 +184,7 @@ final class PipelineRunInfo {
         } else {
             id = null;
             credentialsId = null;
-            publisherServerUrl = null;
+            publisherApiUrl = null;
             publisherClientThreads = 0;
             excludeSyntheticSteps = true;
             excludeMetaSteps = true;
@@ -217,7 +217,7 @@ final class PipelineRunInfo {
                 + ", title=" + title
                 + ", repositoryUrl=" + repositoryUrl
                 + ", scmIfno=" + scmInfo
-                + ", publisherServerUrl=" + publisherServerUrl
+                + ", publisherServerUrl=" + publisherApiUrl
                 + ", publisherClientThreads=" + publisherClientThreads
                 + ", excludeSyntheticSteps=" + excludeSyntheticSteps
                 + ", excludeMetaSteps=" + excludeMetaSteps

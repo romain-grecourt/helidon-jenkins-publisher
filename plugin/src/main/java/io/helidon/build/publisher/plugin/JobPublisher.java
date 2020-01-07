@@ -56,8 +56,8 @@ public final class JobPublisher {
             }
             enabled = true;
             pipelineId = runInfo.id;
-            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
-            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherApiUrl);
+            client = BackendClient.getOrCreate(runInfo.publisherApiUrl, runInfo.publisherClientThreads, pkey);
             GlobalStatus status = new GlobalStatus(run);
             GlobalTimings timings = new GlobalTimings(run);
             pipeline = new Pipeline(runInfo.toPipelineInfo(status, timings));

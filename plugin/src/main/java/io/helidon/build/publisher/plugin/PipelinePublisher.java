@@ -54,8 +54,8 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
         WorkflowRun run = Helper.getRun(execution.getOwner());
         if (run.isBuilding() && runInfo.id != null) {
             enabled = true;
-            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
-            client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherApiUrl);
+            client = BackendClient.getOrCreate(runInfo.publisherApiUrl, runInfo.publisherClientThreads, pkey);
             excludeSyntheticSteps = runInfo.excludeSyntheticSteps;
             excludeMetaSteps = runInfo.excludeMetaSteps;
             pipelineId = runInfo.id;
@@ -223,8 +223,8 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
                     result
                 });
             }
-            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherServerUrl);
-            BackendClient client = BackendClient.getOrCreate(runInfo.publisherServerUrl, runInfo.publisherClientThreads, pkey);
+            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherApiUrl);
+            BackendClient client = BackendClient.getOrCreate(runInfo.publisherApiUrl, runInfo.publisherClientThreads, pkey);
             client.onEvent(new PipelineCompletedEvent(runInfo.id, result, run.getDuration()));
         }
 

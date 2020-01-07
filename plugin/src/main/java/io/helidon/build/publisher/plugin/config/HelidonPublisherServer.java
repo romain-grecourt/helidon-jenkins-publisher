@@ -39,19 +39,55 @@ import org.kohsuke.stapler.DataBoundConstructor;
  */
 public final class HelidonPublisherServer extends AbstractDescribableImpl<HelidonPublisherServer> {
 
-    private final String serverUrl;
+    private final String name;
+    private final String apiUrl;
+    private final String publicUrl;
     private final String credentialsId;
     private final int nthread;
 
     @DataBoundConstructor
-    public HelidonPublisherServer(String serverUrl, String credentialsId, int nThreads) {
+    public HelidonPublisherServer(String name, String apiUrl, String publicUrl, String credentialsId, int nThreads) {
+        name = Util.fixEmptyAndTrim(name);
+        if (name == null) {
+            throw new AssertionError("Name cannot be empty");
+        }
+        this.name = name;
         this.credentialsId = credentialsId;
         this.nthread = nThreads > 0 ? nThreads : 5;
-        serverUrl =  Util.fixEmptyAndTrim(serverUrl);
-        if (serverUrl == null) {
+        apiUrl =  Util.fixEmptyAndTrim(apiUrl);
+        if (apiUrl == null) {
             throw new AssertionError("URL cannot be empty");
         }
-        this.serverUrl = serverUrl;
+        this.apiUrl = apiUrl;
+        publicUrl =  Util.fixEmptyAndTrim(publicUrl);
+        if (publicUrl == null) {
+            throw new AssertionError("URL cannot be empty");
+        }
+        this.publicUrl = publicUrl;
+    }
+
+    /**
+     * Get the server name.
+     * @return String
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Get the API URL for this server.
+     * @return String
+     */
+    public String getApiUrl() {
+        return apiUrl;
+    }
+
+    /**
+     * Get the public URL for this server.
+     * @return String
+     */
+    public String getPublicUrl() {
+        return publicUrl;
     }
 
     /**
@@ -60,14 +96,6 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
      */
     public String getCredentialsId() {
         return credentialsId;
-    }
-
-    /**
-     * Get the URL for this server.
-     * @return String
-     */
-    public String getServerUrl() {
-        return this.serverUrl;
     }
 
     /**
@@ -118,14 +146,14 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     }
 
     /**
-     * Trims and matches the given input URL.
+     * Trims and matches the given input API URL.
      *
-     * @param serverUrl input
-     * @return valid URL or {@code null} if the input is empty or the URL doesn't match a server in the global configuration
+     * @param name input name
+     * @return HelidonPublisherServer or {@code null} if the input is empty or the name doesn't match a server in the global configuration
      */
-    static HelidonPublisherServer validate(String serverUrl) {
-        serverUrl = Util.fixEmptyAndTrim(serverUrl);
-        return HelidonPublisherServer.get(serverUrl);
+    static HelidonPublisherServer validate(String name) {
+        name = Util.fixEmptyAndTrim(name);
+        return HelidonPublisherServer.get(name);
     }
 
     /**
@@ -155,15 +183,15 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     }
 
     /**
-     * Get an instance of {@link HelidonPublisherServer} that matches the given input URL.
-     * @param serverUrl input
-     * @return HelidonPublisherServer or {@code null} if the URL doesn't match a server in the global configuration
+     * Get an instance of {@link HelidonPublisherServer} that matches the given name.
+     * @param name input name
+     * @return HelidonPublisherServer or {@code null} if the name doesn't match a server in the global configuration
      */
-    static HelidonPublisherServer get(String serverUrl) {
-        serverUrl = Util.fixEmptyAndTrim(serverUrl);
+    static HelidonPublisherServer get(String name) {
+        name = Util.fixEmptyAndTrim(name);
         List<HelidonPublisherServer> servers = HelidonPublisherGlobalConfiguration.get().getServers();
         for(HelidonPublisherServer server : servers) {
-            if (server.getServerUrl().equals(serverUrl)) {
+            if (server.getName().equals(name)) {
                 return server;
             }
         }
@@ -174,8 +202,24 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     public static class DescriptorImpl extends Descriptor<HelidonPublisherServer> {
 
         @SuppressWarnings("unused") // used by stapler
-        public FormValidation doCheckUrl(@QueryParameter String value) throws IOException, ServletException {
+        public FormValidation doCheckName(@QueryParameter String name) throws IOException, ServletException {
+            if (Util.fixEmptyAndTrim(name) == null) {
+                return FormValidation.error("Name cannot be empty");
+            }
+            return FormValidation.ok();
+        }
 
+        @SuppressWarnings("unused") // used by stapler
+        public FormValidation doCheckApiUrl(@QueryParameter String value) throws IOException, ServletException {
+            return checkUrl(value);
+        }
+
+        @SuppressWarnings("unused") // used by stapler
+        public FormValidation doCheckPublicUrl(@QueryParameter String value) throws IOException, ServletException {
+            return checkUrl(value);
+        }
+
+        private static FormValidation checkUrl(String value) {
             if (Util.fixEmptyAndTrim(value) == null) {
                 return FormValidation.ok();
             }
@@ -189,18 +233,18 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
 
         @SuppressWarnings("unused") // used by stapler
         @RequirePOST
-        public FormValidation doVerifyCredentials(@QueryParameter String serverUrl, @QueryParameter String credentialsId) {
+        public FormValidation doVerifyCredentials(@QueryParameter String apiUrl, @QueryParameter String credentialsId) {
             Jenkins.get().checkPermission(Jenkins.ADMINISTER);
             try {
-                serverUrl = Util.fixEmpty(serverUrl);
-                if (serverUrl == null) {
+                apiUrl = Util.fixEmpty(apiUrl);
+                if (apiUrl == null) {
                     return FormValidation.error("No URL given");
                 }
-                String pkey = lookupCredentials(Util.fixEmpty(credentialsId), serverUrl);
+                String pkey = lookupCredentials(Util.fixEmpty(credentialsId), apiUrl);
                 if (pkey == null) {
                     return FormValidation.error("Credentials not found");
                 }
-                int code = HttpSignatureHelper.test(new URL(serverUrl), pkey);
+                int code = HttpSignatureHelper.test(new URL(apiUrl), pkey);
                 if (code == 401) {
                     return FormValidation.error("Unauthorized");
                 } else if (code == 404) {
@@ -209,7 +253,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
                     return FormValidation.error("Unexpected response code: " + code);
                 }
             } catch (MalformedURLException ex) {
-                return FormValidation.error(String.format("Malformed URL (%s)", serverUrl), ex);
+                return FormValidation.error(String.format("Malformed URL (%s)", apiUrl), ex);
             } catch (URISyntaxException | IOException ex) {
                 return FormValidation.error(ex.getMessage(), ex);
             }
@@ -241,7 +285,8 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     @Override
     public String toString() {
         return "{"
-                + " serverUrl=" + serverUrl
+                + " apiUrl=" + apiUrl
+                + ", publicUrl=" + publicUrl
                 + ", nthreads=" + nthread
                 + ", credentialId=" + (credentialsId == null ? "null" : credentialsId)
                 + " }";

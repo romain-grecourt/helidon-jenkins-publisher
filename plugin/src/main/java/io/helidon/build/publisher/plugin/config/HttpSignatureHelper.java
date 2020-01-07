@@ -2,6 +2,7 @@ package io.helidon.build.publisher.plugin.config;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -30,7 +31,11 @@ public class HttpSignatureHelper {
      * @throws URISyntaxException if an error occurs when converting the URL to a URI
      */
     public static int test(URL url, String key) throws IOException, URISyntaxException {
-        URL testUrl = url.toURI().resolve("/ping").toURL();
+        String rawUrl = url.toExternalForm();
+        if (rawUrl.endsWith("/")) {
+            rawUrl = rawUrl.substring(0, rawUrl.length() - 2);
+        }
+        URL testUrl = URI.create(rawUrl + "/ping").toURL();
         URLConnection con = testUrl.openConnection();
         if (!(con instanceof HttpURLConnection)) {
             throw new IllegalStateException("Not an HttpURLConnection");

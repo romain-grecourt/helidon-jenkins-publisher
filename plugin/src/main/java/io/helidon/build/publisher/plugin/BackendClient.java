@@ -65,6 +65,9 @@ final class BackendClient implements PipelineEventListener {
         if (nThreads <= 0) {
             throw new IllegalArgumentException("invalid thread size: " + nThreads);
         }
+        if (!serverUrl.endsWith("/")) {
+            serverUrl += "/";
+        }
         URI uri = URI.create(serverUrl);
         synchronized(CLIENTS) {
             BackendClient client = CLIENTS.get(serverUrl);
@@ -279,7 +282,7 @@ final class BackendClient implements PipelineEventListener {
                 events.add(error);
             }
 
-            URL url = serverUri.resolve("/events/").toURL();
+            URL url = serverUri.resolve("events").toURL();
 
             if (LOGGER.isLoggable(Level.FINEST)) {
                 LOGGER.log(Level.FINEST, "Sending events, queueId={0}, url={1}, events={2}", new Object[]{
@@ -319,7 +322,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event to process
          */
         private void processOutputEvent(StepOutputDataEvent event) throws IOException {
-            URL url = serverUri.resolve("/output/"
+            URL url = serverUri.resolve("output/"
                     + event.pipelineId()
                     + "/"
                     + event.stepId())
@@ -383,7 +386,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event
          */
         private void processTestSuiteEvent(TestSuiteResultEvent event) throws IOException {
-            URL url = serverUri.resolve("/files/"
+            URL url = serverUri.resolve("files/"
                     + event.pipelineId()
                     + "/"
                     + event.stepsId()
@@ -430,7 +433,7 @@ final class BackendClient implements PipelineEventListener {
          * @param event event to process
          */
         private void processArtifactEvent(ArtifactDataEvent event) throws IOException {
-            URL url = serverUri.resolve("/files/"
+            URL url = serverUri.resolve("files/"
                     + event.pipelineId()
                     + "/"
                     + event.stepsId()

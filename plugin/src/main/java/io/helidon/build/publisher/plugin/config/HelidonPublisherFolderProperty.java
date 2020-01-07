@@ -24,10 +24,10 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
     private final boolean excludeSyntheticSteps;
 
     @DataBoundConstructor
-    public HelidonPublisherFolderProperty(String serverUrl, String branchExcludes, boolean excludeMetaSteps,
+    public HelidonPublisherFolderProperty(String serverName, String branchExcludes, boolean excludeMetaSteps,
             boolean excludeSyntheticSteps) {
 
-        this.server = HelidonPublisherServer.validate(serverUrl);
+        this.server = HelidonPublisherServer.validate(serverName);
         this.branchExcludes = branchExcludes;
         this.excludeMetaSteps = excludeMetaSteps;
         this.excludeSyntheticSteps = excludeSyntheticSteps;
@@ -74,10 +74,10 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
         public static final String FOLDER_BLOCK_NAME = "helidonFolderPublisher";
 
         @SuppressWarnings("unused") // used by stapler
-        public ListBoxModel doFillServerUrlItems(@AncestorInPath AbstractFolder<?> folder) {
+        public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
-                items.add(server.getServerUrl());
+                items.add(server.getName());
             }
             return items;
         }

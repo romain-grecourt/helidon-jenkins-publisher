@@ -3,7 +3,15 @@ package io.helidon.build.publisher.plugin.config.HelidonPublisherServer
 def f = namespace(lib.FormTagLib);
 def c = namespace(lib.CredentialsTagLib)
 
-f.entry(title: _("Server URL"), field: "serverUrl") {
+f.entry(title: _("Server Name"), field: "name") {
+    f.textbox()
+}
+
+f.entry(title: _("API URL"), field: "apiUrl") {
+    f.textbox()
+}
+
+f.entry(title: _("Public URL"), field: "publicUrl") {
     f.textbox()
 }
 
@@ -16,7 +24,7 @@ f.block() {
             title: _("Test connection"),
             progress: _("Testing..."),
             method: "verifyCredentials",
-            with: "serverUrl,credentialsId"
+            with: "apiUrl,credentialsId"
     )
 }
 

@@ -28,9 +28,9 @@ public class CustomGitHubNotificationStrategy extends AbstractGitHubNotification
     @Override
     public List<GitHubNotificationRequest> notifications(GitHubNotificationContext ctx, TaskListener listener) {
         HelidonPublisherServer pubServer = HelidonPublisherServer.get(ctx.getBuild());
-        String serverUrl = pubServer.getServerUrl();
+        String publicUrl = pubServer != null ? pubServer.getPublicUrl() : null;
         Run<?, ?> run = ctx.getBuild();
-        if (serverUrl != null) {
+        if (publicUrl != null) {
             String pipelineId = null;
             if (run instanceof WorkflowRun) {
                 PipelinePublisher publisher = PipelinePublisher.get((WorkflowRun) run);
@@ -44,7 +44,7 @@ public class CustomGitHubNotificationStrategy extends AbstractGitHubNotification
                 }
             }
             if (pipelineId != null) {
-                String statusUrl = serverUrl + "/" + pipelineId;
+                String statusUrl = publicUrl + "/" + pipelineId;
                 String context = ctx.getDefaultContext(listener).replace(DEFAULT_MESSAGE_PREFIX, "ci/");
                 String message = ctx.getDefaultMessage(listener);
                 if (LOGGER.isLoggable(Level.FINE)) {
