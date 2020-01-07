@@ -169,6 +169,7 @@ echo "INFO: image_config_digest=${IMAGE_CONFIG_DIGEST}"
 
 readonly RESPONSE_HEADERS=$(mktemp -t XXX})
 readonly WORKDIR=$(mktemp -d -t "XXX${SCRIPT}")
+readonly CACHEDIR="${SCRIPT_DIR}/.cache"
 
 # upload layers
 readonly NUM_LAYERS=$(jq -r '.[0].Layers|length' ${IMAGE_MANIFEST})
@@ -177,6 +178,12 @@ DIGEST_SIZES=( )
 for ((i=0;i<${NUM_LAYERS};i++))
 {
     LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
+    # TODO cross post the blob for layers > 0
+    # search for layer in cache
+    # SEARCH_RESULT=$(grep ${LAYER} -r ${CACHEDIR} --include '*.json' | cut -d ':' -f1)
+    # CACHED_IMAGE_NAME=$(basename $(dirname ${SEARCH_RESULT}) | base64 --decode)
+    # POST /v2/<name>/blobs/uploads/?mount=<digest>&from=<repository name>
+
     tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
     DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
     echo "INFO: uploading_layer ${DIGEST}"

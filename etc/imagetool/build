@@ -230,7 +230,7 @@ EOF
 # Process base image
 if [ ! -z "${BASE_IMAGE}" ] ; then
     readonly CACHEDIR="${SCRIPT_DIR}/.cache"
-    readonly BASE_IMGDIR="${CACHEDIR}/$(echo ${BASE_IMAGE} | ${SHASUM} | cut -d ' ' -f1)"
+    readonly BASE_IMGDIR="${CACHEDIR}/$(echo ${BASE_IMAGE} | base64)"
     if ${DEBUG} ; then
         PULL_EXTRA_OPTS="--v"
     elif ${DEBUG2} ; then

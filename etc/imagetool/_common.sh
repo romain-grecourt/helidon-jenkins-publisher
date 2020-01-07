@@ -132,6 +132,10 @@ common_init(){
             exit 1
         fi
     fi
+    if ! type base64 > /dev/null 2>&1; then
+        echo "ERROR: base64 not found in PATH"
+        exit 1
+    fi
     if ! type curl > /dev/null 2>&1; then
         echo "ERROR: curl not found in PATH"
         exit 1
