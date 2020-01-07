@@ -190,11 +190,11 @@ for ((i=0;i<${NUM_LAYERS};i++))
     else
         UPLOAD_URL="${UPLOAD_LOCATION}?digest=${DIGEST}"
     fi
-    curl -v -X PUT --data-binary @${WORKDIR}/layer.tar \
+    curl -v --progress-bar -X PUT --data-binary @${WORKDIR}/layer.tar \
         -D ${RESPONSE_HEADERS} \
         -H "${AUTH_HEADER}" \
         -H "Content-Type: application/octet-stream" \
-        "${UPLOAD_URL}"
+        "${UPLOAD_URL}" >&2
     is_http_status_or_die ${RESPONSE_HEADERS} 201
     blob_size
     DIGEST_SIZES[${#DIGEST_SIZES[*]}]=${BLOB_SIZE}
@@ -207,11 +207,11 @@ if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
 else
     UPLOAD_URL="${UPLOAD_LOCATION}?digest=${IMAGE_CONFIG_DIGEST}"
 fi
-curl -v -X PUT --data-binary @${IMAGE_CONFIG} \
+curl -v --progress-bar -X PUT --data-binary @${IMAGE_CONFIG} \
     -D ${RESPONSE_HEADERS} \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/vnd.docker.container.image.v1+json" \
-    "${UPLOAD_URL}"
+    "${UPLOAD_URL}" >&2
 is_http_status_or_die ${RESPONSE_HEADERS} 201
 
 blob_size
@@ -244,11 +244,11 @@ $(for ((i=0;i<${#DIGESTS[@]};i++))
 EOF
 
 # upload manifest
-curl -v -X PUT --data-binary @${DISTRIBUTION_MANIFEST} \
+curl -v --progress-bar -X PUT --data-binary @${DISTRIBUTION_MANIFEST} \
     -H "${AUTH_HEADER}" \
     -D ${RESPONSE_HEADERS} \
     -H "Content-Type: application/vnd.docker.distribution.manifest.v2+json" \
-    "${API_URL_BASE}/manifests/${IMAGE_TAG}"
+    "${API_URL_BASE}/manifests/${IMAGE_TAG}" >&2
 is_http_status_or_die ${RESPONSE_HEADERS} 201
 
 echo "INFO: image push completed"

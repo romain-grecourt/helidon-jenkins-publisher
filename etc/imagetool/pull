@@ -122,7 +122,7 @@ readonly IMAGE_MANIFEST="${OUTPUT_DIR}/manifest.json"
 RESPONSE_HEADERS=$(mktemp ${WORKDIR}/responseheaders.XXX)
 
 # download manifest
-curl -v -L -X GET \
+curl -v --progress-bar -L -X GET \
     -o ${IMAGE_MANIFEST} \
     -D ${RESPONSE_HEADERS} \
     -H "${AUTH_HEADER}" \
@@ -132,7 +132,7 @@ is_http_status_or_die ${RESPONSE_HEADERS} 200
 
 # download image config
 readonly IMAGE_CONFIG="$(jq -r '.config.digest' ${IMAGE_MANIFEST} | cut -d ':' -f2).json"
-curl -v -L -X GET \
+curl -v --progress-bar -L -X GET \
     -o ${OUTPUT_DIR}/${IMAGE_CONFIG} \
     -D ${RESPONSE_HEADERS} \
     -H "${AUTH_HEADER}" \
@@ -148,7 +148,7 @@ get_layer() {
     local media_type=${2}
     local layer_dir=${digest##*:}
     mkdir ${OUTPUT_DIR}/${layer_dir}
-    curl -v -L -X GET \
+    curl -v --progress-bar -L -X GET \
         -o ${OUTPUT_DIR}/${layer_dir}/layer.tar \
         -D ${RESPONSE_HEADERS} \
         -H "${AUTH_HEADER}" \
