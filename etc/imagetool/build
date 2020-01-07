@@ -240,19 +240,18 @@ if [ ! -z "${BASE_IMAGE}" ] ; then
         CMD_ARRAY[${#CMD_ARRAY[*]}]=$(jq -r ".config.Cmd[${i}]" ${BASE_CONFIG})
     done
 
-    if ${LOAD} ; then
-        for i in $(jq '.layers | to_entries | .[].key' ${BASE_IMGDIR}/manifest.json)
-        do
-            BASE_LAYER_ID=$(jq -r ".layers[${i}].digest" ${BASE_IMGDIR}/manifest.json | cut -d ':' -f2)
-            BASE_LAYER_DIGEST=$(jq -r ".rootfs.diff_ids[${i}]" ${BASE_CONFIG})
-            LAYERS[${#LAYERS[*]}]=${BASE_LAYER_ID}
-            DIGESTS[${#DIGESTS[*]}]=${BASE_LAYER_DIGEST}
+    # copy base layers
+    for i in $(jq '.layers | to_entries | .[].key' ${BASE_IMGDIR}/manifest.json)
+    do
+        BASE_LAYER_ID=$(jq -r ".layers[${i}].digest" ${BASE_IMGDIR}/manifest.json | cut -d ':' -f2)
+        BASE_LAYER_DIGEST=$(jq -r ".rootfs.diff_ids[${i}]" ${BASE_CONFIG})
+        LAYERS[${#LAYERS[*]}]=${BASE_LAYER_ID}
+        DIGESTS[${#DIGESTS[*]}]=${BASE_LAYER_DIGEST}
 
-            mkdir ${IMAGE_DIR}/${BASE_LAYER_ID}
-            cp ${BASE_IMGDIR}/${BASE_LAYER_ID}/layer.tar ${IMAGE_DIR}/${BASE_LAYER_ID}/layer.tar
-            gen_layer_metadata ${IMAGE_DIR} ${BASE_LAYER_ID}
-        done
-    fi
+        mkdir ${IMAGE_DIR}/${BASE_LAYER_ID}
+        cp ${BASE_IMGDIR}/${BASE_LAYER_ID}/layer.tar ${IMAGE_DIR}/${BASE_LAYER_ID}/layer.tar
+        gen_layer_metadata ${IMAGE_DIR} ${BASE_LAYER_ID}
+    done
 fi
 
 # Add image cmd

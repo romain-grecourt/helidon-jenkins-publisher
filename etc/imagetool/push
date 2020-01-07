@@ -183,7 +183,7 @@ for ((i=0;i<${NUM_LAYERS};i++))
     tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
     DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
-    SEARCH_RESULT=$(grep ${LAYER} -r ${CACHEDIR} --include '*.json' | cut -d ':' -f1 | head -1)
+    SEARCH_RESULT=$(grep "${LAYER}" -r ${CACHEDIR} --include '*.json' | cut -d ':' -f1 | head -1 || echo "")
     if [ -z "${SEARCH_RESULT}" ] ; then
         echo "INFO: uploading_layer ${DIGEST}"
         create_blob
