@@ -129,13 +129,13 @@ common_init(){
 
     if ! type jq > /dev/null 2>&1; then
         echo "INFO: installing jq.."
-        mkdir -p ${BINDIR}
+        mkdir -p ${IMAGETOOL_DIR}/bin
         if [ `uname` = "Darwin" ] ; then
-            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
-            chmod +x ${BINDIR}/jq
+            curl -L -o  ${IMAGETOOL_DIR}/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
+            chmod +x ${IMAGETOOL_DIR}/bin/jq
         elif [ `uname` = "Linux" ] ; then
-            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-            chmod +x ${BINDIR}/jq
+            curl -L -o  ${IMAGETOOL_DIR}/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+            chmod +x ${IMAGETOOL_DIR}/bin/jq
         fi
         if ! type jq > /dev/null 2>&1; then
             echo "ERROR: jq not found in PATH"
