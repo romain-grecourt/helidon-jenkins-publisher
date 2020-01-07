@@ -24,8 +24,9 @@ on_error(){
 }
 trap on_error ERR
 
-IMAGETOOL_DIR=$(cd $(dirname ${BASH_SOURCE}); pwd -P)
-export PATH=${IMAGETOOL_DIR}:${IMAGETOOL_DIR}/bin:${PATH}
+readonly IMAGETOOL_DIR=$(cd $(dirname ${BASH_SOURCE}); pwd -P)
+readonly BINDIR=${IMAGETOOL_DIR}/.bin
+export PATH=${IMAGETOOL_DIR}:${BINDIR}:${PATH}
 
 readonly WS_DIR=$(cd ${IMAGETOOL_DIR}/../..; pwd -P)
 
@@ -129,13 +130,13 @@ common_init(){
 
     if ! type jq > /dev/null 2>&1; then
         echo "INFO: installing jq.."
-        mkdir -p ${IMAGETOOL_DIR}/bin
+        mkdir -p ${BINDIR}
         if [ `uname` = "Darwin" ] ; then
-            curl -L -o  ${IMAGETOOL_DIR}/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
-            chmod +x ${IMAGETOOL_DIR}/bin/jq
+            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-osx-amd64
+            chmod +x ${BINDIR}/jq
         elif [ `uname` = "Linux" ] ; then
-            curl -L -o  ${IMAGETOOL_DIR}/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-            chmod +x ${IMAGETOOL_DIR}/bin/jq
+            curl -L -o  ${BINDIR}/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+            chmod +x ${BINDIR}/jq
         fi
         if ! type jq > /dev/null 2>&1; then
             echo "ERROR: jq not found in PATH"
