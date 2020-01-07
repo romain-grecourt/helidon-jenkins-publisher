@@ -179,6 +179,7 @@ for ((i=0;i<${NUM_LAYERS};i++))
     LAYER=$(jq -r ".[0].Layers[${i}]" ${IMAGE_MANIFEST})
     tar --to-stdout -xf "${IMAGE_TAR}" ./${LAYER} > ${WORKDIR}/layer.tar
     DIGEST="sha256:$(${SHASUM} ${WORKDIR}/layer.tar | cut -d ' ' -f1)"
+    echo "INFO: uploading_layer ${DIGEST}"
     DIGESTS[${#DIGESTS[*]}]=${DIGEST}
     create_blob
     if [[ "${UPLOAD_LOCATION}" =~ \? ]] ; then
@@ -233,7 +234,7 @@ $(for ((i=0;i<${#DIGESTS[@]};i++))
     printf "            \"mediaType\": \"application/vnd.docker.image.rootfs.diff.tar.gzip\",\n"
     printf "            \"size\": %i,\n" ${DIGEST_SIZES[${i}]}
     printf "            \"digest\": \"%s\"\n" ${DIGESTS[${i}]}
-    if [ "${i}" = "$((${#LAYERS[@]}-1))" ] ; then printf "        }\n" ; else printf "        },\n" ; fi
+    if [ "${i}" = "$((${#DIGESTS[@]}-1))" ] ; then printf "        }\n" ; else printf "        },\n" ; fi
 })
     ]
 }
