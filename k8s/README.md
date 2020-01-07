@@ -44,6 +44,17 @@ kubectl apply -f storage-claim-nfs.yaml
 
 ### Publisher backend
 
+Create a PKCS8 key pair:
+```bash
+openssl genpkey -out backend.pem -algorithm RSA -pkeyopt rsa_keygen_bits:2048
+openssl rsa -in backend.pem -pubout > backend.pem.pub
+```
+
+Create a secret containing the public key:
+```bash
+kubectl create secret generic backend-secret --from-file=backend.pem.pub
+```
+
 Create a deployment and service:
 ```bash
 kubectl apply -f backend.yaml

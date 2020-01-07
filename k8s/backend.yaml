@@ -40,13 +40,21 @@ spec:
         env:
         - name: storage.path
           value: "/storage"
+        - name: http-signature.public-key
+          value: "/etc/backend-secret/backend.pem.pub"
         volumeMounts:
         - name: build-publisher-storage
           mountPath: "/storage"
+        - name: build-publisher-secret
+          mountPath: "/etc/backend-secret"
+          readOnly: true
       volumes:
       - name: build-publisher-storage
         persistentVolumeClaim:
           claimName: build-publisher-storage
+      - name: build-publisher-secret
+        secret:
+          secretName: helidon-build-publisher-secret
 
 ---
 
