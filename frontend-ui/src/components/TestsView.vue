@@ -6,7 +6,7 @@
     <v-subheader>{{ alltests.passed }} passed, {{ alltests.failed }} failed , {{ alltests.skipped }} skipped</v-subheader>
     <v-row
       justify="center"
-      class="px-5 mt-4"
+      class="px-5 mt-4 test-panels"
     >
       <v-expansion-panels
         multiple
@@ -30,7 +30,11 @@
               </template>
               <v-icon>mdi-hexagon-outline</v-icon>
             </v-badge>
-            <span>{{ testsinfo.path }}</span>
+            <span
+                class="truncate-ltr"
+            >
+              {{ testsinfo.path }}
+            </span>
           </v-expansion-panel-header>
           <v-expansion-panel-content>
             <tests
@@ -44,6 +48,14 @@
   </v-container>
 </template>
 <style>
+@media screen and (max-width: 959px) {
+  .test-panels .v-expansion-panels--popout > .v-expansion-panel:not(.v-expansion-panel--active) {
+    max-width: 100%;
+  }
+  .test-panels .v-expansion-panels--popout > .v-expansion-panel.v-expansion-panel--active {
+    max-width: calc(100% + 24px);
+  }
+}
 .nested-panel.v-expansion-panel::before {
     box-shadow: none
 }

@@ -36,7 +36,7 @@
           >
             mdi-git
           </v-icon>
-          <div class="repourl">
+          <div class="truncate-rtl repourl">
             <a
               :href="pipeline.repositoryUrl"
               target="new"
@@ -166,13 +166,7 @@
 </template>
 <style>
 .repourl {
-  display: inline-block;
   width: 188px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
-  line-height: 1.5;
 }
 </style>
 <script>

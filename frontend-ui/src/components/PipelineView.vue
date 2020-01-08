@@ -15,15 +15,15 @@
     <template
       v-else
     >
-      <v-navigation-drawer
+<!--      <v-navigation-drawer
         v-model="drawerRight"
         app
         right
         temporary
         disable-route-watcher
       >
-        <!--<pipelineNotifications />-->
-      </v-navigation-drawer>
+        <pipelineNotifications />
+      </v-navigation-drawer>-->
       <v-app-bar
         app
         dense
@@ -93,6 +93,7 @@
             <v-list-item
               :disabled="refreshDisabled"
               @click="refresh"
+              class="mb-10-sm-and-down"
             >
               <v-list-item-icon>
                 <v-icon>mdi-cached</v-icon>

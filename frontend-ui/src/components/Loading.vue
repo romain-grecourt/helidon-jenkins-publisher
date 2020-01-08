@@ -1,6 +1,6 @@
 <template>
   <v-container
-    class="fill-height"
+    class="__fill-height"
     fluid
   >
     <v-row>

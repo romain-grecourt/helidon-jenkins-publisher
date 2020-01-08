@@ -9,7 +9,7 @@
       v-else
     >
       <v-container
-        class="fill-height"
+        class="fill-height px-1-sm-and-down"
         fluid
       >
         <v-row

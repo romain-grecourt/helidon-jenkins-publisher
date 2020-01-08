@@ -34,9 +34,13 @@
   </v-dialog>
 </template>
 <style>
+@media screen and (max-width: 959px) {
+  .v-dialog {
+    margin: 5px !important;
+  }
+}
 .window-title {
-  flex: 1 1 90%;
-  width: 90%;
+  width:calc(100% - 60px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

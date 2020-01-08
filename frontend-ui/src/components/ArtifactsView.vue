@@ -4,7 +4,7 @@
     <v-subheader>{{ allartifacts.count }} files.</v-subheader>
     <v-row
       justify="center"
-      class="px-5 mt-4"
+      class="px-5 mt-4 artifacts-panels"
     >
       <v-expansion-panels
         multiple
@@ -26,7 +26,11 @@
               </template>
               <v-icon> mdi-hexagon-outline</v-icon>
             </v-badge>
-            <span>{{ artifactsInfo.path }}</span>
+            <span
+                class="truncate-ltr"
+            >
+              {{ artifactsInfo.path }}
+            </span>
           </v-expansion-panel-header>
           <v-expansion-panel-content>
             <artifacts
@@ -39,6 +43,11 @@
   </v-container>
 </template>
 <style>
+@media screen and (max-width: 959px) {
+  .artifacts-panels .v-expansion-panels--popout > .v-expansion-panel:not(.v-expansion-panel--active) {
+    max-width: 100%;
+  }
+}
 .noflex {
   flex: none !important;
 }

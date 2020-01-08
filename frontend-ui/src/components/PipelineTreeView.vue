@@ -16,7 +16,7 @@
     >
       {{ error }}
     </v-alert>
-    <v-row class="px-5">
+    <v-row class="px-5-md-and-up px-1-sm-and-down mb-10-sm-and-down">
       <v-treeview
         ref="treeview"
         open-all
@@ -24,7 +24,7 @@
         hoverable
         shaped
         open-on-click
-        class="pipeline-tree-view"
+        class="pipeline-tree-view "
         :items="items"
       >
         <template
@@ -141,6 +141,7 @@
           </v-chip>
           <div
             v-if="item.type=='STEP'"
+            class="hidden-xs-only"
           >
             {{ duration(item.date, item.duration) }}
           </div>
@@ -202,6 +203,16 @@
   </v-container>
 </template>
 <style>
+@media screen and (min-width: 960px) {
+  .pipeline-tree-view .v-treeview-node {
+    margin-left: 15px;
+  }
+}
+@media screen and (max-width: 959px) {
+  .pipeline-tree-view .v-treeview-node {
+    margin-left: 5px;
+  }
+}
 .pipeline-tree-view {
   width:100%;
 }

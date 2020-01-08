@@ -10,6 +10,7 @@
       v-else
       accordion
       focusable
+      class="test-panels"
     >
       <v-expansion-panel
         v-for="(result,i) in results"
@@ -25,7 +26,11 @@
           >
             {{ statusIcons(result.failed > 0 ? 'UNSTABLE' : 'PASSED') }}
           </v-icon>
-          <span>{{ result.name }}</span>
+          <span
+            class="truncate-ltr"
+          >
+            {{ result.name }}
+          </span>
         </v-expansion-panel-header>
         <v-expansion-panel-content>
           <v-expansion-panels
@@ -47,7 +52,11 @@
                 >
                   {{ statusIcons(test.status) }}
                 </v-icon>
-                <span>{{ test.name }}</span>
+                <span
+                  class="truncate-ltr"
+                >
+                  {{ test.name }}
+                </span>
               </v-expansion-panel-header>
               <v-expansion-panel-content
                 class="test-output"
@@ -64,11 +73,16 @@
   </div>
 </template>
 <style>
+@media screen and (max-width: 599px) {
+  .test-panels .v-expansion-panel-content__wrap {
+    padding: 0 10px 16px 10px;
+  }
+}
 .test-output > .v-expansion-panel-content__wrap {
   padding: 0 0 10px 0;
 }
 .test-output > .v-expansion-panel-content__wrap > .output {
-  padding: 10px 10px 10px 20px;
+  padding: 5px 5px 5px 5px;
   font-size: 0.9em;
   color: #E0E0E0;
 }
