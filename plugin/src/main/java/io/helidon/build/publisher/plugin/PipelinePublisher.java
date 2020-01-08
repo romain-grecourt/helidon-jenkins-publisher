@@ -217,15 +217,17 @@ final class PipelinePublisher extends TaskListenerDecorator implements GraphList
             WorkflowRun run = Helper.getRun(execution.getOwner());
             Status.Result result = Helper.convertResult(run.getResult());
             PipelineRunInfo runInfo = new PipelineRunInfo(execution);
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.log(Level.FINE, "Forcing pipeline result: pipelineId={0}, result={1}", new Object[]{
-                    runInfo.id,
-                    result
-                });
+            if (runInfo.id != null) {
+                if (LOGGER.isLoggable(Level.FINE)) {
+                    LOGGER.log(Level.FINE, "Forcing pipeline result: pipelineId={0}, result={1}", new Object[]{
+                        runInfo.id,
+                        result
+                    });
+                }
+                String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherApiUrl);
+                BackendClient client = BackendClient.getOrCreate(runInfo.publisherApiUrl, runInfo.publisherClientThreads, pkey);
+                client.onEvent(new PipelineCompletedEvent(runInfo.id, result, run.getDuration()));
             }
-            String pkey = HelidonPublisherServer.lookupCredentials(runInfo.credentialsId, runInfo.publisherApiUrl);
-            BackendClient client = BackendClient.getOrCreate(runInfo.publisherApiUrl, runInfo.publisherClientThreads, pkey);
-            client.onEvent(new PipelineCompletedEvent(runInfo.id, result, run.getDuration()));
         }
 
         @Override
