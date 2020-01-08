@@ -42,6 +42,8 @@ OPTIONS:
   --namespace
           Image namespace (prefix)
 
+  --image-pull-policy
+          Image pull policy (e.g. Always)
 EOF
   common_usage
 }
@@ -58,6 +60,9 @@ for ((i=0;i<${#ARGS[@]};i++))
         ;;
     "--tag="*)
         readonly IMAGES_TAG=${ARG#*=}
+        ;;
+    "--image-pull-policy="*)
+        readonly IMAGE_PULL_POLICY=${ARG#*=}
         ;;
     *)
         common_process_args ${ARG}
@@ -82,10 +87,17 @@ substitute_image(){
     sed s@"^\(\ \{0,\}\)\(\-\ \{0,\}image\ \{0,\}\:\ \{0,\}\)${1}\(.*\)$"@"\1\2${2}\3"@g
 }
 
+image_pull_policy(){
+    if [ ! -z "${IMAGE_PULL_POLICY}" ] ; then
+        sed s@'\(imagePullPolicy: \)IfNotPresent'@"\1${IMAGE_PULL_POLICY}"@g
+    fi
+}
+
 BACKEND_YAML=$(mktemp ${WORKDIR}/backendk8syaml.XXX)
 echo "INFO: backend_yaml = ${BACKEND_YAML}"
 cat ${WS_DIR}/k8s/backend.yaml \
     | substitute_image "helidon-build-publisher-backend:latest" "${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG}" \
+    | image_pull_policy \
     > ${BACKEND_YAML}
 
 FRONTEND_YAML=$(mktemp ${WORKDIR}/frontendk8syaml.XXX)
@@ -93,6 +105,7 @@ echo "INFO: frontend_yaml = ${FRONTEND_YAML}"
 cat ${WS_DIR}/k8s/frontend.yaml \
     | substitute_image "helidon-build-publisher-frontend-ui:latest" "${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG}" \
     | substitute_image "helidon-build-publisher-frontend-api:latest" "${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG}" \
+    | image_pull_policy \
     > ${FRONTEND_YAML}
 
 echo "INFO: applying configuration..."
