@@ -37,19 +37,12 @@ $(basename ${SCRIPT}) [OPTIONS] --tag=TAG
   --tag=TAG
           Image tag to use
 
-  --backend-public-key-file=FILE
-          Backend RSA PKCS8 public key file.
-
 OPTIONS:
 
   --namespace
           Image namespace (prefix)
 
-  --registry-url=URL
-          Registry URL to push to.
-
 EOF
-  common_user_password_usage
   common_usage
 }
 
@@ -66,14 +59,8 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--tag="*)
         readonly IMAGES_TAG=${ARG#*=}
         ;;
-    "--registry-url="*)
-        readonly REGISTRY_URL=${ARG#*=}
-        ;;
-    "--backend-public-key-file="*)
-        readonly BACKEND_PUBLIC_KEY=${ARG#*=}
-        ;;
     *)
-        common_process_user_password_args ${ARG} || common_process_args ${ARG}
+        common_process_args ${ARG}
         ;;
   esac
 }
@@ -91,37 +78,8 @@ fi
 
 export PATH=${PATH}:${SCRIPT_DIR}/../imagetool
 
-create_docker_registry_secret(){
-    echo "INFO: creating docker-registry ${1}"
-    kubectl create secret docker-registry ${1} \
-        --docker-server="${REGISTRY_URL}" \
-        --docker-username="${UNAME}" \
-        --docker-password="${UPASSWD}"
-}
-
-if [ ! -z "${REGISTRY_URL}" ] && [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
-    REGISTRY_NAME=$(echo ${REGISTRY_URL} | \
-        sed s@'^\(http\)\{0,1\}\(s\)\{0,1\}\(\://\)\{0,1\}\(.*\)\(/v2\).*'@'\4'@g)
-    kubectl get secret ${REGISTRY_NAME} >&2 || create_docker_registry_secret ${REGISTRY_NAME}
-fi
-
-create_backend_secret(){
-    if [ -z "${BACKEND_PUBLIC_KEY}" ] ; then
-        echo "ERROR: --backend-public-key-file is required"
-        exit 1
-    fi
-    if [ ! -e "${BACKEND_PUBLIC_KEY}" ] ; then
-        echo "ERROR: ${BACKEND_PUBLIC_KEY} is not a valid file"
-        exit 1
-    fi
-    echo "INFO: creating backend secret"
-    kubectl create secret generic helidon-build-publisher-secret \
-        --from-file=backend.pem.pub=${BACKEND_PUBLIC_KEY}
-}
-kubectl get secret helidon-build-publisher-secret >&2 || create_backend_secret
-
 substitute_image(){
-    sed s@"^\(\ \{0,\}\-\ \{0,\}image\ \{0,\}\:\ \{0,\}\)${1}\(.*\)$"@"\1${2}\2"@g
+    sed s@"^\(\ \{0,\}\)\(\-\ \{0,\}image\ \{0,\}\:\ \{0,\}\)${1}\(.*\)$"@"\1\2${2}\3"@g
 }
 
 BACKEND_YAML=$(mktemp ${WORKDIR}/backendk8syaml.XXX)
