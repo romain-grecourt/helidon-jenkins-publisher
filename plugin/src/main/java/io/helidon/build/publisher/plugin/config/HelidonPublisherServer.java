@@ -221,7 +221,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
 
         private static FormValidation checkUrl(String value) {
             if (Util.fixEmptyAndTrim(value) == null) {
-                return FormValidation.ok();
+                return FormValidation.error("Name cannot be empty");
             }
             try {
                 new URL(value);

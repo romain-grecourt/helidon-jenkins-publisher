@@ -74,10 +74,17 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
         public static final String PROJECT_BLOCK_NAME = "helidonProjectPublisher";
 
         @SuppressWarnings("unused") // used by stapler
-        public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
+        public ListBoxModel doFillServerNameItems(@AncestorInPath Job<?, ?> job) {
+            HelidonPublisherProjectProperty prop = job.getProperty(HelidonPublisherProjectProperty.class);
+            String savedServerName = prop != null ? prop.server.getName() : null;
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
-                items.add(server.getName());
+                String serverName = server.getName();
+                ListBoxModel.Option option = new ListBoxModel.Option(serverName);
+                if (serverName.equals(savedServerName)) {
+                    option.selected = true;
+                }
+                items.add(option);
             }
             return items;
         }

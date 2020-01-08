@@ -75,9 +75,16 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
 
         @SuppressWarnings("unused") // used by stapler
         public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
+            HelidonPublisherFolderProperty prop = folder.getProperties().get(HelidonPublisherFolderProperty.class);
+            String savedServerName = prop != null ? prop.server.getName() : null;
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
-                items.add(server.getName());
+                String serverName = server.getName();
+                ListBoxModel.Option option = new ListBoxModel.Option(serverName);
+                if (serverName.equals(savedServerName)) {
+                    option.selected = true;
+                }
+                items.add(option);
             }
             return items;
         }
