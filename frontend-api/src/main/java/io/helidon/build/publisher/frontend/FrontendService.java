@@ -163,6 +163,7 @@ final class FrontendService implements Service {
         headers.put("Access-Control-Allow-Origin", "*");
         try {
             List<Path> allDescriptors = Files.list(storagePath)
+                    .filter(Files::isDirectory)
                     .sorted(Comparator.<Path>comparingLong((p) -> p.toFile().lastModified()).reversed())
                     .collect(Collectors.toList());
             List<Path> pageDescriptors = allDescriptors.stream()
@@ -172,6 +173,7 @@ final class FrontendService implements Service {
             List<PipelineInfo> pipelines = pageDescriptors.stream()
                     .limit(numitems)
                     .map(descriptorManager::loadInfoFromDir)
+                    .filter((p) -> p != null)
                     .collect(Collectors.toList());
             int totalsize = allDescriptors.size();
             int totalpages = (int) totalsize / numitems;

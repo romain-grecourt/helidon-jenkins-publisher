@@ -43,6 +43,7 @@ public final class DescriptorFileManager implements DescriptorManager {
                 throw new RuntimeException(ex);
             }
         }
+        LOGGER.log(Level.WARNING, "Test result descriptor does not exist: {0}", filePath);
         return null;
     }
 
@@ -65,6 +66,7 @@ public final class DescriptorFileManager implements DescriptorManager {
                 throw new RuntimeException(ex);
             }
         }
+        LOGGER.log(Level.WARNING, "Pipeline descriptor does not exist: {0}", filePath);
         return null;
     }
 
@@ -86,6 +88,7 @@ public final class DescriptorFileManager implements DescriptorManager {
                 throw new RuntimeException(ex);
             }
         }
+        LOGGER.log(Level.WARNING, "Pipeline descriptor does not exist: {0}", filePath);
         return null;
     }
 

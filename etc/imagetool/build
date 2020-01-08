@@ -93,7 +93,10 @@ for ((i=0;i<${#ARGS[@]};i++))
     case ${ARG} in
     "--path="*)
         SOURCE_PATH=${ARG#*=}
-        if [ -d ${SOURCE_PATH} ] ; then
+        if [ ! -e ${SOURCE_PATH} ] ; then
+            echo "ERROR: ${SOURCE_PATH} does not exist"
+            exit 1
+        elif [ -d ${SOURCE_PATH} ] ; then
             SOURCE_PATH=$(cd ${SOURCE_PATH} ; pwd -P)
         else
             SOURCE_PATH=$(cd $(dirname ${SOURCE_PATH}) ; pwd -P)/$(basename ${SOURCE_PATH})
