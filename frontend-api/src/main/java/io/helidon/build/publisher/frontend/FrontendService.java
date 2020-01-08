@@ -72,11 +72,6 @@ final class FrontendService implements Service {
     }
 
     private void getTests(ServerRequest req, ServerResponse res) {
-        ResponseHeaders headers = res.headers();
-        headers.contentType(MediaType.APPLICATION_JSON);
-        // TODO remove me
-        headers.put("Access-Control-Allow-Origin", "*");
-
         Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
         Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
         if (!stagePath.getParent().equals(pipelinePath)) {
@@ -92,6 +87,7 @@ final class FrontendService implements Service {
                     .filter((path) -> path.toString().endsWith(".json"))
                     .map(descriptorManager::loadTestSuiteResult)
                     .collect(Collectors.toList());
+            res.headers().contentType(MediaType.APPLICATION_JSON);
             res.send(new TestSuiteResults(results));
         } catch (IOException ex) {
             req.next(ex);
@@ -99,10 +95,6 @@ final class FrontendService implements Service {
     }
 
     private void getArtifacts(ServerRequest req, ServerResponse res) {
-        ResponseHeaders headers = res.headers();
-        // TODO remove me
-        headers.put("Access-Control-Allow-Origin", "*");
-
         Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
         Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
         if (!stagePath.getParent().equals(pipelinePath)) {
@@ -113,7 +105,7 @@ final class FrontendService implements Service {
             return;
         }
         try {
-            headers.contentType(MediaType.APPLICATION_JSON);
+            res.headers().contentType(MediaType.APPLICATION_JSON);
             res.send(Artifacts.find(stagePath.resolve("artifacts")));
         } catch (IOException ex) {
             req.next(ex);
@@ -123,11 +115,6 @@ final class FrontendService implements Service {
     private void getArtifact(ServerRequest req, ServerResponse res) {
         // produce raw text ? (default is false)
         boolean download = toBoolean(req.queryParams().first("download"), false);
-
-        ResponseHeaders headers = res.headers();
-        // TODO remove me
-        headers.put("Access-Control-Allow-Origin", "*");
-
         Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
         Path stagePath = pipelinePath.resolve(req.path().param("stageId"));
         if (!stagePath.getParent().equals(pipelinePath)) {
@@ -142,6 +129,7 @@ final class FrontendService implements Service {
             res.status(NOT_FOUND_404).send();
         } else {
             try {
+                ResponseHeaders headers = res.headers();
                 if (download) {
                     headers.contentType(MediaType.APPLICATION_OCTET_STREAM);
                     headers.put("Content-Disposition", "attachment; filename=\"" + filePath.getFileName().toString() + "\"");
@@ -159,8 +147,6 @@ final class FrontendService implements Service {
         int pagenum = toInt(req.queryParams().first("pagenum"), 1);
         int numitems = toInt(req.queryParams().first("numitems"), 20);
         ResponseHeaders headers = res.headers();
-        // TODO remove me
-        headers.put("Access-Control-Allow-Origin", "*");
         try {
             List<Path> allDescriptors = Files.list(storagePath)
                     .filter(Files::isDirectory)
@@ -189,8 +175,6 @@ final class FrontendService implements Service {
 
     private void getPipeline(ServerRequest req, ServerResponse res) {
         ResponseHeaders headers = res.headers();
-        // TODO remove me
-        headers.put("Access-Control-Allow-Origin", "*");
         Pipeline pipeline = descriptorManager.loadPipeline(req.path().param("pipelineId"));
         if (pipeline != null) {
             headers.contentType(MediaType.APPLICATION_JSON);
