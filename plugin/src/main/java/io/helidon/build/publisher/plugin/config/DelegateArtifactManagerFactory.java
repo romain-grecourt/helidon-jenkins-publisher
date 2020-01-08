@@ -40,7 +40,7 @@ public final class DelegateArtifactManagerFactory extends ArtifactManagerFactory
     }
 
     /**
-     * The field transient to avoid serializing the delegates, and non final as it is set to {@code null} when de-serialized.
+     * The field is transient to avoid serializing the delegates, and non final as it is set to {@code null} when de-serialized.
      */
     private transient Set<ArtifactManagerFactory> delegates;
 

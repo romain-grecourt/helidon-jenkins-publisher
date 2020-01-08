@@ -28,7 +28,7 @@ import jenkins.model.StandardArtifactManager;
 final class ArtifactsProcessor extends StandardArtifactManager {
 
     /**
-     * Provider of steps to matched with artifacts being archived.
+     * Provider of steps to match with artifacts being archived.
      */
     interface StepsProvider {
 
