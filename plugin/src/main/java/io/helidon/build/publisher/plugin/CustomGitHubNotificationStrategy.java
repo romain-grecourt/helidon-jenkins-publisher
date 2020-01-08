@@ -23,7 +23,8 @@ import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 public class CustomGitHubNotificationStrategy extends AbstractGitHubNotificationStrategy {
 
     private static final Logger LOGGER = Logger.getLogger(CustomGitHubNotificationStrategy.class.getName());
-    private static final String DEFAULT_MESSAGE_PREFIX = "continuous-integration/jenkins/";
+    private static final String CONTEXT_PREFIX = "continuous-integration/jenkins/";
+    private static final String MESSAGE_BODY_PREFIX = "This commit (has )?";
 
     @Override
     public List<GitHubNotificationRequest> notifications(GitHubNotificationContext ctx, TaskListener listener) {
@@ -45,8 +46,8 @@ public class CustomGitHubNotificationStrategy extends AbstractGitHubNotification
             }
             if (pipelineId != null) {
                 String statusUrl = publicUrl + "/" + pipelineId;
-                String context = ctx.getDefaultContext(listener).replace(DEFAULT_MESSAGE_PREFIX, "ci/");
-                String message = ctx.getDefaultMessage(listener);
+                String context = ctx.getDefaultContext(listener).replace(CONTEXT_PREFIX, "ci/");
+                String message = ctx.getDefaultMessage(listener).replaceFirst(MESSAGE_BODY_PREFIX, "");
                 if (LOGGER.isLoggable(Level.FINE)) {
                     LOGGER.log(Level.FINE, "Creating commit status, url={0}, context={1}, message={2}", new Object[] {
                         statusUrl,
