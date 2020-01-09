@@ -71,6 +71,9 @@ final class FrontendService implements Service {
              .get("/{pipelineId}/tests/{stageId}", this::getTests);
     }
 
+    // TODO implement a badge endpoint
+    // query the storage index for a status and redirect to https://shields.io/ URL
+
     private void getTests(ServerRequest req, ServerResponse res) {
         Path pipelinePath = storagePath.resolve(req.path().param("pipelineId"));
         Path stagePath = pipelinePath.resolve(req.path().param("stageId"));

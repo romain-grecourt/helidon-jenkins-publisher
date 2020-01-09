@@ -46,6 +46,9 @@ final class BackendService implements Service {
             }
         }
         this.appender = new FileAppender(appenderThreads);
+        // TODO implement a hook for new pipeline descriptor saved
+        // and implement a simple chronological index of pipelines in a CSV file (id repourl ref)
+        // this will avoid the frontend-api listing files in the storage directory
         this.eventProcessor = new EventProcessor(new DescriptorFileManager(storagePath), listOf(new GitHubInfoAugmenter()));
         LOGGER.log(Level.INFO, "Creating backend service, storagePath={0}, appender nThreads={1}", new Object[]{
             storagePath,
