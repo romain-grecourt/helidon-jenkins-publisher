@@ -62,7 +62,7 @@ final class GitHubInfoAugmenter implements InfoAugmenter {
                         info.title("Pull Request #" + pr + ": " + prInfo.title);
                         info.headRef(prInfo.headRef);
                         String headRepoUrl = GITHUB_URL + "/" + prInfo.headRepo;
-                        info.headRefUrl(headRepoUrl + "/" + prInfo.headRef);
+                        info.headRefUrl(headRepoUrl + "/tree/" + prInfo.headRef);
                         info.commitUrl(headRepoUrl + "/commit/" + info.commit());
                         if (info.mergeCommit() != null) {
                             info.mergeCommitUrl(repoUrl + "/commit/" + info.mergeCommit());
