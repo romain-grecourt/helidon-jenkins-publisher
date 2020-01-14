@@ -9,6 +9,7 @@ if you use a managed K8S cluster you may want to look at using an ingress
 
 Setup the controller in your cluster.
 ```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.26.2/deploy/static/mandatory.yaml
 kubectl apply -f ingress-nginx.yaml
 ```
 
