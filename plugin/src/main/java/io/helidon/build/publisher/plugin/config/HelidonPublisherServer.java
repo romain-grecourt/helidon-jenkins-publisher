@@ -43,7 +43,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
     private final String apiUrl;
     private final String publicUrl;
     private final String credentialsId;
-    private final int nthread;
+    private final int nThreads;
 
     @DataBoundConstructor
     public HelidonPublisherServer(String name, String apiUrl, String publicUrl, String credentialsId, int nThreads) {
@@ -53,7 +53,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
         }
         this.name = name;
         this.credentialsId = credentialsId;
-        this.nthread = nThreads > 0 ? nThreads : 5;
+        this.nThreads = nThreads > 0 ? nThreads : 5;
         apiUrl =  Util.fixEmptyAndTrim(apiUrl);
         if (apiUrl == null) {
             throw new AssertionError("URL cannot be empty");
@@ -102,8 +102,8 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
      * Get the number of threads for the client.
      * @return int
      */
-    public int getNthread() {
-        return nthread;
+    public int getNThread() {
+        return nThreads;
     }
 
     @CheckForNull
@@ -287,7 +287,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
         return "{"
                 + " apiUrl=" + apiUrl
                 + ", publicUrl=" + publicUrl
-                + ", nthreads=" + nthread
+                + ", nThreads=" + nThreads
                 + ", credentialId=" + (credentialsId == null ? "null" : credentialsId)
                 + " }";
     }

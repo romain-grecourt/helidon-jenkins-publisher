@@ -124,7 +124,7 @@ final class PipelineRunInfo {
             if (server != null) {
                 publisherApiUrl = server.getApiUrl();
                 credentialsId = server.getCredentialsId();
-                publisherClientThreads = server.getNthread();
+                publisherClientThreads = server.getNThread();
             } else {
                 publisherApiUrl = null;
                 credentialsId = null;
@@ -174,7 +174,7 @@ final class PipelineRunInfo {
             if (server != null) {
                 publisherApiUrl = server.getApiUrl();
                 credentialsId = server.getCredentialsId();
-                publisherClientThreads = server.getNthread();
+                publisherClientThreads = server.getNThread();
             } else {
                 publisherApiUrl = null;
                 publisherClientThreads = 5;
