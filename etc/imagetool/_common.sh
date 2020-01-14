@@ -28,7 +28,7 @@ readonly IMAGETOOL_DIR=$(cd $(dirname ${BASH_SOURCE}); pwd -P)
 readonly BINDIR=${IMAGETOOL_DIR}/.bin
 export PATH=${IMAGETOOL_DIR}:${BINDIR}:${PATH}
 
-readonly WS_DIR=$(cd ${IMAGETOOL_DIR}/../..; pwd -P)
+WS_DIR=$(cd ${IMAGETOOL_DIR}/../..; pwd -P)
 
 common_process_args(){
     case ${1} in

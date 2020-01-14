@@ -71,6 +71,9 @@ OPTIONS:
   --cmd=CMD
           Image command.
 
+  --entrypoint=CMD
+          Image entrypoint.
+
   --end=KEY=VAL
           Image environment variable.
 
@@ -146,6 +149,9 @@ for ((i=0;i<${#ARGS[@]};i++))
     "--cmd="*)
         readonly IMAGE_CMD=${ARG#*=}
         ;;
+    "--entrypoint="*)
+        readonly IMAGE_ENTRYPOINT=${ARG#*=}
+        ;;
     "--load")
         readonly LOAD=true
         ;;
@@ -194,6 +200,7 @@ echo "INFO: image_dir = ${IMAGE_DIR}"
 LAYERS=( )
 DIGESTS=( )
 CMD_ARRAY=( )
+ENTRYPOINT_ARRAY=( )
 
 gen_layer_metadata(){
     echo "1.0" > ${1}/${2}/VERSION
@@ -258,6 +265,16 @@ if [ ! -z "${BASE_IMAGE}" ] ; then
         CMD_ARRAY[${#CMD_ARRAY[*]}]=$(jq -r ".config.Cmd[${i}]" ${BASE_CONFIG})
     done
 
+    # get ENTRYPOINT from base image
+    # override ENTRYPOINT if not empty
+    if [ ${#ENTRYPOINT_ARRAY[*]} -gt 0 ] ; then
+        ENTRYPOINT_ARRAY=( )
+    fi
+    for i in $(jq -r '(.config.Entrypoint // [])|to_entries | .[].key' ${BASE_CONFIG})
+    do
+        ENTRYPOINT_ARRAY[${#ENTRYPOINT_ARRAY[*]}]=$(jq -r ".config.Entrypoint[${i}]" ${BASE_CONFIG})
+    done
+
     # copy base layers
     for i in $(jq '.layers | to_entries | .[].key' ${BASE_IMGDIR}/manifest.json)
     do
@@ -281,6 +298,18 @@ if [ ! -z "${IMAGE_CMD}" ] ; then
     for cmd in ${IMAGE_CMD[*]}
     do
         CMD_ARRAY[${#CMD_ARRAY[*]}]=${cmd}
+    done
+fi
+
+# Add image cmd
+if [ ! -z "${IMAGE_ENTRYPOINT}" ] ; then
+    # override ENTRYPOINT if not empty
+    if [ ${#ENTRYPOINT_ARRAY[*]} -gt 0 ] ; then
+        ENTRYPOINT_ARRAY=( )
+    fi
+    for cmd in ${IMAGE_ENTRYPOINT[*]}
+    do
+        ENTRYPOINT_ARRAY[${#ENTRYPOINT_ARRAY[*]}]=${cmd}
     done
 fi
 
@@ -391,6 +420,13 @@ $(for ((i=0;i<${#CMD_ARRAY[@]};i++))
 {
     printf "      \"${CMD_ARRAY[${i}]}\""
     if [ "${i}" = "$((${#CMD_ARRAY[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
+})
+     ],
+     "Entrypoint": [
+$(for ((i=0;i<${#ENTRYPOINT_ARRAY[@]};i++))
+{
+    printf "      \"${ENTRYPOINT_ARRAY[${i}]}\""
+    if [ "${i}" = "$((${#ENTRYPOINT_ARRAY[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
      ]
   },

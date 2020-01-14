@@ -107,16 +107,20 @@ fi
 if [ ! -z "${UNAME}" ] && [ ! -z "${UPASSWD}" ] ; then
     AUTH_EXTRA_OPTS="${AUTH_EXTRA_OPTS} --user=${UNAME} --password=${UPASSWD}"
 fi
-readonly TOKEN_FILE=$(mktemp ${WORKDIR}/accesstoken.XXX)
-auth ${AUTH_EXTRA_OPTS} \
-    --workdir=${WORKDIR} \
-    --registry-url=${REGISTRY_URL} \
-    --repository=${IMAGE_NAME} \
-    --scopes="pull" \
-    --output-file=${TOKEN_FILE}
 
-readonly TOKEN=$(cat ${TOKEN_FILE})
-readonly AUTH_HEADER="Authorization: Bearer ${TOKEN}"
+readonly TOKEN_FILE=$(mktemp ${WORKDIR}/accesstoken.XXX)
+
+do_auth(){
+    auth ${AUTH_EXTRA_OPTS} \
+        --workdir=${WORKDIR} \
+        --registry-url=${REGISTRY_URL} \
+        --repository=${IMAGE_NAME} \
+        --scopes="pull" \
+        --output-file=${TOKEN_FILE}
+    TOKEN=$(cat ${TOKEN_FILE})
+    AUTH_HEADER="Authorization: Bearer ${TOKEN}"
+}
+do_auth
 
 readonly IMAGE_MANIFEST="${OUTPUT_DIR}/manifest.json"
 RESPONSE_HEADERS=$(mktemp ${WORKDIR}/responseheaders.XXX)
@@ -148,6 +152,7 @@ get_layer() {
     local media_type=${2}
     local layer_dir=${digest##*:}
     mkdir ${OUTPUT_DIR}/${layer_dir}
+    do_auth
     curl -v --progress-bar -L -X GET \
         -o ${OUTPUT_DIR}/${layer_dir}/layer.tar \
         -D ${RESPONSE_HEADERS} \
