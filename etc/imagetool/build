@@ -411,21 +411,21 @@ cat << EOF > ${IMAGE_DIR}/config.json
      "Env": [
 $(for ((i=0;i<${#ENV_ARRAY[@]};i++))
 {
-    printf "      \"${ENV_ARRAY[${i}]}\""
+    printf '      "%s"' "${ENV_ARRAY[${i}]}"
     if [ "${i}" = "$((${#ENV_ARRAY[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
      ],
      "Cmd": [
 $(for ((i=0;i<${#CMD_ARRAY[@]};i++))
 {
-    printf "      \"${CMD_ARRAY[${i}]}\""
+    printf '      "%s"' "${CMD_ARRAY[${i}]}"
     if [ "${i}" = "$((${#CMD_ARRAY[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
      ],
      "Entrypoint": [
 $(for ((i=0;i<${#ENTRYPOINT_ARRAY[@]};i++))
 {
-    printf "      \"${ENTRYPOINT_ARRAY[${i}]}\""
+    printf '      "%s"' "${ENTRYPOINT_ARRAY[${i}]}"
     if [ "${i}" = "$((${#ENTRYPOINT_ARRAY[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
      ]
@@ -435,7 +435,7 @@ $(for ((i=0;i<${#ENTRYPOINT_ARRAY[@]};i++))
     "diff_ids": [
 $(for ((i=0;i<${#DIGESTS[@]};i++))
 {
-    printf "      \"${DIGESTS[${i}]}\""
+    printf '      "%s"' "${DIGESTS[${i}]}"
     if [ "${i}" = "$((${#DIGESTS[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
     ]
@@ -464,7 +464,7 @@ cat << EOF > ${IMAGE_DIR}/manifest.json
     "Layers": [
 $(for ((i=0;i<${#LAYERS[@]};i++))
 {
-    printf "      \"${LAYERS[${i}]}/layer.tar\""
+    printf '      "%s"' "${LAYERS[${i}]}/layer.tar"
     if [ "${i}" = "$((${#LAYERS[@]}-1))" ] ; then printf "\n" ; else printf ",\n" ; fi
 })
     ]
