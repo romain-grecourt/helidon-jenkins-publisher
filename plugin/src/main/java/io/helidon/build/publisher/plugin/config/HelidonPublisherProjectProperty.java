@@ -3,7 +3,6 @@ package io.helidon.build.publisher.plugin.config;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import hudson.Extension;
 import hudson.model.Job;
 import hudson.model.JobProperty;
@@ -19,7 +18,7 @@ import org.kohsuke.stapler.StaplerRequest;
  */
 public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>> {
 
-    private final HelidonPublisherServer server;
+    private final String serverName;
     private final String branchExcludes;
     private final boolean excludeMetaSteps;
     private final boolean excludeSyntheticSteps;
@@ -28,7 +27,7 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
     public HelidonPublisherProjectProperty(String serverName, String branchExcludes, boolean excludeMetaSteps,
             boolean excludeSyntheticSteps) {
 
-        this.server = HelidonPublisherServer.validate(serverName);
+        this.serverName = serverName;
         this.branchExcludes = branchExcludes;
         this.excludeMetaSteps = excludeMetaSteps;
         this.excludeSyntheticSteps = excludeMetaSteps;
@@ -40,8 +39,16 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
      * @return HelidonPublisherServer
      */
     @Nullable
-    public HelidonPublisherServer getServer() {
-        return server;
+    public HelidonPublisherServer server() {
+        return HelidonPublisherServer.validate(serverName);
+    }
+
+    /**
+     * Get the server name.
+     * @return String
+     */
+    public String getServerName() {
+        return serverName;
     }
 
     /**
@@ -76,7 +83,7 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
         @SuppressWarnings("unused") // used by stapler
         public ListBoxModel doFillServerNameItems(@AncestorInPath Job<?, ?> job) {
             HelidonPublisherProjectProperty prop = job.getProperty(HelidonPublisherProjectProperty.class);
-            String savedServerName = prop != null ? prop.server.getName() : null;
+            String savedServerName = prop != null ? prop.serverName : null;
             ListBoxModel items = new ListBoxModel();
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
                 String serverName = server.getName();
@@ -99,7 +106,7 @@ public final class HelidonPublisherProjectProperty extends JobProperty<Job<?, ?>
             HelidonPublisherProjectProperty tpp = req.bindJSON(
                 HelidonPublisherProjectProperty.class,
                 formData.getJSONObject(PROJECT_BLOCK_NAME));
-            if (tpp == null || tpp.server == null) {
+            if (tpp == null || tpp.serverName == null) {
                 return null;
             }
             return tpp;

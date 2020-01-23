@@ -18,7 +18,7 @@ import org.kohsuke.stapler.StaplerRequest;
  */
 public final class HelidonPublisherFolderProperty extends AbstractFolderProperty<AbstractFolder<?>> {
 
-    private final HelidonPublisherServer server;
+    private final String serverName;
     private final String branchExcludes;
     private final boolean excludeMetaSteps;
     private final boolean excludeSyntheticSteps;
@@ -27,7 +27,7 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
     public HelidonPublisherFolderProperty(String serverName, String branchExcludes, boolean excludeMetaSteps,
             boolean excludeSyntheticSteps) {
 
-        this.server = HelidonPublisherServer.validate(serverName);
+        this.serverName = serverName;
         this.branchExcludes = branchExcludes;
         this.excludeMetaSteps = excludeMetaSteps;
         this.excludeSyntheticSteps = excludeSyntheticSteps;
@@ -38,8 +38,16 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
      * @return HelidonPublisherServer
      */
     @Nullable
-    public HelidonPublisherServer getServer() {
-        return server;
+    public HelidonPublisherServer server() {
+        return HelidonPublisherServer.validate(serverName);
+    }
+
+    /**
+     * Get the server name.
+     * @return String
+     */
+    public String getServerName() {
+        return serverName;
     }
 
     /**
@@ -75,9 +83,9 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
 
         @SuppressWarnings("unused") // used by stapler
         public ListBoxModel doFillServerNameItems(@AncestorInPath AbstractFolder<?> folder) {
-            HelidonPublisherFolderProperty prop = folder.getProperties().get(HelidonPublisherFolderProperty.class);
-            String savedServerName = prop != null ? prop.server.getName() : null;
             ListBoxModel items = new ListBoxModel();
+            HelidonPublisherFolderProperty prop = folder.getProperties().get(HelidonPublisherFolderProperty.class);
+            String savedServerName = prop != null ? prop.serverName : null;
             for (HelidonPublisherServer server : HelidonPublisherGlobalConfiguration.get().getServers()) {
                 String serverName = server.getName();
                 ListBoxModel.Option option = new ListBoxModel.Option(serverName);
@@ -104,7 +112,7 @@ public final class HelidonPublisherFolderProperty extends AbstractFolderProperty
             HelidonPublisherFolderProperty tpp = req.bindJSON(
                 HelidonPublisherFolderProperty.class,
                 formData.getJSONObject(FOLDER_BLOCK_NAME));
-            if (tpp == null || tpp.server == null) {
+            if (tpp == null || tpp.serverName == null) {
                 return null;
             }
             return tpp;

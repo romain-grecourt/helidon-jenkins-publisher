@@ -169,13 +169,13 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
                     AbstractFolder<?> folder = (AbstractFolder<?>) itemGroup;
                     HelidonPublisherFolderProperty prop = folder.getProperties().get(HelidonPublisherFolderProperty.class);
                     if (prop != null) {
-                        return prop.getServer();
+                        return prop.server();
                     }
                 }
             } else {
                 HelidonPublisherProjectProperty prop = run.getParent().getProperty(HelidonPublisherProjectProperty.class);
                 if (prop != null) {
-                    return prop.getServer();
+                    return prop.server();
                 }
             }
         }
@@ -254,7 +254,7 @@ public final class HelidonPublisherServer extends AbstractDescribableImpl<Helido
                 }
             } catch (MalformedURLException ex) {
                 return FormValidation.error(String.format("Malformed URL (%s)", apiUrl), ex);
-            } catch (URISyntaxException | IOException ex) {
+            } catch (Throwable ex) {
                 return FormValidation.error(ex.getMessage(), ex);
             }
             return FormValidation.ok("Success");
