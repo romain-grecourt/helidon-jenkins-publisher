@@ -8,6 +8,7 @@ import jenkins.scm.api.trait.SCMSourceContext;
 import jenkins.scm.api.trait.SCMSourceTrait;
 import jenkins.scm.api.trait.SCMSourceTraitDescriptor;
 import jenkins.scm.impl.trait.Discovery;
+import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.github_branch_source.GitHubSCMSource;
 import org.jenkinsci.plugins.github_branch_source.GitHubSCMSourceContext;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -27,6 +28,7 @@ public final class CustomSCMSourceTrait extends SCMSourceTrait {
         ctx.withNotificationStrategies(Collections.singletonList(new CustomGitHubNotificationStrategy()));
     }
 
+    @Symbol("helidonPublisher")
     @Extension
     @Discovery
     public static class DescriptorImpl extends SCMSourceTraitDescriptor {
