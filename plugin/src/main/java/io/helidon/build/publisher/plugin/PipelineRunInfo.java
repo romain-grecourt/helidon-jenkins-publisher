@@ -103,35 +103,51 @@ final class PipelineRunInfo {
 
     PipelineRunInfo(FlowExecution execution) {
         WorkflowRun run = Helper.getRun(execution.getOwner());
-        startTime = run.getStartTimeInMillis();
         WorkflowMultiBranchProject project = Helper.getProject(run.getParent());
-        title = project.getName();
         HelidonPublisherFolderProperty prop = project.getProperties().get(HelidonPublisherFolderProperty.class);
-        SCMRevisionAction revAction = getSCMRevisionAction(run);
-        SCMRevision rev = revAction.getRevision();
-        SCMSource scmSource = project.getSCMSource(revAction.getSourceId());
-        if (scmSource instanceof AbstractGitSCMSource) {
-            String remote = ((AbstractGitSCMSource)scmSource).getRemote();
-            repositoryUrl = remote;
-        } else {
-            repositoryUrl = null;
-        }
-        scmInfo = new SCMInfo(rev);
-        if (prop != null && !isBranchExcluded(scmInfo.headRef, prop.getBranchExcludes())) {
-            excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
-            excludeMetaSteps = prop.isExcludeMetaSteps();
-            HelidonPublisherServer server = prop.getServer();
-            if (server != null) {
-                publisherApiUrl = server.getApiUrl();
-                credentialsId = server.getCredentialsId();
-                publisherClientThreads = server.getNThread();
+        if (prop != null) {
+            startTime = run.getStartTimeInMillis();
+            title = project.getName();
+            SCMRevisionAction revAction = getSCMRevisionAction(run);
+            SCMRevision rev = revAction != null ? revAction.getRevision() : null;
+            SCMSource scmSource = revAction != null ? project.getSCMSource(revAction.getSourceId()) : null;
+            if (scmSource instanceof AbstractGitSCMSource) {
+                String remote = ((AbstractGitSCMSource) scmSource).getRemote();
+                repositoryUrl = remote;
             } else {
-                publisherApiUrl = null;
-                credentialsId = null;
-                publisherClientThreads = 5;
+                repositoryUrl = null;
             }
-            id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
+            scmInfo = rev != null ? new SCMInfo(rev) : null;
+            String headRef = scmInfo != null ? scmInfo.headRef : null;
+            String commit = scmInfo != null ? scmInfo.commit : null;
+            if (!isBranchExcluded(headRef, prop.getBranchExcludes())) {
+                excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
+                excludeMetaSteps = prop.isExcludeMetaSteps();
+                HelidonPublisherServer server = prop.server();
+                if (server != null) {
+                    publisherApiUrl = server.getApiUrl();
+                    credentialsId = server.getCredentialsId();
+                    publisherClientThreads = server.getNThread();
+                } else {
+                    publisherApiUrl = null;
+                    credentialsId = null;
+                    publisherClientThreads = 5;
+                }
+                id = createId(title, String.valueOf(repositoryUrl), String.valueOf(headRef), String.valueOf(commit), run.getNumber(),
+                        run.getTimeInMillis());
+            } else {
+                id = null;
+                credentialsId = null;
+                publisherApiUrl = null;
+                publisherClientThreads = 0;
+                excludeSyntheticSteps = true;
+                excludeMetaSteps = true;
+            }
         } else {
+            title = null;
+            scmInfo = null;
+            repositoryUrl = null;
+            startTime = -1;
             id = null;
             credentialsId = null;
             publisherApiUrl = null;
@@ -144,44 +160,60 @@ final class PipelineRunInfo {
     PipelineRunInfo(Run<?, ?> run) {
         Job<?, ?> job = run.getParent();
         HelidonPublisherProjectProperty prop = job.getProperty(HelidonPublisherProjectProperty.class);
-        title = run.getParent().getName();
-        SCMRevisionAction revAction = getSCMRevisionAction(run);
-        String remote = null;
-        if (job instanceof SCMTriggerItem) {
-            SCMTriggerItem trigger = (SCMTriggerItem) job;
-            Iterator<? extends SCM> it = trigger.getSCMs().iterator();
-            while(it.hasNext() && remote == null) {
-                SCM scm = it.next();
-                if (scm instanceof GitSCM) {
-                    for (UserRemoteConfig urc : ((GitSCM) scm).getUserRemoteConfigs()) {
-                        String sourceId = revAction.getSourceId();
-                        if (sourceId != null && sourceId.equals(urc.getName())) {
-                            remote = urc.getUrl();
-                            break;
+        if (prop != null) {
+            title = run.getParent().getName();
+            SCMRevisionAction revAction = getSCMRevisionAction(run);
+            String remote = null;
+            if (job instanceof SCMTriggerItem) {
+                SCMTriggerItem trigger = (SCMTriggerItem) job;
+                Iterator<? extends SCM> it = trigger.getSCMs().iterator();
+                while (it.hasNext() && remote == null) {
+                    SCM scm = it.next();
+                    if (scm instanceof GitSCM) {
+                        for (UserRemoteConfig urc : ((GitSCM) scm).getUserRemoteConfigs()) {
+                            String sourceId = revAction.getSourceId();
+                            if (sourceId != null && sourceId.equals(urc.getName())) {
+                                remote = urc.getUrl();
+                                break;
+                            }
                         }
                     }
                 }
             }
-        }
-        startTime = run.getStartTimeInMillis();
-        repositoryUrl = remote;
-        SCMRevision rev = revAction.getRevision();
-        scmInfo = new SCMInfo(rev);
-        if (prop != null && !isBranchExcluded(scmInfo.headRef, prop.getBranchExcludes())) {
-            excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
-            excludeMetaSteps = prop.isExcludeMetaSteps();
-            HelidonPublisherServer server = prop.getServer();
-            if (server != null) {
-                publisherApiUrl = server.getApiUrl();
-                credentialsId = server.getCredentialsId();
-                publisherClientThreads = server.getNThread();
+            startTime = run.getStartTimeInMillis();
+            repositoryUrl = remote;
+            SCMRevision rev = revAction != null ? revAction.getRevision() : null;
+            scmInfo = rev != null ? new SCMInfo(rev) : null;
+            String headRef = scmInfo != null ? scmInfo.headRef : null;
+            String commit = scmInfo != null ? scmInfo.commit : null;
+            if (!isBranchExcluded(headRef, prop.getBranchExcludes())) {
+                excludeSyntheticSteps = prop.isExcludeSyntheticSteps();
+                excludeMetaSteps = prop.isExcludeMetaSteps();
+                HelidonPublisherServer server = prop.server();
+                if (server != null) {
+                    publisherApiUrl = server.getApiUrl();
+                    credentialsId = server.getCredentialsId();
+                    publisherClientThreads = server.getNThread();
+                } else {
+                    publisherApiUrl = null;
+                    publisherClientThreads = 5;
+                    credentialsId = null;
+                }
+                id = createId(title, String.valueOf(repositoryUrl), String.valueOf(headRef), String.valueOf(commit), run.getNumber(),
+                        run.getTimeInMillis());
             } else {
-                publisherApiUrl = null;
-                publisherClientThreads = 5;
+                id = null;
                 credentialsId = null;
+                publisherApiUrl = null;
+                publisherClientThreads = 0;
+                excludeSyntheticSteps = true;
+                excludeMetaSteps = true;
             }
-            id = createId(title, repositoryUrl, scmInfo.headRef, scmInfo.commit, run.getNumber(), run.getTimeInMillis());
         } else {
+            title = null;
+            scmInfo = null;
+            repositoryUrl = null;
+            startTime = -1;
             id = null;
             credentialsId = null;
             publisherApiUrl = null;
@@ -274,7 +306,7 @@ final class PipelineRunInfo {
      * @return {@code true} if excluded, {@code false} otherwise
      */
     private static boolean isBranchExcluded(String branch, String excludes) {
-        if (excludes != null) {
+        if (branch != null && excludes != null) {
             for (String exclude : excludes.split(" ")) {
                 if (Matcher.match(branch, exclude)) {
                     return true;
@@ -289,6 +321,6 @@ final class PipelineRunInfo {
         if (revAction != null) {
             return revAction;
         }
-        throw new IllegalStateException("Unable to get scm revision");
+        return null;
     }
 }
