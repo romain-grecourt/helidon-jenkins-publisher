@@ -2,17 +2,13 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: nfs-client-provisioner
-
 ---
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nfs-client-provisioner
   namespace: nfs-client-provisioner
-
 ---
-
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
@@ -31,18 +27,14 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-
 ---
-
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: nfs
   namespace: nfs-client-provisioner
 provisioner: fuseim.pri/ifs # or choose another name, must match deployment's env PROVISIONER_NAME'
-
 ---
-
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
@@ -56,9 +48,7 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
-
 ---
-
 kind: Deployment
 apiVersion: apps/v1
 metadata:
