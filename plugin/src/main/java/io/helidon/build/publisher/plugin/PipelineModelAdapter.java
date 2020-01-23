@@ -99,7 +99,7 @@ final class PipelineModelAdapter {
         if (!headNodes.isEmpty()) {
             StepAtomNode node = headNodes.pollLast();
             Step step = steps.get(node.getId());
-            if (step.isIncluded(excludeSyntheticSteps, excludeMetaSteps)) {
+            if (step != null && step.isIncluded(excludeSyntheticSteps, excludeMetaSteps)) {
                 return step;
             }
         }
