@@ -64,10 +64,10 @@ for ((i=0;i<${#ARGS[@]};i++))
     ARG=${ARGS[${i}]}
     case ${ARG} in
     "--namespace="*)
-        readonly IMAGES_NAMESPACE=$(remove_trailing_slashes ${ARG#*=})/
+        readonly IMAGE_NAMESPACE=$(remove_trailing_slashes ${ARG#*=})/
         ;;
     "--tag="*)
-        readonly IMAGES_TAG=${ARG#*=}
+        readonly IMAGE_TAG=${ARG#*=}
         ;;
     "--push"*)
         readonly PUSH=true
@@ -84,7 +84,7 @@ for ((i=0;i<${#ARGS[@]};i++))
   esac
 }
 
-if [ -z "${IMAGES_TAG}" ] ; then
+if [ -z "${IMAGE_TAG}" ] ; then
     echo "ERROR: --tag option is required"
     exit 1
 fi
@@ -124,7 +124,7 @@ readonly OPENJDK_VERSION="8-jre-slim"
 
 echo "INFO: building frontend-ui image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGES_TAG}" \
+    --name="${IMAGE_NAMESPACE}helidon-build-publisher-frontend-ui:${IMAGE_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
     --base="library/nginx:${NGINX_VERSION}" \
     --path="${WS_DIR}/frontend-ui/dist" \
@@ -146,7 +146,7 @@ EOF`
 
 echo "INFO: building frontend-api image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGES_TAG}" \
+    --name="${IMAGE_NAMESPACE}helidon-build-publisher-frontend-api:${IMAGE_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
     --base="library/openjdk:${OPENJDK_VERSION}" \
     --path="${WS_DIR}/frontend-api/target" \
@@ -157,7 +157,7 @@ build ${EXTRA_OPTS} ${BUILD_OPTS} \
 
 echo "INFO: building backend image"
 build ${EXTRA_OPTS} ${BUILD_OPTS} \
-    --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend:${IMAGES_TAG}" \
+    --name="${IMAGE_NAMESPACE}helidon-build-publisher-backend:${IMAGE_TAG}" \
     --base-registry-url="https://registry-1.docker.io/v2" \
     --base="library/openjdk:${OPENJDK_VERSION}" \
     --path="${WS_DIR}/backend/target" \
@@ -177,19 +177,19 @@ if ${PUSH} ; then
 
     echo "INFO: pushing frontend-ui image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-ui" \
-        --tag="${IMAGES_TAG}" \
+        --name="${IMAGE_NAMESPACE}helidon-build-publisher-frontend-ui" \
+        --tag="${IMAGE_TAG}" \
         --image="${WORKDIR}/frontend-ui-image.tar"
 
     echo "INFO: pushing frontend-api image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name="${IMAGES_NAMESPACE}helidon-build-publisher-frontend-api" \
-        --tag="${IMAGES_TAG}" \
+        --name="${IMAGE_NAMESPACE}helidon-build-publisher-frontend-api" \
+        --tag="${IMAGE_TAG}" \
         --image="${WORKDIR}/frontend-api-image.tar"
 
     echo "INFO: pushing backend image"
     push ${EXTRA_OPTS} ${PUSH_OPTS} \
-        --name="${IMAGES_NAMESPACE}helidon-build-publisher-backend" \
-        --tag="${IMAGES_TAG}" \
+        --name="${IMAGE_NAMESPACE}helidon-build-publisher-backend" \
+        --tag="${IMAGE_TAG}" \
         --image="${WORKDIR}/backend-image.tar"
 fi
